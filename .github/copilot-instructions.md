@@ -43,3 +43,6 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 - Prioritize user experience, clarity, and maintainability
 - Follow the patterns and logic described in the spec and README
 - Ask for clarification if a requirement is ambiguous
+
+
+Refer to [WIND_README.md](./WIND_README.md) and [IMPLEMENTATION_SUMMARY](.IMPLEMENTATION_SUMMARY) for more details on the project, including setup instructions, development tools, and key features.

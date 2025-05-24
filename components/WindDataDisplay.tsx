@@ -14,7 +14,9 @@ export function WindDataDisplay() {
     isLoading,
     error,
     lastUpdated,
-    refreshData
+    refreshData,
+    fetchRealData,
+    criteria
   } = useWindData();
 
   const textColor = useThemeColor({}, 'text');
@@ -26,6 +28,17 @@ export function WindDataDisplay() {
       await refreshData();
     } catch (err) {
       Alert.alert('Error', 'Failed to refresh wind data. Please try again.');
+    }
+  };
+
+  const handleFetchRealData = async () => {
+    try {
+      await fetchRealData();
+    } catch (err) {
+      Alert.alert(
+        'Error', 
+        'Failed to fetch real data. This may be due to CORS restrictions in web environment or network issues.'
+      );
     }
   };
 
@@ -48,6 +61,12 @@ export function WindDataDisplay() {
         <ThemedText type="subtitle" style={styles.title}>Wind Conditions</ThemedText>
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorText}>⚠️ {error}</ThemedText>
+          <ThemedText style={styles.debugText}>
+            Debug Info:{'\n'}
+            • Data points: {windData.length}{'\n'}
+            • Loading: {isLoading ? 'Yes' : 'No'}{'\n'}
+            • Last updated: {lastUpdated ? formatTime(lastUpdated) : 'Never'}
+          </ThemedText>
           <TouchableOpacity 
             style={[styles.refreshButton, { backgroundColor: tintColor }]} 
             onPress={handleRefresh}
@@ -68,21 +87,39 @@ export function WindDataDisplay() {
         <ThemedText type="subtitle" style={styles.title}>
           Bear Creek Lake Wind
         </ThemedText>
-        <TouchableOpacity 
-          style={[styles.refreshButton, { backgroundColor: tintColor }]} 
-          onPress={handleRefresh}
-          disabled={isLoading}
-        >
-          <ThemedText style={styles.refreshButtonText}>
-            {isLoading ? '🔄' : '↻'}
-          </ThemedText>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: tintColor }]} 
+            onPress={handleRefresh}
+            disabled={isLoading}
+          >
+            <ThemedText style={styles.refreshButtonText}>
+              {isLoading ? '🔄' : '↻'}
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.realDataButton, { backgroundColor: '#4CAF50' }]} 
+            onPress={handleFetchRealData}
+            disabled={isLoading}
+          >
+            <ThemedText style={styles.realDataButtonText}>
+              📡 Real Data
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {lastUpdated && (
-        <ThemedText style={styles.lastUpdated}>
-          Last updated: {formatTime(lastUpdated)}
-        </ThemedText>
+        <View style={styles.statusRow}>
+          <ThemedText style={styles.lastUpdated}>
+            Last updated: {formatTime(lastUpdated)}
+          </ThemedText>
+          {criteria?.alarmEnabled && (
+            <View style={styles.alarmIndicator}>
+              <ThemedText style={styles.alarmIndicatorText}>⏰ {criteria.alarmTime}</ThemedText>
+            </View>
+          )}
+        </View>
       )}
 
       {analysis && (
@@ -188,10 +225,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  realDataButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  realDataButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   lastUpdated: {
     fontSize: 12,
     opacity: 0.7,
-    marginBottom: 12,
+  },
+  alarmIndicator: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  alarmIndicatorText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   analysisContainer: {
     marginVertical: 8,
@@ -261,5 +329,14 @@ const styles = StyleSheet.create({
     color: '#FF5252',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  debugText: {
+    color: '#FF9800',
+    textAlign: 'left',
+    fontSize: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    padding: 8,
+    borderRadius: 4,
   },
 });

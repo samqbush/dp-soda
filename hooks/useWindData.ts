@@ -1,13 +1,14 @@
 import {
-    analyzeWindData,
-    fetchWindData,
-    getAlarmCriteria,
-    getCachedWindData,
-    setAlarmCriteria,
-    verifyWindConditions,
-    type AlarmCriteria,
-    type WindAnalysis,
-    type WindDataPoint
+  analyzeWindData,
+  fetchRealWindData,
+  fetchWindData,
+  getAlarmCriteria,
+  getCachedWindData,
+  setAlarmCriteria,
+  verifyWindConditions,
+  type AlarmCriteria,
+  type WindAnalysis,
+  type WindDataPoint
 } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -28,6 +29,7 @@ export interface UseWindDataReturn {
   
   // Actions
   refreshData: () => Promise<void>;
+  fetchRealData: () => Promise<void>;
   loadCachedData: () => Promise<void>;
 }
 
@@ -43,7 +45,9 @@ export const useWindData = (): UseWindDataReturn => {
     directionConsistencyThreshold: 70,
     minimumConsecutivePoints: 4,
     speedDeviationThreshold: 3,
-    directionDeviationThreshold: 45
+    directionDeviationThreshold: 45,
+    alarmEnabled: false,
+    alarmTime: "05:00" // Default to 5:00 AM
   });
 
   // Load initial criteria from storage
@@ -137,10 +141,39 @@ export const useWindData = (): UseWindDataReturn => {
     }
   }, [criteria, loadCachedData]);
 
-  // Load cached data on mount
+  const fetchRealData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const data = await fetchRealWindData();
+      setWindData(data);
+      
+      // Analyze fresh real data
+      const windAnalysis = analyzeWindData(data, criteria);
+      const windVerification = verifyWindConditions(data, criteria);
+      
+      setAnalysis(windAnalysis);
+      setVerification(windVerification);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error fetching real wind data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch real wind data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [criteria]);
+
+  // Load cached data and then refresh on mount
   useEffect(() => {
-    loadCachedData();
-  }, [loadCachedData]);
+    const initializeData = async () => {
+      await loadCachedData();
+      // Fetch fresh data after loading cached data
+      await refreshData();
+    };
+    
+    initializeData();
+  }, [loadCachedData, refreshData]);
 
   return {
     windData,
@@ -152,6 +185,7 @@ export const useWindData = (): UseWindDataReturn => {
     criteria,
     setCriteria,
     refreshData,
+    fetchRealData,
     loadCachedData
   };
 };
