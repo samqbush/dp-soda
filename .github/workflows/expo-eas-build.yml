@@ -26,7 +26,11 @@ jobs:
       # Optional: Run tests if you have them
       # - name: Run tests
       #   run: npm test
-
+      - name: Configure EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas init --id c70a6758-5324-40f2-ae28-646f452607f2
+        
       - name: EAS Build (Android)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
