@@ -1,0 +1,57 @@
+name: Expo EAS Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      # Optional: Run tests if you have them
+      # - name: Run tests
+      #   run: npm test
+
+      - name: Log in to Expo (EAS)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas login --token $EXPO_TOKEN
+
+      - name: EAS Build (Android)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --platform android --non-interactive
+
+      - name: EAS Build (iOS)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --platform ios --non-interactive
+
+      - name: Expo Publish
+        env:
+           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx expo publish --non-interactive
+
+      - name: Print EAS build URLs
+        run: eas build:list --limit 2
+
+# Instructions:
+# 1. Create an Expo account and get an EXPO_TOKEN (https://docs.expo.dev/accounts/programmatic-access/)
+# 2. Add EXPO_TOKEN as a GitHub repository secret
+# 3. Adjust workflow as needed (e.g., enable Expo Publish, add tests)
+# 4. EAS Build artifacts will be available via Expo dashboard links
