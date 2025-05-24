@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { WindDataDisplay } from '@/components/WindDataDisplay';
 
 export default function HomeScreen() {
   return (
@@ -17,38 +18,37 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
+        <ThemedText type="title">Wind Trend Analyzer</ThemedText>
         <HelloWave />
       </ThemedView>
+      
+      <WindDataDisplay />
+      
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
+        <ThemedText type="subtitle">Bear Creek Lake Wind Monitoring</ThemedText>
         <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+          This app monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado.
+          It analyzes early morning wind trends (3am-5am) to determine if conditions are favorable
+          for beach activities. The alarm logic considers wind speed, direction consistency, and
+          data quality to make wake-up decisions.
         </ThemedText>
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
+        <ThemedText type="subtitle">How It Works</ThemedText>
         <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
+          • Fetches real-time wind data from WindAlert API{'\n'}
+          • Analyzes 3am-5am window for alarm decisions{'\n'}
+          • Verifies conditions in 6am-8am window{'\n'}
+          • Caches data for offline access{'\n'}
+          • Configurable thresholds and criteria
         </ThemedText>
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
+        <ThemedText type="subtitle">Settings</ThemedText>
         <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
+          Tap the Explore tab to configure alarm criteria, wind speed thresholds,
+          and direction consistency requirements. All settings are saved locally
+          and will persist between app launches.
         </ThemedText>
       </ThemedView>
     </ParallaxScrollView>
