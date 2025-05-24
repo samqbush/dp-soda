@@ -30,7 +30,7 @@ jobs:
       - name: Log in to Expo (EAS)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas login --token $EXPO_TOKEN
+        run: echo $EXPO_TOKEN | eas login --stdin
 
       - name: EAS Build (Android)
         env:
