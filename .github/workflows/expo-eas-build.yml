@@ -27,11 +27,6 @@ jobs:
       # - name: Run tests
       #   run: npm test
 
-      - name: Log in to Expo (EAS)
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: echo $EXPO_TOKEN | eas login --stdin
-
       - name: EAS Build (Android)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
