@@ -98,11 +98,18 @@ jobs:
             --ks=android/app/upload-keystore.jks \
             --ks-key-alias=upload-key \
             --ks-pass=pass:${{ secrets.STORE_PASSWORD }} \
-            --key-pass=pass:${{ secrets.STORE_PASSWORD }}
+            --key-pass=pass:${{ secrets.STORE_PASSWORD }} \
+            --mode=universal
 
-      - name: Upload APKs for device testing
+      - name: Extract Universal APK
+        run: |
+          cd android/app/build/outputs/bundle/release
+          unzip -j app-release.apks universal.apk
+          mv universal.apk app-release-universal.apk
+
+      - name: Upload Universal APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: app-apks-for-testing
-          path: android/app/build/outputs/bundle/release/app-release.apks
+          name: app-universal-apk
+          path: android/app/build/outputs/bundle/release/app-release-universal.apk
 
