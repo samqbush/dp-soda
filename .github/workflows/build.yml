@@ -24,9 +24,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
       # Optional: Run tests if you have them
       # - name: Run tests
       #   run: npm test
@@ -53,7 +50,7 @@ jobs:
 
       # Generate the native Android project
       - name: Generate native Android project
-        run: npx expo prebuild --platform android
+        run: expo prebuild --platform android
 
       # Create a keystore file from secrets
       - name: Setup Keystore
