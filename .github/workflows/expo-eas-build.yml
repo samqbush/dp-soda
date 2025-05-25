@@ -26,20 +26,16 @@ jobs:
       # Optional: Run tests if you have them
       # - name: Run tests
       #   run: npm test
-      - name: Configure EAS
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas init --id c70a6758-5324-40f2-ae28-646f452607f2
         
       - name: EAS Build (Android)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --non-interactive
+        run: eas build --platform android --non-interactive --profile production
 
-      - name: EAS Build (iOS)
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform ios --non-interactive
+    #  - name: EAS Build (iOS)
+    #    env:
+    #      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    #    run: eas build --platform ios --non-interactive --profile production
 
       - name: Expo Publish
         env:
@@ -48,9 +44,3 @@ jobs:
 
       - name: Print EAS build URLs
         run: eas build:list --limit 2
-
-# Instructions:
-# 1. Create an Expo account and get an EXPO_TOKEN (https://docs.expo.dev/accounts/programmatic-access/)
-# 2. Add EXPO_TOKEN as a GitHub repository secret
-# 3. Adjust workflow as needed (e.g., enable Expo Publish, add tests)
-# 4. EAS Build artifacts will be available via Expo dashboard links
