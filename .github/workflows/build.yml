@@ -25,9 +25,10 @@ jobs:
         run: npm install -g @expo/cli
 
       - name: Authenticate with Expo
-        run: npx expo login --non-interactive
+        run: npx expo whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: 1
 
       # Optional: Run tests if you have them
       # - name: Run tests
