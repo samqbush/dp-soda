@@ -59,6 +59,9 @@ jobs:
         run: |
           rm -rf android
           npx expo prebuild --platform android --clean
+        env:
+          CI: 1
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       # Create a keystore file from secrets
       - name: Setup Keystore
