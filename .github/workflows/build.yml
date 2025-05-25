@@ -43,7 +43,7 @@ jobs:
         uses: android-actions/setup-android@v2
 
       - name: Cache Gradle packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -53,8 +53,10 @@ jobs:
             ${{ runner.os }}-gradle-
 
       # Generate the native Android project
-      - name: Generate native Android project
-        run: expo prebuild --platform android
+      - name: Clean and generate native Android project
+        run: |
+          rm -rf android
+          expo prebuild --platform android --clear
 
       # Create a keystore file from secrets
       - name: Setup Keystore
