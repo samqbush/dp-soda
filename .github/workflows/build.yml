@@ -1,0 +1,100 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      # Optional: Run tests if you have them
+      # - name: Run tests
+      #   run: npm test
+        
+      # Build for Android locally
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Generate the native Android project
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android
+
+      # Create a keystore file from secrets
+      - name: Setup Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "storeFile=upload-keystore.jks" >> android/gradle.properties
+          echo "keyAlias=upload-key" >> android/gradle.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
+          echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
+
+      # Build the AAB
+      - name: Build Android App Bundle
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      # Upload the AAB as an artifact
+      - name: Upload AAB
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+      # Convert AAB to APKs for device testing
+      - name: Download Bundletool
+        run: |
+          curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
+
+      - name: Generate APKs from AAB
+        run: |
+          java -jar bundletool.jar build-apks \
+            --bundle=android/app/build/outputs/bundle/release/app-release.aab \
+            --output=android/app/build/outputs/bundle/release/app-release.apks \
+            --ks=android/app/upload-keystore.jks \
+            --ks-key-alias=upload-key \
+            --ks-pass=pass:${{ secrets.STORE_PASSWORD }} \
+            --key-pass=pass:${{ secrets.STORE_PASSWORD }}
+
+      - name: Upload APKs for device testing
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-apks-for-testing
+          path: android/app/build/outputs/bundle/release/app-release.apks
+
