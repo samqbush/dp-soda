@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "dp-react",
-    "slug": "dp-react",
+    "slug": "dp-soda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -37,6 +37,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c70a6758-5324-40f2-ae28-646f452607f2"
+      }
+    },
+    "owner": "samqbush"
   }
 }
