@@ -24,11 +24,9 @@ jobs:
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
+          expo-version: latest
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install Expo CLI
-        run: npm install -g @expo/cli
 
       # Optional: Run tests if you have them
       # - name: Run tests
