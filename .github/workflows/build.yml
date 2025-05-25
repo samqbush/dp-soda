@@ -18,11 +18,16 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Expo CLI
+        run: npm install -g @expo/cli
 
       # Optional: Run tests if you have them
       # - name: Run tests
