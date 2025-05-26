@@ -74,11 +74,21 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
-      # Build the AAB
+      # Update gradle.properties for better build performance
+      - name: Configure Gradle for production build
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.configureondemand=true" >> android/gradle.properties
+          echo "android.enableR8.fullMode=false" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          cat android/gradle.properties
+
+      # Build the AAB with detailed logging
       - name: Build Android App Bundle
         run: |
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --stacktrace --info
 
       # Upload the AAB as an artifact
       - name: Upload AAB

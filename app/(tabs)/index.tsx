@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
-import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
+import { SafeImage } from '@/components/SafeImage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindDataDisplay } from '@/components/WindDataDisplay';
@@ -13,14 +14,34 @@ export default function HomeScreen() {
     console.log('🏠 HomeScreen mounted');
   }, []);
 
+  // Track component loaded state for Android
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    // Mark component as fully loaded after a delay on Android
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, Platform.OS === 'android' ? 500 : 0);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
       headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
+        Platform.OS === 'android' ? (
+          <SafeImage
+            source={require('@/assets/images/partial-react-logo.png')}
+            style={styles.reactLogo}
+            fallbackText="Wind Analyzer"
+            backgroundColor="#A1CEDC"
+          />
+        ) : (
+          <Image
+            source={require('@/assets/images/partial-react-logo.png')}
+            style={styles.reactLogo}
+          />
+        )
       }>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Wind Trend Analyzer</ThemedText>

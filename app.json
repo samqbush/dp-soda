@@ -57,6 +57,12 @@
         "backgroundColor": "#121212"
       }
     },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "translucent": false,
+      "barStyle": "dark-content",
+      "hidden": false
+    },
     "experiments": {
       "typedRoutes": true
     },

@@ -25,8 +25,6 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 - Verification logic checks actual conditions in the 6am–8am window
 - All thresholds and criteria should be user-configurable
 
-
-
 ## Documentation and User Experience
 - Keep documentation up to date and clear
 - Ensure all features are discoverable and easy to use
