@@ -1,3 +1,4 @@
+import { prepareNotifications } from '@/services/notificationService';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -24,6 +25,11 @@ export function AppInitializer({
       setTimeoutReached(true);
       onInitialized();
     }, fallbackTimeoutMs);
+
+    // Initialize notification system
+    prepareNotifications().catch(err => {
+      console.warn('⚠️ Failed to initialize notifications', err);
+    });
 
     return () => clearTimeout(timeoutId);
   }, [fallbackTimeoutMs, onInitialized]);

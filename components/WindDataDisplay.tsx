@@ -5,14 +5,75 @@ import { WindChart } from '@/components/WindChart';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
-import React, { useEffect } from 'react';
+import { recoverFromWhiteScreen } from '@/services/recoveryService';
+import React, { useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {
+  const [componentError, setComponentError] = useState<string | null>(null);
+  const [hasAttemptedRecovery, setHasAttemptedRecovery] = useState(false);
+  
   useEffect(() => {
     console.log('🌊 WindDataDisplay mounted');
-  }, []);
+    
+    // This is a critical component that often shows white screen issues
+    // Attempt recovery if we get an error
+    if (componentError && !hasAttemptedRecovery) {
+      setHasAttemptedRecovery(true);
+      
+      // Try to recover from potential white screen issue
+      recoverFromWhiteScreen().catch(e => 
+        console.error('Recovery attempt failed:', e)
+      );
+    }
+    
+    // Add clean-up function to clear memory when component unmounts
+    return () => {
+      console.log('WindDataDisplay unmounting - cleaning up resources');
+      // Perform memory cleanup when component unmounts
+      import('@/services/memoryManager').then(({ performMemoryCleanup }) => {
+        performMemoryCleanup(false).catch(console.error);
+      }).catch(console.error);
+    };
+  }, [componentError, hasAttemptedRecovery]);
 
+  // Safely access wind data using try-catch
+  let windDataResult;
+  try {
+    windDataResult = useWindData();
+  } catch (error) {
+    console.error('💥 Error in useWindData hook:', error);
+    setComponentError(error instanceof Error ? error.message : 'Error in wind data hook');
+    
+    // Return error UI
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText type="subtitle">Wind Data Error</ThemedText>
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>
+            ⚠️ Could not load wind data. Please try again.
+          </ThemedText>
+          
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: useThemeColor({}, 'tint') }]} 
+            onPress={() => {
+              // Try to recover and force refresh
+              recoverFromWhiteScreen().then(() => {
+                setComponentError(null);
+                setHasAttemptedRecovery(false);
+              }).catch(console.error);
+            }}
+          >
+            <ThemedText style={styles.refreshButtonText}>
+              Try Again
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    );
+  }
+  
+  // Destructure our data safely
   const {
     windData,
     analysis,
@@ -23,7 +84,7 @@ export function WindDataDisplay() {
     refreshData,
     fetchRealData,
     criteria
-  } = useWindData();
+  } = windDataResult;
 
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
@@ -200,7 +261,23 @@ export function WindDataDisplay() {
       )}
 
       {windData.length > 0 && (
-        <WindChart data={windData} title="12-Hour Wind Trend" />
+        <View style={{overflow: 'hidden'}}>
+          {/* Wrap WindChart in try-catch to prevent it from crashing the app */}
+          {(() => {
+            try {
+              return <WindChart data={windData} title="12-Hour Wind Trend" />;
+            } catch (err) {
+              console.error('Error rendering WindChart:', err);
+              return (
+                <View style={{padding: 20, alignItems: 'center'}}>
+                  <ThemedText style={{color: 'red'}}>
+                    Error displaying chart. Please try again.
+                  </ThemedText>
+                </View>
+              );
+            }
+          })()}
+        </View>
       )}
 
       {windData.length > 0 && (

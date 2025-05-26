@@ -9,6 +9,7 @@ A React Native app built with Expo that monitors wind conditions at Bear Creek L
 - **Verification System**: Checks 6am-8am window to verify predictions
 - **Offline Support**: Caches data locally for offline access
 - **Configurable Criteria**: User-adjustable thresholds for wind speed, direction consistency, and data quality
+- **Notification System**: Configurable in-app notifications for wind conditions
 - **Dark Mode Support**: Automatically adapts to system theme
 - **Mobile-First Design**: Optimized for iOS and Android devices
 
@@ -62,6 +63,7 @@ The app analyzes wind conditions using configurable criteria:
   - Speed and direction deviation limits
 - Reset to default values
 - Manual data refresh
+- Configure notification settings
 
 ### Standalone Script
 Run the wind data fetcher independently:
@@ -75,13 +77,17 @@ This creates JSON and CSV files with current wind data and analysis.
 ```
 services/
   windService.ts          # Core wind data fetching and analysis
+  notificationService.ts  # Notification system and settings
 hooks/
   useWindData.ts          # React hook for wind data state management
 components/
   WindDataDisplay.tsx     # Main wind data visualization component
+  NotificationSettings.tsx # Notification configuration UI
   WindDataTest.tsx        # Testing component for development
 scripts/
   fetch-wind-data.mjs     # Standalone wind data fetching script
+docs/
+  NOTIFICATIONS_GUIDE.md   # Notification system documentation
 ```
 
 ## API Integration

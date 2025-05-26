@@ -58,19 +58,33 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   handleRetry = async () => {
     try {
-      // Clear cached data if the error might be related to corrupted cache
-      if (this.state.error?.message?.includes('JSON') || 
-          this.state.error?.message?.includes('parse') ||
-          this.state.error?.message?.includes('data')) {
-        console.log('Clearing potentially corrupted cached data...');
-        await AsyncStorage.removeItem('windData');
-      }
+      // Import recovery service dynamically to avoid circular imports
+      const { recoverFromWhiteScreen } = await import('@/services/recoveryService');
+      
+      console.log('🧹 Starting recovery from error state...');
+      
+      // Use the recovery service for consistent recovery process
+      await recoverFromWhiteScreen();
       
       // Reset error state
       this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+      
+      // Force a brief pause before re-render to ensure storage operations complete
+      // Longer pause for Android to ensure all cleanup is done
+      await new Promise(resolve => 
+        setTimeout(resolve, Platform.OS === 'android' ? 500 : 300)
+      );
     } catch (e) {
       console.error('Error handling retry:', e);
+      
       // Last resort - force reload the app by toggling error state
+      // But first try to clear storage directly
+      try {
+        await AsyncStorage.clear();
+      } catch (clearErr) {
+        console.error('Failed final clear attempt:', clearErr);
+      }
+      
       this.setState({ hasError: false });
     }
   };

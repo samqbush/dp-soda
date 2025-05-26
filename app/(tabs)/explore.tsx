@@ -1,3 +1,4 @@
+import { NotificationSettingsComponent } from '@/components/NotificationSettings';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -224,49 +225,30 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.resetButton]}
+          <TouchableOpacity 
+            style={[styles.button, styles.saveButton, { backgroundColor: tintColor }]} 
+            onPress={handleSave}
+          >
+            <ThemedText style={styles.saveButtonText}>Save Settings</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.resetButton]} 
             onPress={handleReset}
           >
             <ThemedText style={styles.resetButtonText}>Reset to Defaults</ThemedText>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.saveButton,
-              { backgroundColor: hasChanges ? tintColor : tintColor + '50' }
-            ]}
-            onPress={handleSave}
-            disabled={!hasChanges}
-          >
-            <ThemedText style={styles.saveButtonText}>
-              {hasChanges ? 'Save Changes' : 'No Changes'}
-            </ThemedText>
-          </TouchableOpacity>
         </View>
-
+        
         <View style={styles.infoSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>About</ThemedText>
           <ThemedText style={styles.infoText}>
-            This app monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado.
-            It analyzes wind data in the 3am-5am window to determine if conditions are favorable
-            for beach activities. The verification window (6am-8am) checks if the predicted
-            conditions actually occurred.
+            Settings are applied immediately when saved and will be used for all future wind data analysis.
           </ThemedText>
-          
-          <ThemedText style={styles.infoText}>
-            Data is fetched from WindAlert and cached locally for offline access.
-            Wind speeds are displayed in mph and directions in degrees.
-          </ThemedText>
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: tintColor }]}
-            onPress={refreshData}
-          >
-            <ThemedText style={styles.saveButtonText}>Refresh Wind Data</ThemedText>
-          </TouchableOpacity>
         </View>
+        
+        {/* Notification Settings Component */}
+        <NotificationSettingsComponent />
+        
       </ThemedView>
     </ScrollView>
   );
