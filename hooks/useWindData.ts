@@ -1,14 +1,14 @@
 import {
-  analyzeWindData,
-  fetchRealWindData,
-  fetchWindData,
-  getAlarmCriteria,
-  getCachedWindData,
-  setAlarmCriteria,
-  verifyWindConditions,
-  type AlarmCriteria,
-  type WindAnalysis,
-  type WindDataPoint
+    analyzeWindData,
+    fetchRealWindData,
+    fetchWindData,
+    getAlarmCriteria,
+    getCachedWindData,
+    setAlarmCriteria,
+    verifyWindConditions,
+    type AlarmCriteria,
+    type WindAnalysis,
+    type WindDataPoint
 } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 

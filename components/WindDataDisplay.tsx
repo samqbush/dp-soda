@@ -1,3 +1,4 @@
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
@@ -58,6 +59,11 @@ export function WindDataDisplay() {
   const getAlarmStatusText = (isAlarmWorthy: boolean) => {
     return isAlarmWorthy ? 'WAKE UP! 🌊' : 'Sleep In 😴';
   };
+
+  // Show loading screen when initially loading and no data
+  if (isLoading && !windData.length && !error) {
+    return <LoadingScreen message="Loading wind data..." />;
+  }
 
   if (error && !windData.length) {
     return (

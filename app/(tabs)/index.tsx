@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { StyleSheet } from 'react-native';
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
