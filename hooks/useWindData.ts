@@ -1,3 +1,5 @@
+import { logBuildIssue } from '@/config/buildConfig';
+import { clearWindDataCache } from '@/services/storageService';
 import {
     analyzeWindData,
     fetchRealWindData,
@@ -11,6 +13,7 @@ import {
     type WindDataPoint
 } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 export interface UseWindDataReturn {
   // Data state
@@ -118,7 +121,14 @@ export const useWindData = (): UseWindDataReturn => {
       setIsLoading(true);
       setError(null);
       
+      console.log(`🔄 Refreshing data (Platform: ${Platform.OS}, Version: ${Platform.Version})`);
+      
       const data = await fetchWindData();
+      
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Invalid data format received');
+      }
+      
       setWindData(data);
       
       // Analyze fresh data
@@ -129,15 +139,34 @@ export const useWindData = (): UseWindDataReturn => {
       setVerification(windVerification);
       setLastUpdated(new Date());
       
-      console.log('Wind data refreshed successfully:', {
+      console.log('✅ Wind data refreshed successfully:', {
         dataPoints: data.length,
         isAlarmWorthy: windAnalysis.isAlarmWorthy,
         averageSpeed: windAnalysis.averageSpeed
       });
       
     } catch (err) {
-      console.error('Error refreshing wind data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch wind data');
+      console.error('❌ Error refreshing wind data:', err);
+      
+      // Log as a build issue for better tracking
+      logBuildIssue('Data refresh failed', err);
+      
+      // User-friendly error message
+      setError(err instanceof Error ? 
+        `Refresh failed: ${err.message}` : 
+        'Failed to fetch wind data'
+      );
+      
+      // Check if the cache might be corrupted
+      const errMsg = err instanceof Error ? err.message.toLowerCase() : '';
+      if (errMsg.includes('json') || errMsg.includes('parse')) {
+        console.warn('⚠️ Possible corrupted cache detected, clearing cache...');
+        try {
+          await clearWindDataCache();
+        } catch (clearErr) {
+          console.error('❌ Failed to clear cache:', clearErr);
+        }
+      }
       
       // Try to load cached data as fallback
       await loadCachedData();
@@ -173,10 +202,48 @@ export const useWindData = (): UseWindDataReturn => {
   useEffect(() => {
     const initializeData = async () => {
       console.log('🚀 Initializing wind data...');
-      await loadCachedData();
-      // Fetch fresh data after loading cached data
-      console.log('🔄 Loading fresh data after cached data...');
-      await refreshData();
+      try {
+        // First try to load cached data
+        await loadCachedData();
+        
+        // Then try to refresh with new data
+        console.log('🔄 Loading fresh data after cached data...');
+        await refreshData();
+      } catch (err) {
+        console.error('💥 Fatal error during data initialization:', err);
+        
+        // Generate fallback sample data if everything else fails
+        try {
+          setIsLoading(true);
+          // Use sample data as a last resort
+          const sampleData = [
+            {
+              time: new Date().toISOString(),
+              windSpeed: "10.5",
+              windGust: "12.3",
+              windDirection: "225"
+            },
+            {
+              time: new Date(Date.now() - 3600000).toISOString(),
+              windSpeed: "9.8",
+              windGust: "11.7",
+              windDirection: "220"
+            }
+          ];
+          
+          setWindData(sampleData);
+          setLastUpdated(new Date());
+          
+          const fallbackAnalysis = analyzeWindData(sampleData, criteria);
+          setAnalysis(fallbackAnalysis);
+          setVerification(null);
+          setError("Using emergency fallback data - please try again later");
+        } catch (fallbackErr) {
+          console.error('💥 Even fallback data generation failed:', fallbackErr);
+        } finally {
+          setIsLoading(false);
+        }
+      }
     };
     
     initializeData();

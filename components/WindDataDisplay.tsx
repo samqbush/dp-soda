@@ -4,8 +4,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
+import { showDiagnosticInfo } from '@/services/diagnosticService';
 import React, { useEffect } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {
   useEffect(() => {
@@ -65,7 +66,9 @@ export function WindDataDisplay() {
     return <LoadingScreen message="Loading wind data..." />;
   }
 
+  // Fallback to sample data if there's an error and no data
   if (error && !windData.length) {
+    console.log('💥 Error without data, displaying error screen:', error);
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="subtitle" style={styles.title}>Wind Conditions</ThemedText>
@@ -84,6 +87,15 @@ export function WindDataDisplay() {
           >
             <ThemedText style={styles.refreshButtonText}>
               {isLoading ? 'Loading...' : 'Retry'}
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: '#4CAF50', marginTop: 8 }]} 
+            onPress={handleFetchRealData}
+            disabled={isLoading}
+          >
+            <ThemedText style={styles.refreshButtonText}>
+              Use Sample Data
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -203,6 +215,27 @@ export function WindDataDisplay() {
         <ThemedText style={styles.errorText}>
           ⚠️ {error} (showing cached data)
         </ThemedText>
+      )}
+      
+      {/* Diagnostics button - only show in development or if there are errors */}
+      {(__DEV__ || error) && (
+        <TouchableOpacity 
+          style={styles.diagnosticButton} 
+          onPress={showDiagnosticInfo}
+        >
+          <ThemedText style={styles.diagnosticButtonText}>
+            📊 Run Diagnostics
+          </ThemedText>
+        </TouchableOpacity>
+      )}
+      
+      {/* Dev info - only in development builds */}
+      {__DEV__ && (
+        <View style={styles.devInfo}>
+          <ThemedText style={styles.devInfoText}>
+            Platform: {Platform.OS} {Platform.Version}
+          </ThemedText>
+        </View>
       )}
     </ThemedView>
   );
@@ -348,5 +381,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 152, 0, 0.1)',
     padding: 8,
     borderRadius: 4,
+  },
+  diagnosticButton: {
+    backgroundColor: '#2196F3',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  diagnosticButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  devInfo: {
+    marginTop: 12,
+    padding: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 4,
+    alignSelf: 'center',
+  },
+  devInfoText: {
+    fontSize: 10,
+    opacity: 0.6,
   },
 });

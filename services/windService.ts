@@ -366,35 +366,70 @@ const countConsecutiveGoodPoints = (
  */
 const cacheWindData = async (data: WindDataPoint[]): Promise<void> => {
   try {
+    // Basic data validation before caching
+    if (!data || !Array.isArray(data)) {
+      console.warn('⚠️ Invalid data format for caching, skipping cache');
+      return;
+    }
+    
     const cacheData = {
       data,
       timestamp: new Date().toISOString()
     };
+    
+    console.log(`📦 Caching ${data.length} wind data points`);
     await AsyncStorage.setItem('windData', JSON.stringify(cacheData));
+    console.log('✅ Wind data cached successfully');
   } catch (error) {
-    console.error('Error caching wind data:', error);
+    console.error('❌ Error caching wind data:', error);
+    // Don't throw - this is a non-critical operation
   }
 };
 
 /**
- * Get cached wind data
+ * Get cached wind data with improved error handling
  */
 export const getCachedWindData = async (): Promise<WindDataPoint[] | null> => {
   try {
-    const cached = await AsyncStorage.getItem('windData');
-    if (!cached) return null;
+    console.log('🔍 Attempting to load cached wind data');
     
-    const cacheData = JSON.parse(cached);
-    const cacheAge = Date.now() - new Date(cacheData.timestamp).getTime();
-    
-    // Return cached data if less than 2 hours old
-    if (cacheAge < 2 * 60 * 60 * 1000) {
-      return cacheData.data;
+    // First check if AsyncStorage is available
+    if (!AsyncStorage) {
+      console.error('❌ AsyncStorage is not available');
+      return null;
     }
     
-    return null;
+    const cached = await AsyncStorage.getItem('windData');
+    if (!cached) {
+      console.log('ℹ️ No cached wind data found');
+      return null;
+    }
+    
+    try {
+      const cacheData = JSON.parse(cached);
+      
+      // Validate the structure of the cache data
+      if (!cacheData || !cacheData.data || !Array.isArray(cacheData.data) || !cacheData.timestamp) {
+        console.warn('⚠️ Invalid cached data format, ignoring cache');
+        return null;
+      }
+      
+      const cacheAge = Date.now() - new Date(cacheData.timestamp).getTime();
+      
+      // Return cached data if less than 2 hours old
+      if (cacheAge < 2 * 60 * 60 * 1000) {
+        console.log(`✅ Found valid cached data (${cacheData.data.length} points)`);
+        return cacheData.data;
+      }
+      
+      console.log('⚠️ Cached data is too old, not using');
+      return null;
+    } catch (parseError) {
+      console.error('❌ Error parsing cached data:', parseError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error retrieving cached wind data:', error);
+    console.error('❌ Error retrieving cached wind data:', error);
     return null;
   }
 };
