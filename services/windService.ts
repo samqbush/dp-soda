@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { Platform } from 'react-native';
 
 // WindAlert API constants
 const BASE_URL = 'https://windalert.com';
@@ -49,7 +50,16 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
     console.log('🌊 Starting wind data fetch...');
     
     // Check if we're in a web environment (CORS issues expected)
-    const isWeb = typeof window !== 'undefined' && window.location;
+    // Use React Native Platform detection as primary method
+    const isWeb = Platform.OS === 'web' || (
+      typeof window !== 'undefined' && 
+      typeof window.location !== 'undefined' && 
+      typeof document !== 'undefined' &&
+      window.location.href &&
+      window.location.href.startsWith('http')
+    );
+    
+    console.log(`📱 Platform detected: ${Platform.OS}, isWeb: ${isWeb}`);
     
     if (isWeb) {
       console.log('🌐 Web environment detected - checking for cached data first');
@@ -60,12 +70,24 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       }
       
       console.log('🌐 No cached data in web environment, using sample data for testing');
-      const sampleData = generateSampleData();
-      await cacheWindData(sampleData);
-      return sampleData;
+      try {
+        const sampleData = generateSampleData();
+        await cacheWindData(sampleData);
+        return sampleData;
+      } catch (sampleError) {
+        console.error('❌ Error generating sample data:', sampleError);
+        // Return minimal data if even sample generation fails
+        return [{
+          time: new Date().toISOString(),
+          windSpeed: "0",
+          windGust: "0",
+          windDirection: "0"
+        }];
+      }
     }
     
     // Mobile environment - make real API call
+    console.log('📱 Mobile environment - making real API call');
     const now = Date.now();
     const params = {
       callback: `jQuery17206585233276552562_${now}`,
@@ -145,9 +167,20 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
     
     // If no cached data, generate sample data for testing
     console.log('🔄 No cached data available, generating sample data for testing');
-    const sampleData = generateSampleData();
-    await cacheWindData(sampleData);
-    return sampleData;
+    try {
+      const sampleData = generateSampleData();
+      await cacheWindData(sampleData);
+      return sampleData;
+    } catch (sampleError) {
+      console.error('❌ Error generating sample data fallback:', sampleError);
+      // Return minimal data if even sample generation fails
+      return [{
+        time: new Date().toISOString(),
+        windSpeed: "0",
+        windGust: "0", 
+        windDirection: "0"
+      }];
+    }
   }
 };
 

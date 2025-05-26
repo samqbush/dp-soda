@@ -34,6 +34,8 @@ export interface UseWindDataReturn {
 }
 
 export const useWindData = (): UseWindDataReturn => {
+  console.log('🔄 useWindData hook initializing...');
+  
   const [windData, setWindData] = useState<WindDataPoint[]>([]);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
   const [verification, setVerification] = useState<WindAnalysis | null>(null);
@@ -52,15 +54,18 @@ export const useWindData = (): UseWindDataReturn => {
 
   // Load initial criteria from storage
   useEffect(() => {
+    console.log('📋 Loading initial criteria...');
     loadCriteria();
   }, []);
 
   const loadCriteria = async () => {
     try {
+      console.log('📥 Getting alarm criteria from storage...');
       const storedCriteria = await getAlarmCriteria();
+      console.log('✅ Criteria loaded:', storedCriteria);
       setCriteriaState(storedCriteria);
     } catch (err) {
-      console.error('Error loading criteria:', err);
+      console.error('❌ Error loading criteria:', err);
     }
   };
 
@@ -167,8 +172,10 @@ export const useWindData = (): UseWindDataReturn => {
   // Load cached data and then refresh on mount
   useEffect(() => {
     const initializeData = async () => {
+      console.log('🚀 Initializing wind data...');
       await loadCachedData();
       // Fetch fresh data after loading cached data
+      console.log('🔄 Loading fresh data after cached data...');
       await refreshData();
     };
     

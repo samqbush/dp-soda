@@ -3,10 +3,14 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {
+  useEffect(() => {
+    console.log('🌊 WindDataDisplay mounted');
+  }, []);
+
   const {
     windData,
     analysis,
