@@ -2,9 +2,11 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
+import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
+import { crashMonitor } from '@/services/crashMonitor';
 import React, { useEffect } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -12,6 +14,27 @@ export function WindDataDisplay() {
   useEffect(() => {
     console.log('🌊 WindDataDisplay mounted');
   }, []);
+
+  const handleCrash = async (error: Error, info: any) => {
+    console.error('🚨 WindDataDisplay crashed:', error);
+    console.error('🚨 Crash info:', info);
+    
+    // Log crash details
+    await crashMonitor.logCrash('WindDataDisplay', error);
+    
+    // Show crash details in diagnostic
+    const summary = crashMonitor.getCrashSummary();
+    console.log('📊 Crash summary after WindDataDisplay crash:', summary);
+  };
+
+  return (
+    <DataCrashDetector componentName="WindDataDisplay" onCrash={handleCrash}>
+      <WindDataDisplayContent />
+    </DataCrashDetector>
+  );
+}
+
+function WindDataDisplayContent() {
 
   const {
     windData,
@@ -406,3 +429,4 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+}

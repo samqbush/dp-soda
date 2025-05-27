@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { WindDataPoint } from '@/services/windService';
 import React from 'react';
@@ -12,6 +13,19 @@ interface WindChartProps {
 }
 
 export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) {
+  const handleChartCrash = (error: Error, info: any) => {
+    console.error('🚨 WindChart crashed:', error);
+    console.error('🚨 Chart data that caused crash:', data);
+  };
+
+  return (
+    <DataCrashDetector componentName="WindChart" onCrash={handleChartCrash}>
+      <WindChartContent data={data} title={title} />
+    </DataCrashDetector>
+  );
+}
+
+function WindChartContent({ data, title }: WindChartProps) {
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
@@ -49,28 +63,72 @@ export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) 
     );
   }
 
-  // Prepare chart data
-  const speeds = recentData.map(point => parseFloat(point.windSpeed) || 0);
-  const gusts = recentData.map(point => parseFloat(point.windGust) || 0);
+  // Prepare chart data with better error handling
+  const speeds = recentData.map(point => {
+    const speed = parseFloat(point.windSpeed);
+    return isNaN(speed) ? 0 : Math.max(0, speed);
+  });
+  
+  const gusts = recentData.map(point => {
+    const gust = parseFloat(point.windGust);
+    return isNaN(gust) ? 0 : Math.max(0, gust);
+  });
+
+  // Ensure we have valid data before proceeding
+  if (speeds.length === 0 || gusts.length === 0) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
+        <View style={styles.noDataContainer}>
+          <ThemedText style={styles.noDataText}>
+            Invalid data for chart rendering
+          </ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+  
   const labels = recentData.map((point, index) => {
-    if (index % Math.ceil(recentData.length / 4) === 0) {
-      const time = new Date(point.time);
-      return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      if (index % Math.ceil(recentData.length / 4) === 0) {
+        const time = new Date(point.time);
+        if (isNaN(time.getTime())) {
+          return '';
+        }
+        return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return '';
+    } catch (error) {
+      console.warn('Error formatting time label:', error);
+      return '';
     }
-    return '';
   });
 
   const chartData = {
     labels,
     datasets: [
       {
-        data: speeds,
-        color: (opacity = 1) => tintColor + Math.round(opacity * 255).toString(16).padStart(2, '0'),
+        data: speeds.length > 0 ? speeds : [0],
+        color: (opacity = 1) => {
+          try {
+            return tintColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
+          } catch (error) {
+            console.warn('Error in speed color function:', error);
+            return '#3366CC80';
+          }
+        },
         strokeWidth: 2,
       },
       {
-        data: gusts,
-        color: (opacity = 1) => '#FF6B6B' + Math.round(opacity * 255).toString(16).padStart(2, '0'),
+        data: gusts.length > 0 ? gusts : [0],
+        color: (opacity = 1) => {
+          try {
+            return '#FF6B6B' + Math.round(opacity * 255).toString(16).padStart(2, '0');
+          } catch (error) {
+            console.warn('Error in gust color function:', error);
+            return '#FF6B6B80';
+          }
+        },
         strokeWidth: 1,
         withDots: false,
       }
@@ -79,10 +137,24 @@ export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) 
   };
 
   const chartConfig = {
-    backgroundGradientFrom: backgroundColor,
-    backgroundGradientTo: backgroundColor,
-    color: (opacity = 1) => textColor + Math.round(opacity * 255).toString(16).padStart(2, '0'),
-    labelColor: (opacity = 1) => textColor + Math.round(opacity * 255).toString(16).padStart(2, '0'),
+    backgroundGradientFrom: backgroundColor || '#ffffff',
+    backgroundGradientTo: backgroundColor || '#ffffff',
+    color: (opacity = 1) => {
+      try {
+        return (textColor || '#000000') + Math.round(opacity * 255).toString(16).padStart(2, '0');
+      } catch (error) {
+        console.warn('Error in chart color function:', error);
+        return '#00000080';
+      }
+    },
+    labelColor: (opacity = 1) => {
+      try {
+        return (textColor || '#000000') + Math.round(opacity * 255).toString(16).padStart(2, '0');
+      } catch (error) {
+        console.warn('Error in label color function:', error);
+        return '#00000080';
+      }
+    },
     strokeWidth: 2,
     barPercentage: 0.5,
     useShadowColorFromDataset: false,
@@ -93,7 +165,7 @@ export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) 
     },
     propsForBackgroundLines: {
       strokeWidth: 1,
-      stroke: textColor + '20',
+      stroke: (textColor || '#000000') + '20',
     },
   };
 
@@ -103,19 +175,35 @@ export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) 
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
       <View style={styles.chartContainer}>
-        <LineChart
-          data={chartData}
-          width={screenWidth - 40}
-          height={200}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-          withInnerLines={true}
-          withOuterLines={true}
-          withVerticalLabels={true}
-          withHorizontalLabels={true}
-          fromZero={true}
-        />
+        {/* Render chart with error handling */}
+        {(() => {
+          try {
+            return (
+              <LineChart
+                data={chartData}
+                width={screenWidth - 40}
+                height={200}
+                chartConfig={chartConfig}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                fromZero={true}
+              />
+            );
+          } catch (error) {
+            console.error('🚨 LineChart rendering error:', error);
+            return (
+              <View style={styles.noDataContainer}>
+                <ThemedText style={styles.noDataText}>
+                  Chart rendering failed. Please try refreshing.
+                </ThemedText>
+              </View>
+            );
+          }
+        })()}
       </View>
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>

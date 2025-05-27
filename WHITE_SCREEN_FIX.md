@@ -28,7 +28,14 @@ This document summarizes the changes made to fix the "white screen" issue in the
 - **15-second timeout**: App automatically forces initialization if still stuck
 - **App State Monitoring**: Detects when app is inactive and forces refresh if needed
 
-### 4. Emergency Recovery Options
+### 4. Advanced Crash Detection (Latest)
+- **DataCrashDetector Component**: Component-level error boundaries with recovery options
+- **CrashMonitor Service**: Centralized crash tracking and analysis system
+- **Chart Error Handling**: Specific error handling for chart rendering issues
+- **Automatic Recovery**: Progressive recovery system for persistent crashes
+- **Diagnostic Tools**: Comprehensive crash analysis and reporting
+
+### 5. Emergency Recovery Options
 - **Clear App Data**: Nuclear option to clear all AsyncStorage data
 - **Force Restart**: Attempts to restart the app using expo-updates
 - **Progressive UI**: Shows different recovery options based on how long the app has been stuck
