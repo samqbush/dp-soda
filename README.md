@@ -1,179 +1,116 @@
 # Wind Trend Analyzer - Bear Creek Lake
 
-A React Native app built with Expo that monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado. The app analyzes early morning wind trends to determine if conditions are favorable for beach activities.
+An app that monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for beach activities. Get reliable predictions based on early morning wind patterns!
+
+![Wind Trend Analyzer App](./assets/images/app-preview.png)
 
 ## Features
 
-- **Real-time Wind Data**: Fetches current wind data from WindAlert API
-- **Smart Analysis**: Analyzes 3am-5am window for alarm decisions
-- **Verification System**: Checks 6am-8am window to verify predictions
-- **Offline Support**: Caches data locally for offline access
-- **Configurable Criteria**: User-adjustable thresholds for wind speed, direction consistency, and data quality
-- **Dark Mode Support**: Automatically adapts to system theme
-- **Mobile-First Design**: Optimized for iOS and Android devices
-- **🛡️ Enhanced Crash Detection**: Multi-layer crash recovery system with comprehensive error handling
+- **Morning Wind Predictions**: Wake up or sleep in based on actual wind conditions
+- **Smart Analysis**: Uses 3am-5am window to analyze if conditions will be favorable
+- **Verification System**: Confirms predictions using 6am-8am window data
+- **Fully Configurable**: Customize all wind criteria to match your preferences
+- **Works Offline**: Access previous predictions even without internet connection
+- **Dark Mode**: Easy on the eyes for early morning checks
+- **Reliable Operation**: Enhanced stability with crash detection and recovery
 
-## Quickstart (Expo/React Native)
+## Getting Started
 
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-2. **Start the app**
-   ```bash
-   npx expo start --tunnel
-   ```
-   - Open in iOS simulator: Press `i`
-   - Open in Android emulator: Press `a`
-   - Scan QR code with Expo Go app for physical device
+### Download Options
+
+- **Android**: Download the latest APK from the [Releases](https://github.com/yourusername/wind-trend-analyzer/releases) page
+- **iOS**: Coming soon to the App Store
+- **Expo Go**: Scan the QR code below to open in Expo Go app
+
+![Expo QR Code](./assets/images/expo-qr-code.png)
 
 ## How It Works
 
-### Data Collection
-- Fetches wind data from WindAlert API every few minutes
-- Collects 24 hours of historical data
-- Converts wind speeds from kph to mph
-- Caches data locally using AsyncStorage
+The Wind Trend Analyzer helps you decide when to head to the beach by analyzing early morning wind patterns at Bear Creek Lake.
 
-### Analysis Algorithm
-The app analyzes wind conditions using configurable criteria:
+### Smart Wake-Up Decisions
 
-- **Minimum Average Speed**: Default 10 mph during 3am-5am window
-- **Direction Consistency**: Default 70% consistency threshold
-- **Consecutive Good Points**: Default 4 consecutive data points meeting criteria
-- **Speed/Direction Deviation**: Configurable thresholds for variability
+1. **Morning Analysis**: The app checks wind conditions during the crucial 3am-5am window
+2. **Decision Making**: Based on speed, consistency, and direction, it determines if conditions are favorable
+3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation
+4. **Verification**: The app also checks the 6am-8am window to validate its predictions
 
-### Time Windows
-- **Alarm Window (3am-5am)**: Primary analysis period for wake-up decisions
-- **Verification Window (6am-8am)**: Checks if predicted conditions occurred
+### Default Settings (All Customizable)
 
-## Usage
+- **Minimum Wind Speed**: 10 mph (good for most water activities)
+- **Direction Consistency**: 70% (ensures reliable wind patterns)
+- **Required Consecutive Points**: 4 (confirms sustained conditions)
+- **Speed Variation Limit**: 3 mph (avoids gusty, unpredictable wind)
+- **Direction Variation Limit**: 45° (ensures consistent direction)
+
+## Using the App
 
 ### Main Screen
-- View current wind conditions and analysis
-- See alarm status (Wake Up! 🌊 or Sleep In 😴)
-- Check wind metrics: speed, direction consistency, data points
-- Manual refresh of wind data
 
-### Settings Screen (Explore Tab)
-- Configure alarm criteria:
-  - Minimum average wind speed
-  - Direction consistency threshold
-  - Required consecutive good points
-  - Speed and direction deviation limits
-- Reset to default values
-- Manual data refresh
+![Main Screen](./assets/images/main-screen.png)
 
-### Standalone Script
-Run the wind data fetcher independently:
-```bash
-npm run fetch-wind
-```
-This creates JSON and CSV files with current wind data and analysis.
+- **Current Status**: Large "Wake Up! 🌊" or "Sleep In 😴" indicator
+- **Wind Statistics**: View current speed, direction consistency, and quality metrics
+- **Trend Chart**: See wind patterns over the last 12 hours
+- **Manual Refresh**: Pull down to update wind data
+- **Last Updated**: Time of most recent data fetch
 
-## File Structure
+### Settings Screen
 
-```
-services/
-  windService.ts          # Core wind data fetching and analysis
-  globalCrashHandler.ts   # Global crash detection and recovery
-  crashMonitor.ts         # Centralized crash tracking
-hooks/
-  useWindData.ts          # React hook for wind data state management
-components/
-  DataCrashDetector.tsx   # Component-level error boundaries
-  GlobalCrashRecovery.tsx # Global crash recovery UI
-  WindDataDisplay.tsx     # Main wind data visualization component
-  WindDataTest.tsx        # Testing component for development
-scripts/
-  fetch-wind-data.mjs     # Standalone wind data fetching script
-```
+![Settings Screen](./assets/images/settings-screen.png)
 
-## API Integration
+- Tap the "Explore" tab to access settings
+- Adjust all wind criteria to match your activity needs
+- Changes take effect immediately with real-time analysis update
+- Reset to defaults with a single tap
 
-The app integrates with WindAlert's API to fetch real-time wind data:
-- **Endpoint**: `https://api.weatherflow.com/wxengine/rest/graph/getGraph`
-- **Location**: Bear Creek Lake (Spot ID: 149264)
-- **Data**: Wind speed, gusts, and direction over 24-hour period
 
-## Configuration
+## Customizing Your Experience
 
-All alarm criteria are configurable through the settings screen:
+Tailor the app to your specific needs through the Settings screen:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Minimum Average Speed | 10 mph | Required wind speed for alarm |
-| Direction Consistency | 70% | Minimum direction consistency |
-| Consecutive Good Points | 4 | Required consecutive qualifying points |
-| Speed Deviation | 3 mph | Maximum speed variation |
-| Direction Deviation | 45° | Maximum direction variation |
+| Setting | Purpose | When to Adjust |
+|---------|---------|----------------|
+| Minimum Wind Speed | Sets threshold for "Wake Up" decision | Increase for activities requiring stronger winds |
+| Direction Consistency | Ensures wind direction stability | Higher values for activities requiring consistent direction |
+| Consecutive Good Points | Requires sustained good conditions | Increase for more certainty, decrease for more alerts |
+| Speed Variation | Controls acceptable gustiness | Lower for activities requiring stable wind speed |
+| Direction Variation | Limits wind direction shifts | Lower for direction-sensitive activities |
 
-## Data Storage
+## Frequently Asked Questions
 
-- **Wind Data**: Cached locally for offline access (2-hour expiry)
-- **User Settings**: Persisted in AsyncStorage
-- **Analysis Results**: Calculated in real-time
+### Why isn't my app showing current data?
+The app may be in offline mode. Check your internet connection and pull down to refresh.
 
-## Development
+### How accurate are the predictions?
+The app analyzes actual wind data from WindAlert's monitoring station at Bear Creek Lake. Predictions are based on established wind patterns and verified using the 6am-8am window data.
 
-### Testing Wind Service
-The app includes a test component (`WindDataTest`) that can be used to verify:
-- API connectivity
-- Data parsing
-- Analysis calculations
-- Error handling
+### Can I use this for other locations?
+Currently, the app is optimized for Bear Creek Lake (Soda Lake Dam 1) in Colorado. Support for additional locations is planned for future updates.
 
-### Debugging
-1. Enable remote debugging in Expo Dev Tools
-2. Check console logs for API responses
-3. Use the test component to validate functionality
-4. Check cached data in device storage
+### What should I do if I see a white screen on Android?
+The app includes advanced recovery systems. If you encounter a white screen, wait a few moments for the recovery system to engage. If problems persist, see the troubleshooting guide in the app settings.
 
-### Adding New Features
-The modular structure makes it easy to extend:
-- Add new analysis criteria in `windService.ts`
-- Create new visualizations in `components/`
-- Extend the React hook in `useWindData.ts`
+## Coming Soon
 
-## Future Enhancements
+- Push notifications for ideal conditions
+- Historical accuracy tracking
+- Integration with weather forecasts
+- Multiple location support
+- Enhanced visualization options
+- Social sharing capabilities
 
-- **Push Notifications**: Alert users when conditions are favorable
-- **Historical Trends**: Track accuracy of predictions over time
-- **Weather Integration**: Combine with weather forecasts
-- **Multiple Locations**: Support for different wind monitoring spots
-- **Charts and Graphs**: Visual representation of wind trends
-- **Sharing**: Share conditions with friends
+## Contact & Support
 
-## Troubleshooting
+For questions, feature requests, or support:
+- Email: support@windtrendanalyzer.com
+- Twitter: @WindTrendApp
+- Visit our website: [windtrendanalyzer.com](https://windtrendanalyzer.com)
 
-### Common Issues
+For Android-specific troubleshooting, tap the "Help" button in the app settings or visit our [Android Support Guide](https://windtrendanalyzer.com/android-support).
 
-1. **No wind data**: Check internet connection and API availability
-2. **App crashes**: Check Expo Go version compatibility
-3. **Settings not saving**: Ensure AsyncStorage permissions
-4. **Stale data**: Use manual refresh or check cache expiry
+## Privacy & Terms
 
-### Error Messages
-- "Failed to fetch wind data": API connectivity issue
-- "No data available for alarm window": Missing data for analysis period
-- "Failed to parse JSONP response": API response format changed
+This app does not collect personal data. Location permissions are requested only to enhance wind analysis relevance. For our full privacy policy, visit [windtrendanalyzer.com/privacy](https://windtrendanalyzer.com/privacy).
 
-## License
-
-This project is licensed under the MIT License.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## Contact
-
-For questions or support, please open an issue in the repository.
-
-## Android Crash & White Screen Guide
-
-For comprehensive troubleshooting, crash detection, and white screen recovery on Android, see [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).
+Wind Trend Analyzer © 2025. All rights reserved.

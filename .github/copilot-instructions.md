@@ -34,10 +34,12 @@
 - When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later
 
 ## Documentation
+- All documentation besides the [README.md](../README.md) should be stored in the `docs` directory
 - Keep documentation up to date and clear
   - Avoid creating multiple versions of the same documentation
-  - Use the README and other markdown files for comprehensive guides
-- Refer to [README.md](../README.md) and [IMPLEMENTATION_SUMMARY](../IMPLEMENTATION_SUMMARY.md) for more details on the project, including setup instructions, development tools, and key features.
+- Refer to [IMPLEMENTATION_SUMMARY](../docs/IMPLEMENTATION_SUMMARY.md) for a summary of implemented features
+- Refer to [FILE_STRUCTURE](../docs/FILE_STRUCTURE.md) for an overview of the project structure
+- Refer to [DEVELOPMENT](../docs/DEVELOPMENT.md) for developer documentation
 
 ## User Experience
 - Ensure all features are discoverable and easy to use
