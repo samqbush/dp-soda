@@ -37,10 +37,19 @@ export function WindDataDisplay() {
     };
   }, [componentError, hasAttemptedRecovery]);
 
-  // Safely access wind data using try-catch
+  // Safely access wind data using try-catch with error boundary pattern
   let windDataResult;
   try {
-    windDataResult = useWindData();
+    // Import the safe hook wrapper to prevent hook errors
+    const { useSafeHook } = require('@/services/reactHelper');
+    
+    // Use the hook through the safe wrapper
+    windDataResult = useSafeHook(() => useWindData());
+    
+    // If we got null from the safe hook wrapper, throw an error
+    if (windDataResult === null) {
+      throw new Error('Failed to initialize wind data hook safely');
+    }
   } catch (error) {
     console.error('💥 Error in useWindData hook:', error);
     setComponentError(error instanceof Error ? error.message : 'Error in wind data hook');

@@ -102,6 +102,10 @@ jobs:
           echo 'org.gradle.parallel=true' >> android/gradle.properties
           echo 'org.gradle.configureondemand=true' >> android/gradle.properties
           echo 'org.gradle.caching=true' >> android/gradle.properties
+          # Add configuration to prevent duplicate React instance
+          echo 'hermesEnabled=true' >> android/gradle.properties
+          # Add configurations to fix dependency issues
+          echo 'android.enableDexingArtifactTransform=false' >> android/gradle.properties
         shell: bash
 
       # Build the AAB with detailed logging

@@ -6,6 +6,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { LogBox, Platform, Text, TouchableOpacity, View } from 'react-native';
+// Import React explicitly to ensure consistent version usage
+import React from 'react';
+// Import helper to ensure single React instance
+import { ensureSingleReactInstance } from '@/services/reactHelper';
 import 'react-native-reanimated';
 
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
@@ -35,6 +39,9 @@ prepareSplashScreen().then(() => {
 }).catch(error => console.log('Error setting up splash screen:', error));
 
 export default function RootLayout() {
+  // Ensure we're using a single consistent React instance
+  ensureSingleReactInstance();
+  
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
