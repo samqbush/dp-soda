@@ -268,15 +268,8 @@ export default function SettingsScreen() {
           
           <ThemedText style={styles.infoText}>
             The verification window (6am-8am) checks if the predicted conditions actually occurred.
-            Wind speeds are displayed in mph and directions in degrees.
+            Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: tintColor }]}
-            onPress={refreshData}
-          >
-            <ThemedText style={styles.saveButtonText}>Refresh Wind Data</ThemedText>
-          </TouchableOpacity>
           
           {/* Version display with secret gesture detection */}
           <View style={styles.versionContainer}>

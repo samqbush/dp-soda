@@ -133,15 +133,18 @@ function WindDataDisplayContent() {
               {isLoading ? 'Loading...' : 'Retry'}
             </ThemedText>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.refreshButton, { backgroundColor: '#4CAF50', marginTop: 8 }]} 
-            onPress={handleFetchRealData}
-            disabled={isLoading}
-          >
-            <ThemedText style={styles.refreshButtonText}>
-              Use Sample Data
-            </ThemedText>
-          </TouchableOpacity>
+          {/* Only show in development mode */}
+          {__DEV__ && (
+            <TouchableOpacity 
+              style={[styles.refreshButton, { backgroundColor: '#4CAF50', marginTop: 8 }]} 
+              onPress={handleFetchRealData}
+              disabled={isLoading}
+            >
+              <ThemedText style={styles.refreshButtonText}>
+                📡 Real Data
+              </ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
       </ThemedView>
     );
@@ -163,15 +166,18 @@ function WindDataDisplayContent() {
               {isLoading ? '🔄' : '↻'}
             </ThemedText>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.realDataButton, { backgroundColor: '#4CAF50' }]} 
-            onPress={handleFetchRealData}
-            disabled={isLoading}
-          >
-            <ThemedText style={styles.realDataButtonText}>
-              📡 Real Data
-            </ThemedText>
-          </TouchableOpacity>
+          {/* Real Data button only shown in development mode */}
+          {__DEV__ && (
+            <TouchableOpacity 
+              style={[styles.realDataButton, { backgroundColor: '#4CAF50' }]} 
+              onPress={handleFetchRealData}
+              disabled={isLoading}
+            >
+              <ThemedText style={styles.realDataButtonText}>
+                📡 Real Data
+              </ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
