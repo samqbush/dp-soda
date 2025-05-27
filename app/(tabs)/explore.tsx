@@ -249,16 +249,25 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.infoSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>About</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>About Soda Lake Wind Monitoring</ThemedText>
           <ThemedText style={styles.infoText}>
             This app monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado.
-            It analyzes wind data in the 3am-5am window to determine if conditions are favorable
-            for beach activities. The verification window (6am-8am) checks if the predicted
-            conditions actually occurred.
+            It analyzes early morning wind trends (3am-5am) to determine if conditions are favorable
+            for beach activities. The alarm logic considers wind speed, direction consistency, and
+            data quality to make wake-up decisions.
+          </ThemedText>
+          
+          <ThemedText type="subtitle" style={styles.subsectionTitle}>How It Works</ThemedText>
+          <ThemedText style={styles.infoText}>
+            • Fetches real-time wind data from WindAlert API{'\n'}
+            • Analyzes 3am-5am window for alarm decisions{'\n'}
+            • Verifies conditions in 6am-8am window{'\n'}
+            • Caches data for offline access{'\n'}
+            • Configurable thresholds and criteria
           </ThemedText>
           
           <ThemedText style={styles.infoText}>
-            Data is fetched from WindAlert and cached locally for offline access.
+            The verification window (6am-8am) checks if the predicted conditions actually occurred.
             Wind speeds are displayed in mph and directions in degrees.
           </ThemedText>
 
@@ -298,6 +307,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 12,
+  },
+  subsectionTitle: {
+    marginTop: 16,
+    fontSize: 16,
   },
   settingItem: {
     marginBottom: 16,

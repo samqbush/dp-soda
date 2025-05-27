@@ -244,7 +244,7 @@ function WindDataDisplayContent() {
       )}
 
       {windData.length > 0 && (
-        <WindChart data={windData} title="12-Hour Wind Trend" />
+        <WindChart data={windData} title="10-Hour Wind Trend (2am-10am)" />
       )}
 
       {windData.length > 0 && (

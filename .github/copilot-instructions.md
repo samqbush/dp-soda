@@ -17,7 +17,7 @@
 
 ## Data Handling
 - The data should be fetched a minute or two before the alarm time to minimize scrapping
-- Data is processed to focus on the 2am–8am window, with special analysis for 3am–5am (alarm) and 6am–8am (verification)
+- Data is processed to focus on the 2am–10am window, with special analysis for 3am–5am (alarm) and 6am–8am (verification)
 - Wind speeds are converted from kph to mph
 - Data is output as CSV and/or JSON for visualization and mobile consumption
 

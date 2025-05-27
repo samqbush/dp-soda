@@ -22,7 +22,7 @@
 - **Main Display Components**
   - Wind status indicator (Wake Up! 🌊 or Sleep In 😴)
   - Key metrics dashboard: speed, consistency, consecutive points
-  - Wind trend visualization chart showing 12-hour history
+  - Wind trend visualization chart showing 10-hour history
   - Manual refresh and data management
   - Configurable settings interface
   - Dark mode support throughout the application
@@ -53,7 +53,7 @@
 
 ### ✅ Data Handling
 - Fetches data just before analysis (configurable timing)
-- Focuses on 2am-8am window with 3am-5am alarm analysis
+- Focuses on 2am-10am window with 3am-5am alarm analysis
 - Converts kph to mph as in original script
 - Outputs structured data for visualization
 - Robust error handling and fallback data
@@ -94,7 +94,7 @@ The modular architecture makes it easy to add:
 
 1. **Start the app**: `npm start` or `npx expo start --tunnel` for public wifi testing
 2. **View wind conditions**: Home screen shows current analysis
-3. **Adjust settings**: Explore tab for configuration
+3. **Adjust settings**: Settings tab for configuration
 4. **Test functionality**: WindDataTest component for debugging
 5. **Run standalone**: `npm run fetch-wind` for independent data fetching
 6. **Android build**: GitHub Actions workflow handles optimized Android builds

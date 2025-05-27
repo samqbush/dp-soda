@@ -43,11 +43,13 @@ function WindChartContent({ data, title }: WindChartProps) {
     );
   }
 
-  // Filter data to last 12 hours for better visualization
-  const now = new Date();
-  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+  // Filter data to show only the 2am-10am window
   const recentData = data
-    .filter(point => new Date(point.time) >= twelveHoursAgo)
+    .filter(point => {
+      const date = new Date(point.time);
+      const hours = date.getHours();
+      return hours >= 2 && hours < 10; // Only include data from 2am to 10am
+    })
     .slice(-20); // Limit to 20 points for better chart readability
 
   if (recentData.length < 2) {
