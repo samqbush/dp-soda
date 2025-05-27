@@ -104,8 +104,8 @@ jobs:
           echo 'org.gradle.caching=true' >> android/gradle.properties
           # Add configuration to prevent duplicate React instance
           echo 'hermesEnabled=true' >> android/gradle.properties
-          # Add configurations to fix dependency issues
-          echo 'android.enableDexingArtifactTransform=false' >> android/gradle.properties
+          # Add recommended configuration for dexing transform
+          echo 'android.useFullClasspathForDexingTransform=true' >> android/gradle.properties
         shell: bash
 
       # Build the AAB with detailed logging
