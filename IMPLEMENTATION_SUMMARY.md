@@ -3,71 +3,57 @@
 ## ✅ Implemented Features
 
 ### Core Services
-- **`windService.ts`** - Complete wind data fetching and analysis service
-  - Fetches data from WindAlert API (same endpoint as your original script)
-  - Converts kph to mph 
+- **Wind Data Services**
+  - Fetches data from WindAlert API (endpoint: Bear Creek Lake/Soda Lake Dam 1)
+  - Converts kph to mph and processes data
   - Analyzes 3am-5am alarm window and 6am-8am verification window
   - Configurable alarm criteria with sensible defaults
-  - Offline caching with AsyncStorage
-  - Error handling and fallback to cached data
+  - Offline caching with AsyncStorage and fallback data
+  - Error handling and recovery mechanisms
 
 ### React Integration
-- **`useWindData.ts`** - React hook for state management
-  - Manages wind data, analysis, and loading states
-  - Handles configuration persistence
+- **Custom React Hooks**
+  - Wind data state management with useWindData hook
+  - Theme management with dark/light mode support
   - Automatic data refresh and caching
   - Error handling with user-friendly messages
 
 ### User Interface
-- **`WindDataDisplay.tsx`** - Main display component
-  - Shows current alarm status (Wake Up! 🌊 or Sleep In 😴)
-  - Displays key metrics: speed, consistency, consecutive points
-  - Manual refresh functionality
-  - Shows verification results for 6am-8am window
-  - Data info and last updated timestamp
+- **Main Display Components**
+  - Wind status indicator (Wake Up! 🌊 or Sleep In 😴)
+  - Key metrics dashboard: speed, consistency, consecutive points
+  - Wind trend visualization chart showing 12-hour history
+  - Manual refresh and data management
+  - Configurable settings interface
+  - Dark mode support throughout the application
 
-- **`WindChart.tsx`** - Visual wind trend chart
-  - Line chart showing wind speed and gusts over 12 hours
-  - Statistics: max speed, average speed, max gust
-  - Responsive design with theme support
-  - Handles cases with insufficient data
+### Android Crash & White Screen Prevention
+- **Enhanced Crash Detection & Recovery**
+  - Multi-layer crash detection system
+  - White screen prevention mechanisms
+  - Progressive recovery system with timeout escalation
+  - Emergency recovery options for critical failures
+  - Crash reporting and diagnostic tools
 
-- **Settings Screen** (`explore.tsx`) - Configuration interface
-  - Adjust all alarm criteria in real-time
-  - Reset to defaults functionality
-  - Immediate re-analysis when settings change
-  - Input validation and user feedback
-
-### Development Tools
-- **`WindDataTest.tsx`** - Testing component (can be removed for production)
-  - Tests API connectivity
-  - Validates data parsing and analysis
-  - Console-style output for debugging
-
-- **`fetch-wind-data.mjs`** - Standalone script
-  - Can be run independently with `npm run fetch-wind`
-  - Outputs JSON and CSV files
-  - Console analysis results
-  - Same functionality as your original script
-
-### App Integration
-- **Updated home screen** with wind monitoring focus
-- **Settings screen** for configuration
-- **Dark mode support** throughout
-- **Offline functionality** with cached data
+- **Debug & Diagnostic Tools**
+  - Android Crash Logger with detailed reports
+  - APK Diagnostics for runtime testing
+  - Enhanced Android Debugger with system monitoring
+  - Quick Export button for emergency crash reports
 
 ## 🎯 Key Features Matching Your Requirements
 
 ### ✅ Mobile App (Expo/React Native)
 - Self-contained app (no backend required)
-- Cross-platform iOS/Android support
-- Dark mode and modern UI
+- Cross-platform iOS/Android support with specific Android optimizations
+- Dark mode and modern UI with responsive design
 
 ### ✅ Data Handling
 - Fetches data just before analysis (configurable timing)
 - Focuses on 2am-8am window with 3am-5am alarm analysis
 - Converts kph to mph as in original script
 - Outputs structured data for visualization
+- Robust error handling and fallback data
 
 ### ✅ Alarm Logic
 - All criteria are user-configurable:
@@ -85,6 +71,13 @@
 - Offline access to last-fetched data
 - Loading states and error handling
 
+### ✅ Android-Specific Enhancements
+- White screen prevention and detection
+- Enhanced crash detection and recovery
+- Diagnostic tools and crash reporting
+- APK-specific optimizations
+- Progressive recovery system
+
 ## 🚀 Ready for Future Enhancements
 
 The modular architecture makes it easy to add:
@@ -92,15 +85,16 @@ The modular architecture makes it easy to add:
 - Historical tracking
 - Multiple locations
 - Weather integration
-- Advanced charts
+- Advanced charts and visualizations
 
 ## 📱 How to Use
 
-1. **Start the app**: `npm start`
+1. **Start the app**: `npm start` or `npx expo start --tunnel` for public wifi testing
 2. **View wind conditions**: Home screen shows current analysis
 3. **Adjust settings**: Explore tab for configuration
 4. **Test functionality**: WindDataTest component for debugging
 5. **Run standalone**: `npm run fetch-wind` for independent data fetching
+6. **Android build**: GitHub Actions workflow handles optimized Android builds
 
 ## 📊 Data Flow
 
@@ -111,8 +105,17 @@ The modular architecture makes it easy to add:
 5. **Verify**: Check 6am-8am window against prediction
 6. **Display**: Show results with visual indicators and charts
 
-The implementation follows your original script's approach while adding mobile-optimized features and user configurability.
+## 🔧 Crash Prevention & Recovery
 
-## Android Crash & White Screen Guide
+1. **Detection**: Multi-level crash detection monitors app health
+2. **Prevention**: Pre-emptive measures to avoid white screens
+3. **Recovery**: Progressive system with increasingly powerful recovery options
+4. **Diagnostics**: Runtime testing tools and crash reporting
+5. **Emergency**: Last-resort options for critical failures
 
-For all details on Android crash detection, white screen fixes, debugging, and recovery, see [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).
+## 📑 Documentation
+
+For more detailed information about the project:
+- **File Structure**: See [docs/FILE_STRUCTURE.md](./docs/FILE_STRUCTURE.md) for detailed file documentation
+- **Android Issues**: See [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) for Android-specific crash and white screen solutions
+- **Local Building**: See [docs/LOCAL_BUILD_INSTRUCTIONS.md](./docs/LOCAL_BUILD_INSTRUCTIONS.md) for building locally
