@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "dpreact",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.samqbush.dpsoda"
@@ -19,11 +19,14 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
       ],
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": true,
-      "versionCode": 2
+      "versionCode": 3,
+      "theme": "@style/Theme.App.SplashScreen"
     },
     "web": {
       "bundler": "metro",
@@ -64,7 +67,8 @@
       "hidden": false
     },
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "turboModules": false
     },
     "extra": {
       "router": {},

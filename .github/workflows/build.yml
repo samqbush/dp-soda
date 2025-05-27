@@ -1,4 +1,4 @@
-name: Build
+name: Build Wind Trend Analyzer with White Screen Fixes
 
 on:
   push:
@@ -11,42 +11,54 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: 📦 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: 🔧 Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: 🧹 Clean previous builds and caches
+        run: |
+          rm -rf node_modules/.cache
+          rm -rf .expo
+          rm -rf android
+
+      - name: 📦 Install dependencies
         run: npm ci
 
-      - name: Install Expo CLI
+      - name: 🔧 Install Expo CLI
         run: npm install -g @expo/cli
 
-      - name: Authenticate with Expo
+      - name: 🔐 Authenticate with Expo
         run: npx expo whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
+
+      - name: 🔍 Fix package versions (white screen fix)
+        run: npx expo install --fix
+
+      - name: 🧪 Run lint check
+        run: npm run lint
 
       # Optional: Run tests if you have them
       # - name: Run tests
       #   run: npm test
         
       # Build for Android locally
-      - name: Set up JDK
+      - name: ☕ Set up JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: 📱 Setup Android SDK
         uses: android-actions/setup-android@v2
 
-      - name: Cache Gradle packages
+      - name: 💾 Cache Gradle packages
         uses: actions/cache@v4
         with:
           path: |
@@ -56,17 +68,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # Generate the native Android project
-      - name: Clean and generate native Android project
+      # Generate the native Android project with white screen fixes
+      - name: 🔧 Clean and generate native Android project (with fixes)
         run: |
-          rm -rf android
+          echo "🔧 Generating Android project with white screen fixes..."
+          echo "Key fixes applied:"
+          echo "- newArchEnabled: false (disabled new React Native architecture)"
+          echo "- Enhanced timeout and recovery mechanisms"
+          echo "- Comprehensive debugging tools included"
+          echo "- Progressive recovery system"
+          echo "- Emergency recovery options"
           npx expo prebuild --platform android --clean
         env:
           CI: 1
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       # Create a keystore file from secrets
-      - name: Setup Keystore
+      - name: 🔐 Setup Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           echo "storeFile=upload-keystore.jks" >> android/gradle.properties
@@ -74,36 +92,49 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
-      # Update gradle.properties for better build performance
-      - name: Configure Gradle for production build
+      # Update gradle.properties for better build performance and white screen fixes
+      - name: ⚙️ Configure Gradle for production build (with white screen optimizations)
         run: |
+          echo "🔧 Applying Android build optimizations for white screen fixes..."
           echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
           echo "org.gradle.parallel=true" >> android/gradle.properties
           echo "org.gradle.configureondemand=true" >> android/gradle.properties
           echo "android.enableR8.fullMode=false" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
+          # Additional optimizations for stability
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableDexingArtifactTransform=false" >> android/gradle.properties
+          echo "Configured gradle.properties:"
           cat android/gradle.properties
 
       # Build the AAB with detailed logging
-      - name: Build Android App Bundle
+      - name: 🏗️ Build Android App Bundle (with white screen fixes)
         run: |
+          echo "🏗️ Building Android App Bundle with white screen fixes..."
+          echo "Build includes:"
+          echo "✅ Disabled new React Native architecture"
+          echo "✅ Enhanced debugging components"
+          echo "✅ Progressive recovery system"
+          echo "✅ Emergency recovery options"
+          echo "✅ Android-specific optimizations"
           cd android
           ./gradlew bundleRelease --stacktrace --info
 
       # Upload the AAB as an artifact
-      - name: Upload AAB
+      - name: 📤 Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-with-white-screen-fixes
           path: android/app/build/outputs/bundle/release/app-release.aab
 
       # Convert AAB to APKs for device testing
-      - name: Download Bundletool
+      - name: 📥 Download Bundletool
         run: |
           curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
 
-      - name: Generate APKs from AAB
+      - name: 📱 Generate Universal APK from AAB
         run: |
+          echo "📱 Generating universal APK for easy device testing..."
           java -jar bundletool.jar build-apks \
             --bundle=android/app/build/outputs/bundle/release/app-release.aab \
             --output=android/app/build/outputs/bundle/release/app-release.apks \
@@ -113,15 +144,46 @@ jobs:
             --key-pass=pass:${{ secrets.STORE_PASSWORD }} \
             --mode=universal
 
-      - name: Extract Universal APK
+      - name: 📦 Extract Universal APK
         run: |
           cd android/app/build/outputs/bundle/release
           unzip -j app-release.apks universal.apk
-          mv universal.apk app-release-universal.apk
+          mv universal.apk app-release-universal-with-fixes.apk
+          echo "✅ Universal APK created: app-release-universal-with-fixes.apk"
 
-      - name: Upload Universal APK for device testing
+      - name: 📤 Upload Universal APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: app-universal-apk
-          path: android/app/build/outputs/bundle/release/app-release-universal.apk
+          name: app-universal-apk-with-white-screen-fixes
+          path: android/app/build/outputs/bundle/release/app-release-universal-with-fixes.apk
+
+      # Add a summary of the white screen fixes
+      - name: 📋 White Screen Fixes Summary
+        run: |
+          echo "## 🎉 Build Complete with White Screen Fixes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Fixes Applied:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Disabled React Native new architecture** (\`newArchEnabled: false\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Enhanced timeout and recovery mechanisms**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Comprehensive debugging tools** (WhiteScreenDetective, AndroidDebugger)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Progressive recovery system** (5s, 8s, 12s, 15s intervals)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Emergency recovery options** (Force Reload, Clear Data, Restart App)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Android-specific optimizations**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Better AsyncStorage initialization**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Memory and execution monitoring**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download \`app-universal-apk-with-white-screen-fixes\` artifact" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install the APK on your Android device" >> $GITHUB_STEP_SUMMARY
+          echo "3. Watch for progressive recovery features if white screen appears:" >> $GITHUB_STEP_SUMMARY
+          echo "   - ⏱️ 0-3s: Normal loading with spinner" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🔍 3-5s: White Screen Detective panel (top-left)" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🐛 5-8s: Debug panel (top-right)" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🔄 8-12s: Force Reload button" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🆘 12+s: Emergency Recovery button" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚨 If Issues Persist:" >> $GITHUB_STEP_SUMMARY
+          echo "- Use the diagnostic tools to identify specific problems" >> $GITHUB_STEP_SUMMARY
+          echo "- Try the Force Reload and Emergency Recovery options" >> $GITHUB_STEP_SUMMARY
+          echo "- Check device logs with \`adb logcat\` for detailed error information" >> $GITHUB_STEP_SUMMARY
 

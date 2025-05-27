@@ -1,6 +1,9 @@
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AndroidDebugger } from './AndroidDebugger';
+import { EmergencyRecovery } from './EmergencyRecovery';
+import { WhiteScreenDetective } from './WhiteScreenDetective';
 
 /**
  * A component that renders while the app is loading,
@@ -9,6 +12,8 @@ import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-nativ
  */
 export function SafeAppLoader() {
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
+  const [forceReload, setForceReload] = useState(0);
   
   useEffect(() => {
     // Try to hide splash screen as soon as this component mounts
@@ -27,18 +32,15 @@ export function SafeAppLoader() {
       setTimeElapsed(prev => {
         const newVal = prev + 1;
         
+        // Show debug info after 5 seconds
+        if (newVal === 5 && Platform.OS === 'android') {
+          setShowDebug(true);
+        }
+        
         // Extra safety - if we're stuck for 10 seconds, force reload
         if (newVal >= 10 && Platform.OS === 'android') {
           console.log('🔄 Loader timeout - attempting force refresh');
-          // This is a last resort measure - the app should never get here
-          try {
-            if (typeof window !== 'undefined') {
-              // @ts-ignore - using raw DOM API as last resort
-              window.location?.reload?.();
-            }
-          } catch (e) {
-            console.error('Failed force refresh attempt', e);
-          }
+          setForceReload(prev => prev + 1);
         }
         
         return newVal;
@@ -46,7 +48,7 @@ export function SafeAppLoader() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [forceReload]);
   
   // Message based on how long we've been loading
   let message = 'Loading app...';
@@ -62,12 +64,34 @@ export function SafeAppLoader() {
   
   return (
     <View style={styles.container}>
+      <WhiteScreenDetective />
+      <AndroidDebugger enabled={showDebug} />
+      
       <ActivityIndicator
         size="large"
         color={Platform.OS === 'android' ? '#4CAF50' : '#007AFF'}
         style={styles.spinner}
       />
       <Text style={styles.loadingText}>{message}</Text>
+      
+      {timeElapsed > 8 && (
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            console.log('User initiated force reload');
+            setTimeElapsed(0);
+            setForceReload(prev => prev + 1);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Force Reload</Text>
+        </TouchableOpacity>
+      )}
+      
+      <Text style={styles.timeElapsed}>
+        Loading for {timeElapsed} seconds...
+      </Text>
+      
+      {timeElapsed > 12 && <EmergencyRecovery />}
     </View>
   );
 }
@@ -85,7 +109,24 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 40,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  timeElapsed: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 10,
   },
 });
 

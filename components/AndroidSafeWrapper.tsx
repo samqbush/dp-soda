@@ -6,17 +6,17 @@ import { AppState, Platform, StyleSheet, View } from 'react-native';
  * Helps prevent and recover from white screen issues in production
  */
 export function AndroidSafeWrapper({ children }: { children: React.ReactNode }) {
-  // Only needed for Android
-  if (Platform.OS !== 'android') {
-    return <>{children}</>;
-  }
-
   const [appState, setAppState] = useState(AppState.currentState);
   const [lastActive, setLastActive] = useState(Date.now());
   const [renderKey, setRenderKey] = useState(0);
   
   // Handle app state changes (background/foreground)
   useEffect(() => {
+    // Only set up listeners on Android
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
     const subscription = AppState.addEventListener('change', nextAppState => {
       setAppState(nextAppState);
       
@@ -45,6 +45,11 @@ export function AndroidSafeWrapper({ children }: { children: React.ReactNode }) 
   // Recovery logic - if we're not rendering properly, this useEffect will never run
   // and the recovery timeout won't be cleared, leading to a re-render
   useEffect(() => {
+    // Only set up recovery on Android
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
     // Setting up a last resort recovery system
     const recoveryTimeout = setTimeout(() => {
       // This should never execute unless the component tree is hung
@@ -57,6 +62,11 @@ export function AndroidSafeWrapper({ children }: { children: React.ReactNode }) 
       clearTimeout(recoveryTimeout);
     };
   }, [renderKey]);
+
+  // Only apply wrapper behavior for Android
+  if (Platform.OS !== 'android') {
+    return <>{children}</>;
+  }
 
   return (
     <View style={styles.container} key={`android-wrapper-${renderKey}`}>

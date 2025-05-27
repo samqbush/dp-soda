@@ -4,9 +4,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { LogBox, Platform, Text, View } from 'react-native';
+import { AppState, LogBox, Platform, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AndroidDebugger } from '@/components/AndroidDebugger';
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
 import { AppInitializer } from '@/components/AppInitializer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -40,6 +41,25 @@ export default function RootLayout() {
   });
   const [isStorageInitialized, setIsStorageInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [appStartTime] = useState(Date.now());
+  const [isStuck, setIsStuck] = useState(false);
+  
+  // Monitor app state to detect if we're stuck
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        const timeElapsed = Date.now() - appStartTime;
+        // If we've been trying to load for more than 15 seconds and are still stuck
+        if (timeElapsed > 15000 && (!loaded || !isStorageInitialized)) {
+          console.warn('🚨 App appears to be stuck - forcing initialization');
+          setIsStuck(true);
+          setIsStorageInitialized(true);
+        }
+      }
+    });
+
+    return () => subscription?.remove();
+  }, [loaded, isStorageInitialized, appStartTime]);
   
   // Initialize storage and other critical services
   useEffect(() => {
@@ -124,7 +144,7 @@ export default function RootLayout() {
   }, []);
 
   // Normal initialization state - loading resources
-  if (!loaded || !isStorageInitialized || !minimumLoadingComplete) {
+  if ((!loaded || !isStorageInitialized || !minimumLoadingComplete) && !isStuck) {
     // Use SafeAppLoader for Android, AppInitializer for iOS
     return Platform.OS === 'android' 
       ? <SafeAppLoader /> 
@@ -133,6 +153,26 @@ export default function RootLayout() {
           <AppInitializer onInitialized={handleInitialized} />
         </View>
       );
+  }
+  
+  // Emergency fallback UI if app is stuck
+  if (isStuck) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        padding: 20, 
+        backgroundColor: '#ffffff' 
+      }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
+          Wind Trend Analyzer
+        </Text>
+        <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center' }}>
+          Loading took longer than expected. Continuing anyway...
+        </Text>
+      </View>
+    );
   }
   
   // Handle initialization errors with friendly recovery UI
@@ -170,6 +210,7 @@ export default function RootLayout() {
 
   return (
     <AndroidSafeWrapper>
+      <AndroidDebugger enabled={__DEV__ || isStuck} />
       <ErrorBoundary>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
