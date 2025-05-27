@@ -49,7 +49,7 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
           const errorData = await AsyncStorage.getItem('lastError');
           lastError = errorData ? JSON.parse(errorData).message : null;
         } catch (e) {
-          // Ignore error getting last error
+          console.log('Error getting last error:', e);
         }
 
         const info: DebugInfo = {

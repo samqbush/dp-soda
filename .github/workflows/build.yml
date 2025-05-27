@@ -186,9 +186,16 @@ jobs:
           echo "   - 🐛 5-8s: Debug panel (top-right)" >> $GITHUB_STEP_SUMMARY
           echo "   - 🔄 8-12s: Force Reload button" >> $GITHUB_STEP_SUMMARY
           echo "   - 🆘 12+s: Emergency Recovery button" >> $GITHUB_STEP_SUMMARY
+          echo "4. If crashes occur after data loads:" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🚨 Crash recovery screen will appear automatically" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🔄 Use 'Try Again' for single crashes" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🔍 Use 'Show Details' to see crash information" >> $GITHUB_STEP_SUMMARY
+          echo "   - 🗑️ Use 'Clear All Data' for persistent crashes" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚨 If Issues Persist:" >> $GITHUB_STEP_SUMMARY
-          echo "- Use the diagnostic tools to identify specific problems" >> $GITHUB_STEP_SUMMARY
+          echo "- White screen: Use the diagnostic tools and progressive recovery features" >> $GITHUB_STEP_SUMMARY
+          echo "- App crashes: Check crash recovery screen for specific error details" >> $GITHUB_STEP_SUMMARY
           echo "- Try the Force Reload and Emergency Recovery options" >> $GITHUB_STEP_SUMMARY
           echo "- Check device logs with \`adb logcat\` for detailed error information" >> $GITHUB_STEP_SUMMARY
+          echo "- See docs/CRASH_RECOVERY_GUIDE.md for comprehensive troubleshooting" >> $GITHUB_STEP_SUMMARY
 

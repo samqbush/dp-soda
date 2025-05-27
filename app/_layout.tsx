@@ -13,6 +13,7 @@ import { AppInitializer } from '@/components/AppInitializer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
 import { initializeStorage } from '@/services/storageService';
 
 // Ignore specific warnings in production builds
@@ -23,9 +24,6 @@ if (!__DEV__) {
     'AsyncStorage has been extracted from react-native',
   ]);
 }
-
-// Import our specialized Android splash handler
-import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
 
 // Keep the splash screen visible while we fetch resources
 // And set a safety timeout to ensure it doesn't get stuck

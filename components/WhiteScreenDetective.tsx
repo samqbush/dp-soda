@@ -19,6 +19,7 @@ export function WhiteScreenDetective() {
         results.platform = `${Platform.OS} ${Platform.Version}`;
         results.platformCheck = true;
       } catch (e) {
+        console.log('Platform check failed:', e);
         results.platformCheck = false;
       }
 
@@ -28,6 +29,7 @@ export function WhiteScreenDetective() {
         results.buildConfig = `v${config.version} (${config.environment})`;
         results.buildConfigCheck = true;
       } catch (e) {
+        console.log('Build config check failed:', e);
         results.buildConfigCheck = false;
       }
 
@@ -38,6 +40,7 @@ export function WhiteScreenDetective() {
         await AsyncStorage.removeItem('detective_test');
         results.storageCheck = result === 'working';
       } catch (e) {
+        console.log('Storage check failed:', e);
         results.storageCheck = false;
       }
 
@@ -48,6 +51,7 @@ export function WhiteScreenDetective() {
         testArray.length = 0;
         results.memoryCheck = true;
       } catch (e) {
+        console.log('Memory check failed:', e);
         results.memoryCheck = false;
       }
 
@@ -57,6 +61,7 @@ export function WhiteScreenDetective() {
         const result = await testFunction();
         results.jsExecutionCheck = result === 'working';
       } catch (e) {
+        console.log('JS execution check failed:', e);
         results.jsExecutionCheck = false;
       }
 

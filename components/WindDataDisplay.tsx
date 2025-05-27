@@ -1,12 +1,12 @@
+import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
-import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
-import { showDiagnosticInfo } from '@/services/diagnosticService';
 import { crashMonitor } from '@/services/crashMonitor';
+import { showDiagnosticInfo } from '@/services/diagnosticService';
 import React, { useEffect } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -48,14 +48,16 @@ function WindDataDisplayContent() {
     criteria
   } = useWindData();
 
-  const textColor = useThemeColor({}, 'text');
+  // const textColor = useThemeColor({}, 'text'); // Removed unused variable
   const tintColor = useThemeColor({}, 'tint');
-  const backgroundColor = useThemeColor({}, 'background');
+  // Remove unused backgroundColor for now
+  // const backgroundColor = useThemeColor({}, 'background');
 
   const handleRefresh = async () => {
     try {
       await refreshData();
     } catch (err) {
+      console.error('Refresh failed:', err);
       Alert.alert('Error', 'Failed to refresh wind data. Please try again.');
     }
   };
@@ -64,6 +66,7 @@ function WindDataDisplayContent() {
     try {
       await fetchRealData();
     } catch (err) {
+      console.error('Fetch real data failed:', err);
       Alert.alert(
         'Error', 
         'Failed to fetch real data. This may be due to CORS restrictions in web environment or network issues.'
@@ -429,4 +432,3 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
-}

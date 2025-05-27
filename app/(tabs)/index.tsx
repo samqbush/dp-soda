@@ -25,6 +25,15 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Show loading on Android until component is ready
+  if (Platform.OS === 'android' && !isLoaded) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
