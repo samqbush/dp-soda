@@ -121,7 +121,6 @@ jobs:
           echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
           # Enhanced crash detection settings
           echo "# Crash detection optimizations" >> android/gradle.properties
-          echo "android.enableDexingArtifactTransform=false" >> android/gradle.properties
           echo "android.enableR8=true" >> android/gradle.properties
           echo "android.enableProguard=false" >> android/gradle.properties
           echo "Configured gradle.properties:"
