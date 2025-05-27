@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { crashMonitor } from './crashMonitor';
+import { formatCrashLogForTerminal } from './terminalLogger';
 
 interface GlobalCrashInfo {
   message: string;
@@ -121,7 +122,16 @@ class GlobalCrashHandler {
 
   private async handleGlobalCrash(crashInfo: GlobalCrashInfo) {
     try {
-      console.log('🚨 Global crash detected:', crashInfo);
+      // Format and log to terminal in a more visible way
+      const formattedCrash = formatCrashLogForTerminal({
+        ...crashInfo,
+        context: crashInfo.component || 'global',
+        error: crashInfo.message,
+        buildType: __DEV__ ? 'development' : 'production'
+      });
+      
+      console.log('🚨 Global crash detected:');
+      console.log(formattedCrash);
       
       // Increment crash count
       this.crashCount++;

@@ -18,6 +18,7 @@ This guide consolidates all documentation related to Android white screen issues
   - [Key Features \& Fixes](#key-features--fixes)
   - [Crash Detection \& Recovery System](#crash-detection--recovery-system)
   - [Debugging Tools](#debugging-tools)
+  - [Enhanced Terminal Logging](#enhanced-terminal-logging)
   - [Testing \& Troubleshooting](#testing--troubleshooting)
   - [Emergency Recovery Options](#emergency-recovery-options)
   - [Build \& Installation](#build--installation)
@@ -67,6 +68,39 @@ The app includes a multi-layered crash detection and white screen prevention sys
 - **Quick Export Button**: Emergency crash report export
 - **SafeAppLoader & AndroidSafeWrapper**: Ensures UI loads even if init fails
 
+## Enhanced Terminal Logging
+
+The app now includes a comprehensive terminal logging system to make debugging Android crashes in the terminal easier:
+
+### Features
+- **Formatted Crash Logs**: All crashes are logged to the terminal in a well-structured, readable format
+- **Anti-Truncation**: Logs are formatted to prevent truncation in the terminal
+- **Global Helper Functions**: Access crash logs directly from the terminal
+
+### Terminal Commands
+
+When running in development mode, the following global commands are available in the terminal or Expo dev console:
+
+```javascript
+// Print all crash logs from all sources (won't be truncated)
+printCrashLogs()
+
+// Print just the most recent crash with full details
+printLatestCrash()
+
+// Print a summary of all crash statistics
+printCrashSummary()
+
+// Access the full terminal logger API
+terminalLogger.printAllCrashLogs()
+terminalLogger.printCrashSummary()
+terminalLogger.printLatestCrash()
+```
+
+### UI Integration
+
+The Android Crash Logger UI component now includes a "Print to Terminal" button that will output all crash logs to the terminal in a well-formatted way, avoiding truncation issues.
+
 ## Testing & Troubleshooting
 - Build with fixes: see build instructions in README
 - Install APK on device, enable unknown sources
@@ -95,6 +129,8 @@ The app includes a multi-layered crash detection and white screen prevention sys
 - Get crash summary: `crashMonitor.getCrashSummary()`
 - Export crash logs: use in-app export or console
 - ADB logcat for device logs (see above)
+- Print all logs: `printCrashLogs()` (in development mode)
+- Print latest crash: `printLatestCrash()` (in development mode)
 
 ## Reporting Issues
 When reporting, include:

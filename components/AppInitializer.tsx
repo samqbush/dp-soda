@@ -1,6 +1,7 @@
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import '../services/terminalLogger'; // Import for side effects (global terminal logger)
 
 interface AppInitializerProps {
   onInitialized: () => void;
@@ -18,6 +19,11 @@ export function AppInitializer({
   const [timeoutReached, setTimeoutReached] = useState(false);
 
   useEffect(() => {
+    // Log app startup in a visible format
+    console.log('\n' + '='.repeat(40));
+    console.log('🚀 APP STARTING - INITIALIZING TERMINAL LOGGER');
+    console.log('='.repeat(40) + '\n');
+
     // Set a fallback timeout to ensure app continues loading
     const timeoutId = setTimeout(() => {
       console.warn('⚠️ Initialization timeout reached, continuing with app');

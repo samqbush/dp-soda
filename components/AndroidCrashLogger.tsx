@@ -28,6 +28,33 @@ interface CrashLog {
 }
 
 /**
+ * Enhanced terminal logging function that prevents truncation 
+ * and formats crash logs in an easy to read way
+ */
+const logToTerminal = (log: CrashLog) => {
+  // Create a divider to make logs stand out in terminal
+  const divider = '\n' + '='.repeat(80) + '\n';
+  
+  // Format the crash information in a readable way
+  const formattedLog = [
+    `${divider}`,
+    `📱 ANDROID CRASH LOG - ${new Date(log.timestamp).toLocaleString()}`,
+    `${divider}`,
+    `🔍 CONTEXT: ${log.context}`,
+    `❌ ERROR: ${log.error}`,
+    log.stack ? `📚 STACK TRACE:\n${log.stack}` : '📚 STACK TRACE: None',
+    `🛠️ BUILD: ${log.buildType}`,
+    `📱 DEVICE: ${log.deviceInfo.platform} ${log.deviceInfo.version}`,
+    `${divider}`
+  ].join('\n');
+  
+  // Log to console with special formatting to make it stand out
+  console.log(formattedLog);
+  
+  return formattedLog;
+};
+
+/**
  * Android Crash Logger - Helps debug crashes in Expo Go and production APKs
  * This component collects crash information and provides debugging tools
  * Only visible when enabled through Developer Mode settings
@@ -92,7 +119,14 @@ export function AndroidCrashLogger() {
       // Load existing crash logs
       const stored = await AsyncStorage.getItem('android_crash_logs');
       if (stored) {
-        setCrashLogs(JSON.parse(stored));
+        const parsedLogs = JSON.parse(stored);
+        setCrashLogs(parsedLogs);
+        
+        // Print any recent crashes to terminal on startup
+        if (parsedLogs.length > 0) {
+          console.log(`📱 Found ${parsedLogs.length} existing crash logs. Most recent:`);
+          logToTerminal(parsedLogs[0]);
+        }
       }
 
       // Set up crash detection
@@ -146,6 +180,9 @@ export function AndroidCrashLogger() {
     };
 
     try {
+      // Always log to terminal in a formatted way first (won't be truncated)
+      logToTerminal(crashLog);
+      
       const updatedLogs = [crashLog, ...crashLogs].slice(0, 20); // Keep last 20 crashes
       setCrashLogs(updatedLogs);
       await AsyncStorage.setItem('android_crash_logs', JSON.stringify(updatedLogs));
@@ -178,6 +215,10 @@ export function AndroidCrashLogger() {
         logs: crashLogs
       };
 
+      // Log complete data to terminal
+      console.log('\n📋 COMPLETE ANDROID CRASH LOG EXPORT:');
+      console.log(JSON.stringify(logData, null, 2));
+      
       const content = JSON.stringify(logData, null, 2);
       
       await Share.share({
@@ -187,6 +228,20 @@ export function AndroidCrashLogger() {
     } catch (error) {
       Alert.alert('Error', 'Failed to export logs: ' + (error instanceof Error ? error.message : String(error)));
     }
+  };
+
+  // Add function to print all logs to terminal
+  const printAllLogsToTerminal = () => {
+    if (crashLogs.length === 0) {
+      console.log('📱 No crash logs to display');
+      return;
+    }
+    
+    console.log(`\n📱 PRINTING ALL CRASH LOGS (${crashLogs.length}):`);
+    crashLogs.forEach((log, index) => {
+      console.log(`\nLOG #${index + 1} of ${crashLogs.length}:`);
+      logToTerminal(log);
+    });
   };
 
   const getStatusColor = () => {
@@ -245,6 +300,9 @@ export function AndroidCrashLogger() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={clearLogs}>
               <Text style={styles.buttonText}>🗑️ Clear Logs</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={printAllLogsToTerminal}>
+              <Text style={styles.buttonText}>📝 Print to Terminal</Text>
             </TouchableOpacity>
           </View>
 
@@ -328,12 +386,12 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     padding: 10,
-    gap: 10,
+    gap: 5, // Reduced gap to fit 3 buttons
   },
   button: {
     flex: 1,
     backgroundColor: '#2196F3',
-    padding: 10,
+    padding: 8, // Slightly smaller padding to fit 3 buttons
     borderRadius: 5,
     alignItems: 'center',
   },
