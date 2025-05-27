@@ -171,7 +171,14 @@ export function AndroidCrashLogger() {
     <View style={styles.container}>
       <TouchableOpacity
         style={[styles.statusButton, { backgroundColor: getStatusColor() }]}
-        onPress={() => setIsVisible(!isVisible)}
+        onPress={() => {
+          try {
+            console.log('🔧 Android crash logger toggle clicked');
+            setIsVisible(!isVisible);
+          } catch (error) {
+            console.error('❌ Android crash logger toggle failed:', error);
+          }
+        }}
       >
         <Text style={styles.statusText}>
           {getStatusText()} ({crashLogs.length})

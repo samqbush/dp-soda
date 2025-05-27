@@ -18,6 +18,7 @@ export function QuickExportButton() {
             text: 'Text Report',
             onPress: async () => {
               try {
+                console.log('📤 Generating text crash report...');
                 const report = await crashReportExportService.generateCrashReport();
                 await crashReportExportService.exportCrashReport(report, {
                   includeUserActions: true,
@@ -26,7 +27,9 @@ export function QuickExportButton() {
                   includePerformanceMetrics: true,
                   format: 'text'
                 });
+                console.log('✅ Text report export completed');
               } catch (error) {
+                console.error('❌ Text export failed:', error);
                 Alert.alert('Export Failed', `Error: ${error instanceof Error ? error.message : String(error)}`);
               }
             }
@@ -35,6 +38,7 @@ export function QuickExportButton() {
             text: 'JSON Report',
             onPress: async () => {
               try {
+                console.log('📤 Generating JSON crash report...');
                 const report = await crashReportExportService.generateCrashReport();
                 await crashReportExportService.exportCrashReport(report, {
                   includeUserActions: true,
@@ -43,7 +47,9 @@ export function QuickExportButton() {
                   includePerformanceMetrics: true,
                   format: 'json'
                 });
+                console.log('✅ JSON report export completed');
               } catch (error) {
+                console.error('❌ JSON export failed:', error);
                 Alert.alert('Export Failed', `Error: ${error instanceof Error ? error.message : String(error)}`);
               }
             }
@@ -53,9 +59,12 @@ export function QuickExportButton() {
             style: 'destructive',
             onPress: async () => {
               try {
+                console.log('🚨 Starting emergency export...');
                 await crashReportExportService.emergencyExport();
                 Alert.alert('Emergency Export', 'Complete crash data has been logged to console');
+                console.log('✅ Emergency export completed');
               } catch (error) {
+                console.error('❌ Emergency export failed:', error);
                 Alert.alert('Export Failed', `Error: ${error instanceof Error ? error.message : String(error)}`);
               }
             }
@@ -63,7 +72,7 @@ export function QuickExportButton() {
         ]
       );
     } catch (error) {
-      console.error('Quick export failed:', error);
+      console.error('❌ Quick export initialization failed:', error);
       Alert.alert('Error', 'Failed to initialize export');
     }
   };

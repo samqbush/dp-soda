@@ -91,12 +91,26 @@ export function EnhancedAndroidDebugger() {
 
   const collectSystemInfo = async (): Promise<void> => {
     try {
+      console.log('🔍 Collecting system info...');
       const screen = Dimensions.get('screen');
-      const crashData = await productionCrashDetector.getCrashData();
+      let crashData;
+      
+      try {
+        crashData = await productionCrashDetector.getCrashData();
+      } catch (error) {
+        console.warn('Failed to get crash data:', error);
+        crashData = { crashes: [], actions: [] };
+      }
       
       // Estimate memory usage (rough approximation)
-      const memoryTest = new Array(1000).fill('test');
-      const roughMemory = JSON.stringify(memoryTest).length;
+      let roughMemory = 0;
+      try {
+        const memoryTest = new Array(1000).fill('test');
+        roughMemory = JSON.stringify(memoryTest).length;
+      } catch (error) {
+        console.warn('Failed to estimate memory:', error);
+        roughMemory = 0;
+      }
 
       const info: SystemInfo = {
         memory: {
@@ -283,7 +297,14 @@ export function EnhancedAndroidDebugger() {
     <View style={styles.container}>
       <TouchableOpacity
         style={[styles.statusButton, { backgroundColor: getStatusColor() }]}
-        onPress={() => setIsVisible(!isVisible)}
+        onPress={() => {
+          try {
+            console.log('🔧 Enhanced debugger toggle clicked');
+            setIsVisible(!isVisible);
+          } catch (error) {
+            console.error('❌ Enhanced debugger toggle failed:', error);
+          }
+        }}
       >
         <Text style={styles.statusText}>
           🔧 {isMonitoring ? '📊' : '💤'} Debug

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert, Platform, Share } from 'react-native';
+import { Alert, Dimensions, Platform, Share } from 'react-native';
 import { productionCrashDetector } from './productionCrashDetector';
 
 interface CrashReport {
@@ -57,20 +57,47 @@ class CrashReportExportService {
       const reportId = `crash_report_${Date.now()}`;
       const timestamp = new Date().toISOString();
 
-      // Gather all crash and diagnostic data
-      const [
-        crashData,
-        systemLogs,
-        errorBoundaryLogs,
-        performanceMetrics,
-        diagnostics
-      ] = await Promise.all([
-        productionCrashDetector.getCrashData(),
-        this.getSystemLogs(),
-        this.getErrorBoundaryLogs(),
-        this.getPerformanceMetrics(),
-        this.getDiagnostics()
-      ]);
+      // Gather all crash and diagnostic data with individual error handling
+      let crashData: any = { crashes: [], actions: [] };
+      let systemLogs: string[] = [];
+      let errorBoundaryLogs: any[] = [];
+      let performanceMetrics: any[] = [];
+      let diagnostics: any[] = [];
+      
+      try {
+        crashData = await productionCrashDetector.getCrashData();
+      } catch (error) {
+        console.warn('Failed to get crash data:', error);
+        crashData = { crashes: [], actions: [] };
+      }
+
+      try {
+        systemLogs = await this.getSystemLogs();
+      } catch (error) {
+        console.warn('Failed to get system logs:', error);
+        systemLogs = [];
+      }
+
+      try {
+        errorBoundaryLogs = await this.getErrorBoundaryLogs();
+      } catch (error) {
+        console.warn('Failed to get error boundary logs:', error);
+        errorBoundaryLogs = [];
+      }
+
+      try {
+        performanceMetrics = await this.getPerformanceMetrics();
+      } catch (error) {
+        console.warn('Failed to get performance metrics:', error);
+        performanceMetrics = [];
+      }
+
+      try {
+        diagnostics = await this.getDiagnostics();
+      } catch (error) {
+        console.warn('Failed to get diagnostics:', error);
+        diagnostics = [];
+      }
 
       // Collect device and app information
       const { width, height, scale } = await this.getScreenDimensions();
@@ -168,8 +195,13 @@ class CrashReportExportService {
    */
   private async shareReport(data: string, filename: string, mimeType: string): Promise<void> {
     try {
+      // Check if Share is available
+      if (!Share || !Share.share) {
+        throw new Error('Share API not available');
+      }
+
       const shareOptions = {
-        message: `Wind Trend Analyzer Crash Report\n\nGenerated: ${new Date().toLocaleString()}\n\n${data}`,
+        message: `Wind Trend Analyzer Crash Report\n\nGenerated: ${new Date().toLocaleString()}\n\n${data.substring(0, 1000)}${data.length > 1000 ? '\n\n... (full report in console logs)' : ''}`,
         title: 'Crash Report',
       };
 
@@ -342,12 +374,22 @@ class CrashReportExportService {
    * Get screen dimensions
    */
   private async getScreenDimensions(): Promise<{width: number, height: number, scale: number}> {
-    // This would typically use Dimensions.get('screen')
-    return {
-      width: 400, // Fallback values
-      height: 800,
-      scale: 2
-    };
+    try {
+      const screen = Dimensions.get('screen');
+      return {
+        width: screen.width,
+        height: screen.height,
+        scale: screen.scale
+      };
+    } catch (error) {
+      console.warn('Failed to get screen dimensions:', error);
+      // Fallback values
+      return {
+        width: 400,
+        height: 800,
+        scale: 2
+      };
+    }
   }
 
   /**

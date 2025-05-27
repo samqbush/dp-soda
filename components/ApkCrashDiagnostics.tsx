@@ -253,7 +253,14 @@ export function ApkCrashDiagnostics() {
     <View style={styles.container}>
       <TouchableOpacity
         style={[styles.statusButton, { backgroundColor: getStatusColor() }]}
-        onPress={() => setIsVisible(!isVisible)}
+        onPress={() => {
+          try {
+            console.log('🔧 APK diagnostics toggle clicked');
+            setIsVisible(!isVisible);
+          } catch (error) {
+            console.error('❌ APK diagnostics toggle failed:', error);
+          }
+        }}
       >
         <Text style={styles.statusText}>
           🔧 {failedTests > 0 ? `${failedTests} Fail` : passedTests > 0 ? `${passedTests} Pass` : 'Test'}
