@@ -1,4 +1,6 @@
 # GitHub Copilot Custom Instructions
+
+## Build and Test Instructions
 This app is not built locally, it is built using [build.yml](./workflows/build.yml) in the GitHub Actions workflow. 
 The app can be tested locally using `npx expo start` or `npx expo start --tunnel`.
 The app can be tested after a github action build by downloading the universal apk and installing on a usb tethered android device.
@@ -30,6 +32,9 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 
 ## Documentation and User Experience
 - Keep documentation up to date and clear
+  - Avoid creating multiple versions of the same documentation
+  - Use the README and other markdown files for comprehensive guides
+- Refer to [README.md](../README.md) and [IMPLEMENTATION_SUMMARY](../IMPLEMENTATION_SUMMARY.md) for more details on the project, including setup instructions, development tools, and key features.
 - Ensure all features are discoverable and easy to use
 - Provide clear visual indicators for wind quality, alarm status, and prediction accuracy
 - Make all settings and thresholds easily adjustable by the user
@@ -45,4 +50,3 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 - Follow the patterns and logic described in the spec and README
 - Ask for clarification if a requirement is ambiguous
 
-Refer to [WIND_README.md](./WIND_README.md) and [IMPLEMENTATION_SUMMARY](.IMPLEMENTATION_SUMMARY) for more details on the project, including setup instructions, development tools, and key features.
