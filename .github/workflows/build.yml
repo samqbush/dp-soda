@@ -63,6 +63,7 @@ jobs:
           npx expo prebuild --platform android --clean
         env:
           CI: 1
+          NODE_OPTIONS: "--max-old-space-size=8192"
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       # Create a keystore file from secrets
@@ -111,7 +112,23 @@ jobs:
       # Build the AAB with detailed logging
       - name: Build Android App Bundle
         run: |
+          # First run our debug script to gather more information about the environment
+          echo "Running Metro debugging script..."
+          node scripts/metro-debug.js
+          
+          # Add more memory for node and configure environment for better bundling
+          export DEBUG=metro:*
+          export NODE_OPTIONS="--max-old-space-size=8192 --expose-gc"
+          export EXPO_DEBUG=true
+          export REACT_NATIVE_MAX_WORKERS=2
+          
+          # Clear metro cache
+          echo "Clearing metro cache..."
+          rm -rf node_modules/.cache/metro
+          
+          # Try building with extra diagnostic logging
           cd android
+          ./gradlew clean
           ./gradlew bundleRelease --stacktrace --info
 
       # Upload the AAB as an artifact
