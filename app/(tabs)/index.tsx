@@ -5,6 +5,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { SafeImage } from '@/components/SafeImage';
+import { SVGTest } from '@/components/SVGTest';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindDataDisplay } from '@/components/WindDataDisplay';
@@ -58,6 +59,8 @@ export default function HomeScreen() {
         <ThemedText type="title">Wind Trend Analyzer</ThemedText>
         <HelloWave />
       </ThemedView>
+      
+      <SVGTest />
       
       <WindDataDisplay />
       
