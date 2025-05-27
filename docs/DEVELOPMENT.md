@@ -4,7 +4,7 @@ This document contains information for developers working on the Wind Trend Anal
 
 ## Project Overview
 
-The Wind Trend Analyzer is a React Native app built with Expo that analyzes wind conditions at Bear Creek Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
+The Wind Trend Analyzer is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
 
 ## Development Environment
 

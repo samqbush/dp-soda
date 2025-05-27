@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 // WindAlert API constants
 const BASE_URL = 'https://windalert.com';
-const SPOT_ID = '149264'; // Bear Creek Lake (Soda Lake Dam 1)
+const SPOT_ID = '149264'; // (Soda Lake Dam 1)
 
 export interface WindDataPoint {
   time: string;
@@ -484,7 +484,7 @@ export const verifyWindConditions = (
 
 /**
  * Generates realistic sample wind data for testing purposes
- * Creates 24 hours of wind data with patterns similar to Bear Creek Lake
+ * Creates 24 hours of wind data with patterns similar to Soda Lake
  * Includes scenarios that would trigger alarms for testing
  */
 const generateSampleData = (): WindDataPoint[] => {
@@ -498,7 +498,7 @@ const generateSampleData = (): WindDataPoint[] => {
   for (let i = 0; i < 96; i++) { // 15-minute intervals
     const time = new Date(now.getTime() - (95 - i) * 15 * 60 * 1000);
     
-    // Create realistic wind patterns for Bear Creek Lake
+    // Create realistic wind patterns for Soda Lake
     const hour = time.getHours();
     let baseSpeed = 2;
     

@@ -151,7 +151,7 @@ function WindDataDisplayContent() {
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText type="subtitle" style={styles.title}>
-          Bear Creek Lake Wind
+          Soda Lake Wind
         </ThemedText>
         <View style={styles.buttonContainer}>
           <TouchableOpacity 

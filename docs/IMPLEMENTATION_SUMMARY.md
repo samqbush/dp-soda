@@ -4,7 +4,7 @@
 
 ### Core Services
 - **Wind Data Services**
-  - Fetches data from WindAlert API (endpoint: Bear Creek Lake/Soda Lake Dam 1)
+  - Fetches data from WindAlert API (endpoint: Soda Lake Dam 1)
   - Converts kph to mph and processes data
   - Analyzes 3am-5am alarm window and 6am-8am verification window
   - Configurable alarm criteria with sensible defaults

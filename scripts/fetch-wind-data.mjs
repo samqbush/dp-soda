@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Standalone wind data fetching script for Bear Creek Lake
+ * Standalone wind data fetching script for Soda Lake
  * This script can be run independently to fetch and analyze wind data
  * Similar to the original scrap-wind-react.js but optimized for the mobile app
  */
@@ -11,7 +11,7 @@ import fs from 'fs';
 
 // WindAlert API constants
 const BASE_URL = 'https://windalert.com';
-const SPOT_ID = '149264'; // Bear Creek Lake (Soda Lake Dam 1)
+const SPOT_ID = '149264'; // Soda Lake (Soda Lake Dam 1)
 
 /**
  * Fetches wind data directly from WindAlert API
@@ -246,7 +246,7 @@ const countConsecutiveGoodPoints = (data, criteria) => {
  */
 const main = async () => {
   try {
-    console.log('🌊 Bear Creek Lake Wind Data Fetcher');
+    console.log('🌊 Soda Lake Wind Data Fetcher');
     console.log('=====================================');
     
     const windData = await fetchWindData();
@@ -260,7 +260,7 @@ const main = async () => {
     // Write JSON
     fs.writeFileSync(jsonFile, JSON.stringify({
       metadata: {
-        location: 'Bear Creek Lake (Soda Lake Dam 1), Colorado',
+        location: 'Soda Lake (Soda Lake Dam 1), Colorado',
         timestamp: new Date().toISOString(),
         dataPoints: windData.length
       },

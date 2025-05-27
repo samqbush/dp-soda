@@ -251,7 +251,7 @@ export default function SettingsScreen() {
         <View style={styles.infoSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>About</ThemedText>
           <ThemedText style={styles.infoText}>
-            This app monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado.
+            This app monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado.
             It analyzes wind data in the 3am-5am window to determine if conditions are favorable
             for beach activities. The verification window (6am-8am) checks if the predicted
             conditions actually occurred.

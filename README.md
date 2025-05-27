@@ -1,6 +1,6 @@
-# Wind Trend Analyzer - Bear Creek Lake
+# Wind Trend Analyzer - Soda Lake
 
-An app that monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for beach activities. Get reliable predictions based on early morning wind patterns!
+An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for beach activities. Get reliable predictions based on early morning wind patterns!
 
 ![Wind Trend Analyzer App](./assets/images/app-preview.png)
 
@@ -26,7 +26,7 @@ An app that monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Col
 
 ## How It Works
 
-The Wind Trend Analyzer helps you decide when to head to the beach by analyzing early morning wind patterns at Bear Creek Lake.
+The Wind Trend Analyzer helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
 
 ### Smart Wake-Up Decisions
 
@@ -83,10 +83,10 @@ Tailor the app to your specific needs through the Settings screen:
 The app may be in offline mode. Check your internet connection and pull down to refresh.
 
 ### How accurate are the predictions?
-The app analyzes actual wind data from WindAlert's monitoring station at Bear Creek Lake. Predictions are based on established wind patterns and verified using the 6am-8am window data.
+The app analyzes actual wind data from WindAlert's monitoring station at Soda Lake. Predictions are based on established wind patterns and verified using the 6am-8am window data.
 
 ### Can I use this for other locations?
-Currently, the app is optimized for Bear Creek Lake (Soda Lake Dam 1) in Colorado. Support for additional locations is planned for future updates.
+Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado. Support for additional locations is planned for future updates.
 
 ### What should I do if I see a white screen on Android?
 The app includes advanced recovery systems. If you encounter a white screen, wait a few moments for the recovery system to engage. If problems persist, see the troubleshooting guide in the app settings.
