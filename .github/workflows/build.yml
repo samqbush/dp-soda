@@ -1,8 +1,6 @@
-name: Build Wind Trend Analyzer with White Screen Fixes
+name: Build Wind Trend Analyzer
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,6 +11,8 @@ jobs:
     steps:
       - name: 📦 Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🔧 Set up Node.js
         uses: actions/setup-node@v4
@@ -22,47 +22,28 @@ jobs:
 
       - name: 🧹 Clean previous builds and caches
         run: |
-          rm -rf node_modules/.cache
-          rm -rf .expo
-          rm -rf android
+          rm -rf node_modules/.cache .expo android
 
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🔧 Install Expo CLI
-        run: npm install -g @expo/cli
-
-      - name: 🔐 Authenticate with Expo
-        run: npx expo whoami
+      - name: 🔧 Install Expo CLI and authenticate
+        run: |
+          npm install -g @expo/cli
+          npx expo whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
 
-      - name: 🔍 Fix package versions (white screen fix)
+      - name: 🔍 Fix package versions
         run: npx expo install --fix
 
-      - name: 🔧 Enable Enhanced Crash Detection for APK
+      - name: 🧪 Run checks
         run: |
-          echo "🔧 Configuring enhanced crash detection for production APK..."
-          echo "Adding comprehensive crash logging and debugging tools..."
-          # Create a build-time configuration for enhanced crash detection
-          echo '{ "crashDetection": { "enabled": true, "verbose": true, "autoExport": true } }' > crash-config.json
-
-      - name: 🧪 Run lint check
-        run: npm run lint
-
-      - name: 🧪 Test crash detection system
-        run: |
-          echo "🧪 Testing crash detection components..."
-          # Test that all crash detection services are properly configured
+          npm run lint
           npx tsc --noEmit --skipLibCheck
-          echo "✅ TypeScript compilation passed for crash detection"
-
-      # Optional: Run tests if you have them
-      # - name: Run tests
-      #   run: npm test
         
-      # Build for Android locally
+      # Android build setup
       - name: ☕ Set up JDK
         uses: actions/setup-java@v3
         with:
@@ -82,17 +63,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # Generate the native Android project with white screen fixes
-      - name: 🔧 Clean and generate native Android project (with fixes)
-        run: |
-          echo "🔧 Generating Android project with white screen fixes..."
-          echo "Key fixes applied:"
-          echo "- newArchEnabled: false (disabled new React Native architecture)"
-          echo "- Enhanced timeout and recovery mechanisms"
-          echo "- Comprehensive debugging tools included"
-          echo "- Progressive recovery system"
-          echo "- Emergency recovery options"
-          npx expo prebuild --platform android --clean
+      # Generate the native Android project
+      - name: 🔧 Generate native Android project
+        run: npx expo prebuild --platform android --clean
         env:
           CI: 1
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -106,56 +79,37 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
-      # Update gradle.properties for better build performance and white screen fixes
-      - name: ⚙️ Configure Gradle for production build (with white screen optimizations)
+      # Update gradle.properties for better build performance
+      - name: ⚙️ Configure Gradle for production build
         run: |
-          echo "🔧 Applying Android build optimizations for white screen fixes..."
           echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
           echo "org.gradle.parallel=true" >> android/gradle.properties
           echo "org.gradle.configureondemand=true" >> android/gradle.properties
           echo "android.enableR8.fullMode=false" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
-          # Additional optimizations for stability
           echo "android.useAndroidX=true" >> android/gradle.properties
-          # Use recommended replacement for deprecated enableDexingArtifactTransform
           echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
-          # Enhanced crash detection settings
-          echo "# Crash detection optimizations" >> android/gradle.properties
           echo "android.enableR8=true" >> android/gradle.properties
           echo "android.enableProguard=false" >> android/gradle.properties
-          echo "Configured gradle.properties:"
-          cat android/gradle.properties
 
-      - name: 🔧 Inject Enhanced Crash Detection into APK
+      - name: 🔧 Add build metadata
         run: |
-          echo "🔧 Injecting enhanced crash detection into Android build..."
-          # Add crash detection metadata to the Android manifest
           if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            echo "📝 Adding crash detection metadata to AndroidManifest.xml"
-            # This will help identify the build in crash reports
             sed -i '/<application/a\        <meta-data android:name="crash_detection_build" android:value="github_actions_enhanced" />' android/app/src/main/AndroidManifest.xml
             sed -i '/<application/a\        <meta-data android:name="build_timestamp" android:value="'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" />' android/app/src/main/AndroidManifest.xml
-            echo "✅ Enhanced crash detection metadata injected"
           fi
 
-      # Build the AAB with detailed logging
-      - name: 🏗️ Build Android App Bundle (with white screen fixes)
+      # Build the AAB
+      - name: 🏗️ Build Android App Bundle
         run: |
-          echo "🏗️ Building Android App Bundle with white screen fixes..."
-          echo "Build includes:"
-          echo "✅ Disabled new React Native architecture"
-          echo "✅ Enhanced debugging components"
-          echo "✅ Progressive recovery system"
-          echo "✅ Emergency recovery options"
-          echo "✅ Android-specific optimizations"
           cd android
-          ./gradlew bundleRelease --stacktrace --info
+          ./gradlew bundleRelease
 
       # Upload the AAB as an artifact
       - name: 📤 Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-with-white-screen-fixes
+          name: app-release
           path: android/app/build/outputs/bundle/release/app-release.aab
 
       # Convert AAB to APKs for device testing
@@ -165,7 +119,6 @@ jobs:
 
       - name: 📱 Generate Universal APK from AAB
         run: |
-          echo "📱 Generating universal APK for easy device testing..."
           java -jar bundletool.jar build-apks \
             --bundle=android/app/build/outputs/bundle/release/app-release.aab \
             --output=android/app/build/outputs/bundle/release/app-release.apks \
@@ -179,74 +132,25 @@ jobs:
         run: |
           cd android/app/build/outputs/bundle/release
           unzip -j app-release.apks universal.apk
-          mv universal.apk app-release-universal-with-fixes.apk
-          echo "✅ Universal APK created: app-release-universal-with-fixes.apk"
+          mv universal.apk app-release-universal.apk
 
       - name: 📤 Upload Universal APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: app-universal-apk-with-white-screen-fixes
-          path: android/app/build/outputs/bundle/release/app-release-universal-with-fixes.apk
+          name: app-universal-apk
+          path: android/app/build/outputs/bundle/release/app-release-universal.apk
 
-      # Add a summary of the white screen fixes
-      - name: 📋 Enhanced Crash Detection & Debugging Summary
+      # Add a brief build summary
+      - name: 📋 Build Summary
         run: |
-          echo "## 🎉 Build Complete with Advanced Crash Detection" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔧 Core Fixes Applied:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Disabled React Native new architecture** (\`newArchEnabled: false\`)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Enhanced timeout and recovery mechanisms**" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Progressive recovery system** (5s, 8s, 12s, 15s intervals)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Emergency recovery options** (Force Reload, Clear Data, Restart App)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Android-specific optimizations**" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "- **AAB**: For Google Play Store submission" >> $GITHUB_STEP_SUMMARY
+          echo "- **Universal APK**: For direct device installation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🛡️ Advanced Crash Detection Features:" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 **Enhanced APK Diagnostics** - System health checks and real-time monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 **Performance Metrics Tracking** - Memory usage, render times, and bottleneck detection" >> $GITHUB_STEP_SUMMARY
-          echo "- 🚨 **Production Crash Logging** - Comprehensive error capture with stack traces" >> $GITHUB_STEP_SUMMARY
-          echo "- 📤 **Advanced Export System** - JSON, Text, and CSV report formats with sharing" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔧 **Enhanced Android Debugger** - Real-time system monitoring and crash simulation" >> $GITHUB_STEP_SUMMARY
-          echo "- ⚡ **Quick Export Button** - Emergency crash data export (floating button)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🧪 **Memory Pressure Testing** - Stress testing and stability verification" >> $GITHUB_STEP_SUMMARY
-          echo "- 📱 **Device-Specific Diagnostics** - Screen info, platform details, and compatibility checks" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎛️ Debug Tools Available in APK:" >> $GITHUB_STEP_SUMMARY
-          echo "1. **🟢 Android Crash Logger** (top-right) - Real-time crash monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "2. **🔵 APK Diagnostics** (top-right) - Tap to run system tests" >> $GITHUB_STEP_SUMMARY
-          echo "3. **🔧 Enhanced Debugger** (top-right) - Advanced system monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "4. **📤 Quick Export** (bottom-right) - Emergency crash report export" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📱 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download \`app-universal-apk-with-white-screen-fixes\` artifact" >> $GITHUB_STEP_SUMMARY
-          echo "2. Install the APK on your Android device" >> $GITHUB_STEP_SUMMARY
-          echo "3. Watch for progressive recovery features if white screen appears:" >> $GITHUB_STEP_SUMMARY
-          echo "   - ⏱️ 0-3s: Normal loading with spinner" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🔍 3-5s: White Screen Detective panel (top-left)" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🐛 5-8s: Debug panel (top-right)" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🔄 8-12s: Force Reload button" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🆘 12+s: Emergency Recovery button" >> $GITHUB_STEP_SUMMARY
-          echo "4. If crashes occur after data loads:" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🚨 Crash recovery screen will appear automatically" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🔄 Use 'Try Again' for single crashes" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🔍 Use 'Show Details' to see crash information" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🗑️ Use 'Clear All Data' for persistent crashes" >> $GITHUB_STEP_SUMMARY
-          echo "5. Test the enhanced debugging tools:" >> $GITHUB_STEP_SUMMARY
-          echo "   - 📊 Use Enhanced Debugger to monitor real-time performance" >> $GITHUB_STEP_SUMMARY
-          echo "   - 🧪 Run memory pressure tests to verify stability" >> $GITHUB_STEP_SUMMARY
-          echo "   - 💥 Use crash simulation to test recovery systems" >> $GITHUB_STEP_SUMMARY
-          echo "   - 📤 Test crash report export functionality" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚨 If Issues Persist:" >> $GITHUB_STEP_SUMMARY
-          echo "- White screen: Use the diagnostic tools and progressive recovery features" >> $GITHUB_STEP_SUMMARY
-          echo "- App crashes: Check crash recovery screen for specific error details" >> $GITHUB_STEP_SUMMARY
-          echo "- Try the Force Reload and Emergency Recovery options" >> $GITHUB_STEP_SUMMARY
-          echo "- Use the Quick Export button (📤) to generate immediate crash reports" >> $GITHUB_STEP_SUMMARY
-          echo "- Check device logs with \`adb logcat\` for detailed error information" >> $GITHUB_STEP_SUMMARY
-          echo "- See docs/CRASH_RECOVERY_GUIDE.md for comprehensive troubleshooting" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚨 If Issues Persist:" >> $GITHUB_STEP_SUMMARY
-          echo "- White screen: Use the diagnostic tools and progressive recovery features" >> $GITHUB_STEP_SUMMARY
-          echo "- App crashes: Check crash recovery screen for specific error details" >> $GITHUB_STEP_SUMMARY
-          echo "- Try the Force Reload and Emergency Recovery options" >> $GITHUB_STEP_SUMMARY
-          echo "- Check device logs with \`adb logcat\` for detailed error information" >> $GITHUB_STEP_SUMMARY
-          echo "- See docs/CRASH_RECOVERY_GUIDE.md for comprehensive troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the \`app-universal-apk\` artifact" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install on your Android device" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run the app and verify functionality" >> $GITHUB_STEP_SUMMARY
 

@@ -1,0 +1,60 @@
+name: Release Wind Trend Analyzer
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      # Download the artifacts from the most recent successful build
+      - name: 📥 Download the AAB artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: build.yml
+          branch: ${{ github.event.pull_request.head.ref || 'main' }}
+          workflow_conclusion: success
+          name: app-release
+          path: artifacts/aab
+
+      - name: 📥 Download the universal APK artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: build.yml
+          branch: ${{ github.event.pull_request.head.ref || 'main' }}
+          workflow_conclusion: success
+          name: app-universal-apk
+          path: artifacts/apk
+
+      # Create a GitHub Release
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Wind Trend Analyzer v${{ github.run_number }}"
+          tag_name: "v${{ github.run_number }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/aab/app-release.aab
+            artifacts/apk/app-release-universal.apk
+          body: |
+            ## Wind Trend Analyzer Release
+
+            This release contains the latest version of the Wind Trend Analyzer app for Android.
+
+            ### Installation
+            - Download the APK file directly from this release
+            - Allow installation from unknown sources in your device settings
+            - Install and enjoy!
+
+            ### Version Information
+            - Build: ${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+            - Built on: $(date -u +"%Y-%m-%d")
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
