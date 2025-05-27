@@ -1,8 +1,10 @@
+import { debugSettings } from '@/services/debugSettings';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    AppState,
     Platform,
     ScrollView,
     StyleSheet,
@@ -21,21 +23,65 @@ interface DiagnosticResult {
 /**
  * Android Crash Diagnostics - Helps identify crashes in Expo Go and APKs
  * Runs system health checks to identify root causes of crashes
+ * Only visible when enabled through Developer Mode settings
  */
 export function ApkCrashDiagnostics() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
   const [autoRan, setAutoRan] = useState(false);
 
   useEffect(() => {
-    // Auto-run diagnostics on first load (for production APK debugging)
-    if (!__DEV__ && !autoRan) {
-      setAutoRan(true);
-      setTimeout(() => {
-        runDiagnostics();
-      }, 3000); // Wait a bit for app to settle
-    }
+    const checkVisibilityAndRun = async () => {
+      try {
+        if (Platform.OS !== 'android') return; // Only relevant on Android
+        
+        // Check if this component should be shown
+        const shouldShow = await debugSettings.isComponentVisible('showApkDiagnostics');
+        console.log('🔍 ApkCrashDiagnostics visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(shouldShow);
+        
+        // Only run diagnostics if visible and not already run
+        if (shouldShow && !autoRan) {
+          setAutoRan(true);
+          setTimeout(() => {
+            runDiagnostics();
+          }, 3000); // Wait a bit for app to settle
+        }
+      } catch (error) {
+        console.error('Failed to check ApkCrashDiagnostics visibility:', error);
+      }
+    };
+
+    checkVisibilityAndRun();
+
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showApkDiagnostics', 
+      (isVisible) => {
+        console.log('🔄 ApkCrashDiagnostics visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(isVisible);
+        
+        if (isVisible && !autoRan) {
+          setAutoRan(true);
+          setTimeout(() => {
+            runDiagnostics();
+          }, 1000);
+        }
+      }
+    );
+
+    // Also check when app comes back to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibilityAndRun();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+    };
   }, [autoRan]);
 
   const runDiagnostics = async () => {
@@ -194,8 +240,8 @@ export function ApkCrashDiagnostics() {
       // Log results for debugging
       console.log('🔍 APK Diagnostics completed:', results);
       
-      // If running automatically and there are failures, show the panel
-      if (!__DEV__ && results.some(r => r.result === 'fail')) {
+      // If there are failures, show the panel
+      if (results.some(r => r.result === 'fail')) {
         setIsVisible(true);
       }
 
@@ -234,8 +280,8 @@ export function ApkCrashDiagnostics() {
     }
   };
 
-  // Only show on Android
-  if (Platform.OS !== 'android') {
+  // Don't render if not enabled or not on Android
+  if (Platform.OS !== 'android' || !isComponentEnabled) {
     return null;
   }
 

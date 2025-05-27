@@ -1,15 +1,17 @@
 import { crashMonitor } from '@/services/crashMonitor';
+import { debugSettings } from '@/services/debugSettings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Platform,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  AppState,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface CrashLog {
@@ -28,22 +30,65 @@ interface CrashLog {
 /**
  * Android Crash Logger - Helps debug crashes in Expo Go and production APKs
  * This component collects crash information and provides debugging tools
- * Available in both development (Expo Go) and production builds
+ * Only visible when enabled through Developer Mode settings
  */
 export function AndroidCrashLogger() {
   const [crashLogs, setCrashLogs] = useState<CrashLog[]>([]);
   const [isVisible, setIsVisible] = useState(false);
+  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
   const [appState, setAppState] = useState<'loading' | 'ready' | 'crashed'>('loading');
 
+  // Single unified useEffect for both visibility checking and initialization
   useEffect(() => {
-    // Show on Android (both Expo Go and production APKs)
+    // Only relevant on Android
     if (Platform.OS !== 'android') return;
 
-    initializeCrashLogger();
+    const checkVisibilityAndInit = async () => {
+      try {
+        // Check if this component should be shown
+        const shouldShow = await debugSettings.isComponentVisible('showAndroidCrashLogger');
+        console.log('🔍 AndroidCrashLogger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(shouldShow);
+        
+        // Only initialize if component should be shown
+        if (shouldShow) {
+          await initializeCrashLogger();
+        }
+      } catch (error) {
+        console.error('Failed to check AndroidCrashLogger visibility:', error);
+      }
+    };
+    
+    checkVisibilityAndInit();
+    
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showAndroidCrashLogger', 
+      async (isVisible) => {
+        console.log('🔄 AndroidCrashLogger visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(isVisible);
+        
+        if (isVisible) {
+          await initializeCrashLogger();
+        }
+      }
+    );
+    
+    // Also check when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibilityAndInit();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+    };
   }, []);
 
   const initializeCrashLogger = async () => {
     try {
+      console.log('🔍 Initializing Android Crash Logger');
       // Load existing crash logs
       const stored = await AsyncStorage.getItem('android_crash_logs');
       if (stored) {
@@ -161,9 +206,9 @@ export function AndroidCrashLogger() {
       default: return '❓ Unknown';
     }
   };
-
-  // Only show on Android
-  if (Platform.OS !== 'android') {
+  
+  // Don't render if not enabled or not on Android
+  if (Platform.OS !== 'android' || !isComponentEnabled) {
     return null;
   }
 

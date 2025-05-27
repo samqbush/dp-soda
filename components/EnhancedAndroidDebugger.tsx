@@ -1,8 +1,10 @@
+import { debugSettings } from '@/services/debugSettings';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    AppState,
     Dimensions,
     Platform,
     ScrollView,
@@ -51,6 +53,7 @@ interface PerformanceMetric {
 /**
  * Enhanced Android Debugger - Advanced debugging tools for production APKs
  * Provides real-time system monitoring, performance metrics, and crash prediction
+ * Only visible when enabled through Developer Mode settings
  */
 export function EnhancedAndroidDebugger() {
   const [isVisible, setIsVisible] = useState(false);
@@ -58,12 +61,59 @@ export function EnhancedAndroidDebugger() {
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [appStartTime] = useState(Date.now());
+  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
 
+  // Check visibility and initialize if enabled
   useEffect(() => {
-    // Auto-start monitoring in production builds
-    if (!__DEV__) {
-      startMonitoring();
-    }
+    // Only relevant on Android
+    if (Platform.OS !== 'android') return;
+
+    const checkVisibilityAndInit = async () => {
+      try {
+        // Check if this component should be shown
+        const shouldShow = await debugSettings.isComponentVisible('showEnhancedAndroidDebugger');
+        console.log('🔍 EnhancedAndroidDebugger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(shouldShow);
+        
+        // Only initialize monitoring if component should be shown
+        if (shouldShow) {
+          startMonitoring();
+        } else {
+          stopMonitoring(); // Ensure monitoring is stopped if component becomes invisible
+        }
+      } catch (error) {
+        console.error('Failed to check EnhancedAndroidDebugger visibility:', error);
+      }
+    };
+    
+    checkVisibilityAndInit();
+    
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showEnhancedAndroidDebugger', 
+      (isVisible) => {
+        console.log('🔄 EnhancedAndroidDebugger visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(isVisible);
+        
+        if (isVisible) {
+          startMonitoring();
+        } else {
+          stopMonitoring();
+        }
+      }
+    );
+    
+    // Also check when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibilityAndInit();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+      stopMonitoring(); // Clean up on unmount
+    };
   }, []);
 
   const startMonitoring = async () => {
@@ -281,8 +331,8 @@ export function EnhancedAndroidDebugger() {
     );
   };
 
-  // Only show on Android
-  if (Platform.OS !== 'android') {
+  // Don't render if not enabled or not on Android
+  if (Platform.OS !== 'android' || !isComponentEnabled) {
     return null;
   }
 

@@ -1,12 +1,56 @@
 import { crashReportExportService } from '@/services/crashReportExportService';
-import React from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { debugSettings } from '@/services/debugSettings';
+import React, { useEffect, useState } from 'react';
+import { Alert, AppState, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 /**
  * Quick Export Button - Emergency crash report export
  * Provides immediate access to crash report export functionality
  */
 export function QuickExportButton() {
+  const [isEnabled, setIsEnabled] = useState(false);
+  
+  useEffect(() => {
+    const checkVisibility = async () => {
+      try {
+        if (Platform.OS !== 'android') return; // Only relevant on Android
+        
+        // Check if this component should be shown
+        const shouldShow = await debugSettings.isComponentVisible('showQuickExportButton');
+        console.log('🔍 QuickExportButton visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsEnabled(shouldShow);
+      } catch (error) {
+        console.error('Failed to check QuickExportButton visibility:', error);
+      }
+    };
+    
+    checkVisibility();
+    
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showQuickExportButton', 
+      (isVisible) => {
+        console.log('🔄 QuickExportButton visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsEnabled(isVisible);
+      }
+    );
+    
+    // Check again when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibility();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+    };
+  }, []);
+
+  // Don't render if not enabled or not on Android
+  if (Platform.OS !== 'android' || !isEnabled) {
+    return null;
+  }
   const handleQuickExport = async () => {
     try {
       Alert.alert(
@@ -77,10 +121,8 @@ export function QuickExportButton() {
     }
   };
 
-  // Only show on Android
-  if (Platform.OS !== 'android') {
-    return null;
-  }
+  // Only one visibility check is needed
+  // The duplicate check has been removed
 
   return (
     <View style={styles.container}>

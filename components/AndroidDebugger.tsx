@@ -1,8 +1,9 @@
 import { getBuildConfig } from '@/config/buildConfig';
+import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface DebugInfo {
   timestamp: string;
@@ -16,87 +17,133 @@ interface DebugInfo {
 
 /**
  * Android-specific debugging component to help diagnose white screen issues
- * Only shows in development or when explicitly enabled
+ * Only visible when enabled through Developer Mode settings
  */
 export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [renderCount, setRenderCount] = useState(0);
   const [visible, setVisible] = useState(false);
+  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
 
-  // Only show on Android and when enabled or in development
-  const shouldShow = Platform.OS === 'android' && (enabled || __DEV__);
-
+  // Check visibility and initialize if enabled
   useEffect(() => {
-    if (!shouldShow) return;
+    // Only relevant on Android
+    if (Platform.OS !== 'android') return;
 
-    const currentRenderCount = renderCount + 1;
-    setRenderCount(currentRenderCount);
-
-    const gatherDebugInfo = async () => {
+    const checkVisibilityAndInit = async () => {
       try {
-        // Test AsyncStorage
-        let storageTest = 'failed';
-        try {
-          await AsyncStorage.setItem('debugTest', 'working');
-          const result = await AsyncStorage.getItem('debugTest');
-          storageTest = result === 'working' ? 'working' : 'failed';
-          await AsyncStorage.removeItem('debugTest');
-        } catch (e) {
-          storageTest = `error: ${e}`;
+        // Check if this component should be shown - only use debug settings
+        const shouldShow = await debugSettings.isComponentVisible('showAndroidDebugger');
+        console.log('🔍 AndroidDebugger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(shouldShow);
+        
+        // Only initialize if component should be shown
+        if (shouldShow) {
+          await gatherDebugInfo();
         }
-
-        // Get last error
-        let lastError = null;
-        try {
-          const errorData = await AsyncStorage.getItem('lastError');
-          lastError = errorData ? JSON.parse(errorData).message : null;
-        } catch (e) {
-          console.log('Error getting last error:', e);
-        }
-
-        const info: DebugInfo = {
-          timestamp: new Date().toISOString(),
-          platform: `${Platform.OS} ${Platform.Version}`,
-          buildInfo: getBuildConfig(),
-          storageTest,
-          renderCount: currentRenderCount,
-          memoryWarnings: 0, // Could be enhanced with memory monitoring
-          lastError
-        };
-
-        setDebugInfo(info);
-      } catch (e) {
-        console.error('Failed to gather debug info:', e);
+      } catch (error) {
+        console.error('Failed to check AndroidDebugger visibility:', error);
       }
     };
+    
+    // Function to check if app appears to be stuck or crashed
+    const isStuckOrCrashed = () => {
+      // App has been running for more than 15 seconds without initializing
+      const appStartTime = (global as any).__APP_START_TIME || Date.now();
+      return (Date.now() - appStartTime) > 15000;
+    };
+    
+    checkVisibilityAndInit();
+    
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showAndroidDebugger', 
+      async (isVisible) => {
+        console.log('🔄 AndroidDebugger visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(isVisible);
+        
+        if (isVisible) {
+          await gatherDebugInfo();
+        }
+      }
+    );
+    
+    // Also check when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibilityAndInit();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+    };
+  }, [enabled]);
 
-    gatherDebugInfo();
-  }, [shouldShow]); // Removed renderCount from dependencies to prevent infinite loop
+  const gatherDebugInfo = async () => {
+    try {
+      // Update render count
+      const currentRenderCount = renderCount + 1;
+      setRenderCount(currentRenderCount);
+      
+      // Test AsyncStorage
+      let storageTest = 'failed';
+      try {
+        await AsyncStorage.setItem('debugTest', 'working');
+        const result = await AsyncStorage.getItem('debugTest');
+        storageTest = result === 'working' ? 'working' : 'failed';
+        await AsyncStorage.removeItem('debugTest');
+      } catch (e) {
+        storageTest = `error: ${e}`;
+      }
 
-  if (!shouldShow || !debugInfo) {
+      // Get last error
+      let lastError = null;
+      try {
+        const errorData = await AsyncStorage.getItem('lastError');
+        if (errorData) {
+          lastError = errorData;
+        }
+      } catch (e) {
+        console.error('Error reading last error:', e);
+      }
+
+      // Set the debug info
+      setDebugInfo({
+        timestamp: new Date().toISOString(),
+        platform: `${Platform.OS} ${Platform.Version}`,
+        buildInfo: getBuildConfig(),
+        storageTest,
+        renderCount: currentRenderCount,
+        memoryWarnings: 0,
+        lastError
+      });
+    } catch (error) {
+      console.error('Failed to gather debug info:', error);
+    }
+  };
+
+  // Don't render if not enabled or not on Android
+  if (Platform.OS !== 'android' || !isComponentEnabled) {
     return null;
   }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.toggleButton}
         onPress={() => setVisible(!visible)}
       >
-        <Text style={styles.toggleText}>
-          {visible ? '📱 Hide Debug' : '🐛 Debug Info'}
-        </Text>
+        <Text style={styles.toggleText}>🔧 Debug Info</Text>
       </TouchableOpacity>
-
-      {visible && (
-        <ScrollView style={styles.debugPanel}>
-          <Text style={styles.title}>Android Debug Info</Text>
-          
+      
+      {visible && debugInfo && (
+        <ScrollView style={styles.infoPanel}>
           <View style={styles.section}>
             <Text style={styles.label}>Platform:</Text>
             <Text style={styles.value}>{debugInfo.platform}</Text>
           </View>
-
+          
           <View style={styles.section}>
             <Text style={styles.label}>Build:</Text>
             <Text style={styles.value}>
@@ -134,17 +181,16 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
             </Text>
           </View>
 
-          {__DEV__ && (
-            <View style={styles.section}>
-              <Text style={styles.label}>Crash Testing:</Text>
-              <TouchableOpacity 
-                style={styles.testButton}
-                onPress={() => globalCrashHandler.reportTestCrash('AndroidDebugger', 'Test crash triggered')}
-              >
-                <Text style={styles.testButtonText}>🧪 Test Crash</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Only show crash testing in developer mode */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Crash Testing:</Text>
+            <TouchableOpacity 
+              style={styles.testButton}
+              onPress={() => globalCrashHandler.reportTestCrash('AndroidDebugger', 'Test crash triggered')}
+            >
+              <Text style={styles.testButtonText}>🧪 Test Crash</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
     </View>
@@ -169,7 +215,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  debugPanel: {
+  infoPanel: {
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     marginTop: 5,
     padding: 15,
@@ -177,14 +223,8 @@ const styles = StyleSheet.create({
     maxHeight: 300,
     minWidth: 250,
   },
-  title: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
   section: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   label: {
     color: '#ccc',

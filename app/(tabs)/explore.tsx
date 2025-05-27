@@ -1,3 +1,4 @@
+import { VersionDisplay } from '@/components/SecretGestureActivator';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -267,6 +268,11 @@ export default function SettingsScreen() {
           >
             <ThemedText style={styles.saveButtonText}>Refresh Wind Data</ThemedText>
           </TouchableOpacity>
+          
+          {/* Version display with secret gesture detection */}
+          <View style={styles.versionContainer}>
+            <VersionDisplay />
+          </View>
         </View>
       </ThemedView>
     </ScrollView>
@@ -373,4 +379,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  versionContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+  }
 });

@@ -19,6 +19,7 @@ import { QuickExportButton } from '@/components/QuickExportButton';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
+import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
@@ -40,6 +41,11 @@ globalCrashHandler.initialize().catch(error =>
 // Initialize production crash detector for APK debugging
 productionCrashDetector.initialize().catch(error =>
   console.error('Failed to initialize production crash detector:', error)
+);
+
+// Reset debug settings to ensure developer mode is correctly disabled by default
+debugSettings.forceResetToDefaults().catch(error =>
+  console.error('Failed to reset debug settings:', error)
 );
 
 // Keep the splash screen visible while we fetch resources
@@ -230,7 +236,7 @@ export default function RootLayout() {
 
   return (
     <AndroidSafeWrapper>
-      <AndroidDebugger enabled={__DEV__ || isStuck} />
+      <AndroidDebugger />
       <AndroidCrashLogger />
       <ApkCrashDiagnostics />
       <EnhancedAndroidDebugger />
