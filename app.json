@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "dp-soda",
+    "name": "Wind Trend Analyzer",
     "slug": "dp-soda",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
       "package": "com.samqbush.dpsoda",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#1E3D58"
       },
       "permissions": [
         "INTERNET",
@@ -45,11 +45,11 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#1E3D58",
           "dark": {
             "image": "./assets/images/splash-icon.png",
             "resizeMode": "contain",
-            "backgroundColor": "#121212"
+            "backgroundColor": "#0A1F33"
           }
         }
       ]
@@ -57,17 +57,17 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#1E3D58",
       "dark": {
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#121212"
+        "backgroundColor": "#0A1F33"
       }
     },
     "androidStatusBar": {
-      "backgroundColor": "#ffffff",
-      "translucent": false,
-      "barStyle": "dark-content",
+      "backgroundColor": "#1E3D58",
+      "translucent": true,
+      "barStyle": "light-content",
       "hidden": false
     },
     "experiments": {
