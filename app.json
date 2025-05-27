@@ -25,8 +25,12 @@
       ],
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": true,
-      "versionCode": 3,
-      "theme": "@style/Theme.App.SplashScreen"
+      "versionCode": 4,
+      "theme": "@style/Theme.App.SplashScreen",
+      "jsEngine": "jsc",
+      "enableHermes": false,
+      "enableProguard": false,
+      "enableShrinkResources": false
     },
     "web": {
       "bundler": "metro",
@@ -67,8 +71,9 @@
       "hidden": false
     },
     "experiments": {
-      "typedRoutes": true,
-      "turboModules": false
+      "typedRoutes": false,
+      "turboModules": false,
+      "newArchEnabled": false
     },
     "extra": {
       "router": {},
