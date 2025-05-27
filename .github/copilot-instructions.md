@@ -1,8 +1,7 @@
 # GitHub Copilot Custom Instructions
 This app is not built locally, it is built using [build.yml](./workflows/build.yml) in the GitHub Actions workflow. 
-The can can be tested locally using npx `expo start --tunnel` or `npx expo start`
-I cannot tether an Android device to my computer, so I cannot test the app on a physical device.
-I can only test the app using the Expo Go app on my Android device.
+The app can be tested locally using `npx expo start` or `npx expo start --tunnel`.
+The app can be tested after a github action build by downloading the universal apk and installing on a usb tethered android device.
 
 ## Project Context
 This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda Lake Dam 1), Colorado. It scrapes wind data from WindAlert, analyzes and visualizes early morning wind trends (especially 3am–5am), and determines if conditions are favorable for beach activities. The project includes:

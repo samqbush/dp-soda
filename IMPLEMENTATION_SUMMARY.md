@@ -112,3 +112,7 @@ The modular architecture makes it easy to add:
 6. **Display**: Show results with visual indicators and charts
 
 The implementation follows your original script's approach while adding mobile-optimized features and user configurability.
+
+## Android Crash & White Screen Guide
+
+For all details on Android crash detection, white screen fixes, debugging, and recovery, see [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).

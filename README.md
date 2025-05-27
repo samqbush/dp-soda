@@ -173,3 +173,7 @@ This project is licensed under the MIT License.
 ## Contact
 
 For questions or support, please open an issue in the repository.
+
+## Android Crash & White Screen Guide
+
+For comprehensive troubleshooting, crash detection, and white screen recovery on Android, see [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).

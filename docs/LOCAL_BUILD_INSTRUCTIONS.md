@@ -53,3 +53,14 @@ When you're ready to switch to local builds:
 - Keep your keystore file secure; losing it will prevent you from updating your app on the Play Store
 - You may need to adjust Gradle settings based on your specific app requirements
 - The AAB file will be available as an artifact in the GitHub Actions run
+
+## Local Debug Instructions
+```shell
+# install new apk
+adb install /Users/samquakenbush/Downloads/app-release-universal-with-fixes.apk 
+
+# clear the logs
+adb logcat -c
+# Launch the app and let it crash
+adb logcat -s "ReactNative:*" "ReactNativeJS:*" "AndroidRuntime:*" "System.err:*" "com.samqbush.dpsoda:*" "*:F" "*:E" | tee crash-logs-filtered.log
+```
