@@ -2,12 +2,14 @@
 
 This document summarizes the changes made to fix the "white screen" issue in the React Native Android app when running as a release build from GitHub Actions.
 
-**Update**: Additional comprehensive fixes have been implemented to address persistent white screen issues. See below for the complete set of changes.
+**Update**: Additional comprehensive fixes have been implemented to address persistent white screen issues, including Gradle compatibility fixes for modern Android build tools. See below for the complete set of changes.
 
 ## Latest Updates (May 2025)
 
-### 1. React Native Architecture Changes
-- **Disabled New Architecture**: Set `newArchEnabled: false` in app.json to avoid compatibility issues
+### 1. Build System Fixes
+- **Fixed Gradle Compatibility**: Removed deprecated `android.enableDexingArtifactTransform` property
+- **Updated Build Configuration**: Added `android.useFullClasspathForDexingTransform=true` for modern Android Gradle Plugin compatibility
+- **React Native Architecture Changes**: Set `newArchEnabled: false` in app.json to avoid compatibility issues
 - **Improved Build Configuration**: Enhanced Android build settings and permissions
 - **Version Code Update**: Incremented to version code 3 for clean installation
 

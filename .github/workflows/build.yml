@@ -103,7 +103,8 @@ jobs:
           echo "android.enableJetifier=true" >> android/gradle.properties
           # Additional optimizations for stability
           echo "android.useAndroidX=true" >> android/gradle.properties
-          echo "android.enableDexingArtifactTransform=false" >> android/gradle.properties
+          # Use recommended replacement for deprecated enableDexingArtifactTransform
+          echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
           echo "Configured gradle.properties:"
           cat android/gradle.properties
 
@@ -168,6 +169,7 @@ jobs:
           echo "- ✅ **Comprehensive debugging tools** (WhiteScreenDetective, AndroidDebugger)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Progressive recovery system** (5s, 8s, 12s, 15s intervals)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Emergency recovery options** (Force Reload, Clear Data, Restart App)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Fixed Android Gradle Plugin compatibility** (removed deprecated properties)"
           echo "- ✅ **Android-specific optimizations**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Better AsyncStorage initialization**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Memory and execution monitoring**" >> $GITHUB_STEP_SUMMARY
