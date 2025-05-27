@@ -1,3 +1,4 @@
+import { VersionDisplay } from '@/components/SecretGestureActivator';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
       await setCriteria(localCriteria);
       Alert.alert('Success', 'Settings saved successfully!');
     } catch (error) {
+      console.error('Failed to save settings:', error);
       Alert.alert('Error', 'Failed to save settings. Please try again.');
     }
   };
@@ -249,7 +251,7 @@ export default function SettingsScreen() {
         <View style={styles.infoSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>About</ThemedText>
           <ThemedText style={styles.infoText}>
-            This app monitors wind conditions at Bear Creek Lake (Soda Lake Dam 1) in Colorado.
+            This app monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado.
             It analyzes wind data in the 3am-5am window to determine if conditions are favorable
             for beach activities. The verification window (6am-8am) checks if the predicted
             conditions actually occurred.
@@ -266,6 +268,11 @@ export default function SettingsScreen() {
           >
             <ThemedText style={styles.saveButtonText}>Refresh Wind Data</ThemedText>
           </TouchableOpacity>
+          
+          {/* Version display with secret gesture detection */}
+          <View style={styles.versionContainer}>
+            <VersionDisplay />
+          </View>
         </View>
       </ThemedView>
     </ScrollView>
@@ -372,4 +379,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  versionContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+  }
 });

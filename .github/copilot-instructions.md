@@ -1,10 +1,15 @@
 # GitHub Copilot Custom Instructions
 
 ## Project Context
-This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda Lake Dam 1), Colorado. It scrapes wind data from WindAlert, analyzes and visualizes early morning wind trends (especially 3am–5am), and determines if conditions are favorable for beach activities. The project includes:
+- This repository is for a wind trend analyzer focused on Soda Lake (Soda Lake Dam 1), Colorado. 
+- It is an Expo/React Native application that scrapes wind data from WindAlert, analyzes and visualizes early morning wind trends (especially 3am–5am), and determines if conditions are favorable for beach activities.
+
+## Build and Test Instructions
+- This app is not built locally, it is built using [build.yml](./workflows/build.yml) in the GitHub Actions workflow. 
+- The app can be tested locally using `npx expo start` or `npx expo start --tunnel`.
+- The app can be tested after a github action build by downloading the universal apk and installing on a usb tethered android device.
 
 ## Mobile App Guidance
-- Use Expo/React Native for cross-platform mobile development
 - The application should be self contained and not rely on a backend server
 - Visualize wind trends and alarm analysis in a simple, mobile-friendly UI
 - Support dark mode, manual refresh, and offline access to last-fetched data
@@ -25,10 +30,18 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 - Verification logic checks actual conditions in the 6am–8am window
 - All thresholds and criteria should be user-configurable
 
+## Cleanup
+- When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later
 
-
-## Documentation and User Experience
+## Documentation
+- All documentation besides the [README.md](../README.md) should be stored in the `docs` directory
 - Keep documentation up to date and clear
+  - Avoid creating multiple versions of the same documentation
+- Refer to [IMPLEMENTATION_SUMMARY](../docs/IMPLEMENTATION_SUMMARY.md) for a summary of implemented features
+- Refer to [FILE_STRUCTURE](../docs/FILE_STRUCTURE.md) for an overview of the project structure
+- Refer to [DEVELOPMENT](../docs/DEVELOPMENT.md) for developer documentation
+
+## User Experience
 - Ensure all features are discoverable and easy to use
 - Provide clear visual indicators for wind quality, alarm status, and prediction accuracy
 - Make all settings and thresholds easily adjustable by the user
@@ -41,8 +54,4 @@ This repository is for a wind trend analyzer focused on Bear Creek Lake (Soda La
 
 ## When in Doubt
 - Prioritize user experience, clarity, and maintainability
-- Follow the patterns and logic described in the spec and README
 - Ask for clarification if a requirement is ambiguous
-
-
-Refer to [WIND_README.md](./WIND_README.md) and [IMPLEMENTATION_SUMMARY](.IMPLEMENTATION_SUMMARY) for more details on the project, including setup instructions, development tools, and key features.

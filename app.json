@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "dpreact",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.samqbush.dpsoda"
@@ -17,7 +17,20 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "INTERNET",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "softwareKeyboardLayoutMode": "pan",
+      "allowBackup": true,
+      "versionCode": 4,
+      "theme": "@style/Theme.App.SplashScreen",
+      "jsEngine": "jsc",
+      "enableHermes": false,
+      "enableProguard": false,
+      "enableShrinkResources": false
     },
     "web": {
       "bundler": "metro",
@@ -32,12 +45,35 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#121212"
+          }
         }
       ]
     ],
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#121212"
+      }
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "translucent": false,
+      "barStyle": "dark-content",
+      "hidden": false
+    },
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": false,
+      "turboModules": false,
+      "newArchEnabled": false
     },
     "extra": {
       "router": {},

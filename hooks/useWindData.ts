@@ -1,16 +1,20 @@
+import { logBuildIssue } from '@/config/buildConfig';
+import EMERGENCY_FALLBACK_DATA from '@/services/fallbackData';
+import { clearWindDataCache } from '@/services/storageService';
 import {
-  analyzeWindData,
-  fetchRealWindData,
-  fetchWindData,
-  getAlarmCriteria,
-  getCachedWindData,
-  setAlarmCriteria,
-  verifyWindConditions,
-  type AlarmCriteria,
-  type WindAnalysis,
-  type WindDataPoint
+    analyzeWindData,
+    fetchRealWindData,
+    fetchWindData,
+    getAlarmCriteria,
+    getCachedWindData,
+    setAlarmCriteria,
+    verifyWindConditions,
+    type AlarmCriteria,
+    type WindAnalysis,
+    type WindDataPoint
 } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 export interface UseWindDataReturn {
   // Data state
@@ -30,10 +34,12 @@ export interface UseWindDataReturn {
   // Actions
   refreshData: () => Promise<void>;
   fetchRealData: () => Promise<void>;
-  loadCachedData: () => Promise<void>;
+  loadCachedData: () => Promise<boolean>;
 }
 
 export const useWindData = (): UseWindDataReturn => {
+  console.log('🔄 useWindData hook initializing...');
+  
   const [windData, setWindData] = useState<WindDataPoint[]>([]);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
   const [verification, setVerification] = useState<WindAnalysis | null>(null);
@@ -52,15 +58,18 @@ export const useWindData = (): UseWindDataReturn => {
 
   // Load initial criteria from storage
   useEffect(() => {
+    console.log('📋 Loading initial criteria...');
     loadCriteria();
   }, []);
 
   const loadCriteria = async () => {
     try {
+      console.log('📥 Getting alarm criteria from storage...');
       const storedCriteria = await getAlarmCriteria();
+      console.log('✅ Criteria loaded:', storedCriteria);
       setCriteriaState(storedCriteria);
     } catch (err) {
-      console.error('Error loading criteria:', err);
+      console.error('❌ Error loading criteria:', err);
     }
   };
 
@@ -89,7 +98,7 @@ export const useWindData = (): UseWindDataReturn => {
       setError(null);
       
       const cached = await getCachedWindData();
-      if (cached) {
+      if (cached && cached.length > 0) {
         setWindData(cached);
         
         // Analyze cached data
@@ -99,10 +108,15 @@ export const useWindData = (): UseWindDataReturn => {
         setAnalysis(windAnalysis);
         setVerification(windVerification);
         setLastUpdated(new Date());
+        return true;
+      } else {
+        console.log('No valid cached data found, using emergency fallback');
+        return false;
       }
     } catch (err) {
       console.error('Error loading cached data:', err);
       setError('Failed to load cached wind data');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +127,14 @@ export const useWindData = (): UseWindDataReturn => {
       setIsLoading(true);
       setError(null);
       
+      console.log(`🔄 Refreshing data (Platform: ${Platform.OS}, Version: ${Platform.Version})`);
+      
       const data = await fetchWindData();
+      
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Invalid data format received');
+      }
+      
       setWindData(data);
       
       // Analyze fresh data
@@ -124,15 +145,34 @@ export const useWindData = (): UseWindDataReturn => {
       setVerification(windVerification);
       setLastUpdated(new Date());
       
-      console.log('Wind data refreshed successfully:', {
+      console.log('✅ Wind data refreshed successfully:', {
         dataPoints: data.length,
         isAlarmWorthy: windAnalysis.isAlarmWorthy,
         averageSpeed: windAnalysis.averageSpeed
       });
       
     } catch (err) {
-      console.error('Error refreshing wind data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch wind data');
+      console.error('❌ Error refreshing wind data:', err);
+      
+      // Log as a build issue for better tracking
+      logBuildIssue('Data refresh failed', err);
+      
+      // User-friendly error message
+      setError(err instanceof Error ? 
+        `Refresh failed: ${err.message}` : 
+        'Failed to fetch wind data'
+      );
+      
+      // Check if the cache might be corrupted
+      const errMsg = err instanceof Error ? err.message.toLowerCase() : '';
+      if (errMsg.includes('json') || errMsg.includes('parse')) {
+        console.warn('⚠️ Possible corrupted cache detected, clearing cache...');
+        try {
+          await clearWindDataCache();
+        } catch (clearErr) {
+          console.error('❌ Failed to clear cache:', clearErr);
+        }
+      }
       
       // Try to load cached data as fallback
       await loadCachedData();
@@ -167,13 +207,69 @@ export const useWindData = (): UseWindDataReturn => {
   // Load cached data and then refresh on mount
   useEffect(() => {
     const initializeData = async () => {
-      await loadCachedData();
-      // Fetch fresh data after loading cached data
-      await refreshData();
+      console.log('🚀 Initializing wind data...');
+      let dataLoaded = false;
+      
+      try {
+        // SAFETY: Ensure we never hang forever on initialization
+        setTimeout(() => {
+          if (!dataLoaded) {
+            console.warn('⚠️ Wind data initialization timeout - using emergency fallback');
+            handleEmergencyFallback();
+          }
+        }, Platform.OS === 'android' ? 2000 : 5000);
+        
+        // First try to load cached data
+        const cachedDataLoaded = await loadCachedData();
+        
+        // If no cached data, immediately use fallback first
+        if (!cachedDataLoaded) {
+          console.log('No cached data available, using emergency fallback first');
+          handleEmergencyFallback();
+          dataLoaded = true;
+        }
+        
+        // Regardless, try to refresh with new data if possible
+        try {
+          console.log('🔄 Loading fresh data...');
+          await refreshData();
+          dataLoaded = true;
+        } catch (refreshErr) {
+          console.error('💥 Error refreshing data:', refreshErr);
+          if (!cachedDataLoaded) {
+            handleEmergencyFallback();
+          }
+          dataLoaded = true;
+        }
+      } catch (err) {
+        console.error('💥 Fatal error during data initialization:', err);
+        handleEmergencyFallback();
+        dataLoaded = true;
+      }
+    };
+    
+    // Function to use emergency fallback data
+    const handleEmergencyFallback = () => {
+      try {
+        console.log('📊 Using emergency fallback data');
+        setIsLoading(true);
+        
+        setWindData(EMERGENCY_FALLBACK_DATA);
+        setLastUpdated(new Date());
+        
+        const fallbackAnalysis = analyzeWindData(EMERGENCY_FALLBACK_DATA, criteria);
+        setAnalysis(fallbackAnalysis);
+        setVerification(null);
+        setError("Using emergency fallback data - please pull down to refresh");
+      } catch (fallbackErr) {
+        console.error('💥 Even fallback data setup failed:', fallbackErr);
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     initializeData();
-  }, [loadCachedData, refreshData]);
+  }, [loadCachedData, refreshData, criteria]);
 
   return {
     windData,
