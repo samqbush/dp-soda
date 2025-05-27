@@ -111,6 +111,64 @@ Key Android development features:
 - Diagnostic tools and crash reporting
 - Production-specific optimizations
 
+## Developer Mode
+
+The app includes a Developer Mode that makes testing and debugging easier, especially for Android issues.
+
+### Enabling Developer Mode in Development
+
+During development, you can enable Developer Mode in several ways:
+
+1. **Secret Gesture**: Tap any text element 5 times in rapid succession (same method end users would use)
+2. **Direct API Call**: Use the debugSettings service directly:
+   ```typescript
+   import { debugSettings } from '@/services/debugSettings';
+   
+   // Enable developer mode
+   await debugSettings.toggleDeveloperMode(true);
+   
+   // Show specific debug component
+   await debugSettings.setComponentVisibility('showAndroidCrashLogger', true);
+   ```
+3. **Debug Settings Component**: Import and use the DebugSettingsUI component directly in your development screens
+
+### Available Debug Components
+
+| Component | Purpose | API Key |
+|-----------|---------|---------|
+| Android Debugger | Basic Android debugging | `showAndroidDebugger` |
+| Android Crash Logger | Enhanced crash logging | `showAndroidCrashLogger` |
+| APK Diagnostics | APK-specific tests | `showApkDiagnostics` |
+| Enhanced Android Debugger | Advanced system monitoring | `showEnhancedAndroidDebugger` |
+| Quick Export Button | Floating export button | `showQuickExportButton` |
+
+### Debug Settings API
+
+The `debugSettings` service provides these key methods:
+
+```typescript
+// Get current settings
+const settings = await debugSettings.getSettings();
+
+// Toggle developer mode (master switch)
+await debugSettings.toggleDeveloperMode(true);
+
+// Set visibility for specific debug component
+await debugSettings.setComponentVisibility('componentKey', true);
+
+// Check if a component should be visible
+const isVisible = await debugSettings.isComponentVisible('componentKey');
+
+// Subscribe to visibility changes for real-time updates
+const unsubscribe = debugSettings.subscribeToVisibilityChanges(
+  'componentKey',
+  (visible) => console.log('Component visibility changed:', visible)
+);
+
+// Unsubscribe when done
+unsubscribe();
+```
+
 ## Contributing
 
 1. Fork the repository
@@ -151,3 +209,28 @@ Follow these guidelines:
 - For React issues, use React DevTools
 - For network issues, use the Network tab in browser dev tools when running in web mode
 - Check logs with `adb logcat` for Android-specific issues
+
+### Enhanced Terminal Logging
+
+The app includes enhanced terminal logging functions to help with debugging:
+
+```typescript
+// Available in the terminal when running in development mode
+import { terminalLogger } from '@/services/terminalLogger';
+
+// Print all crash logs with formatting that prevents truncation
+terminalLogger.printAllCrashLogs();
+
+// Print just the most recent crash with full details
+terminalLogger.printLatestCrash();
+
+// Print a summary of all crash statistics
+terminalLogger.printCrashSummary();
+
+// For convenience, these are also exposed as global functions:
+printCrashLogs(); // Prints all logs
+printLatestCrash(); // Prints most recent crash
+printCrashSummary(); // Prints statistics
+```
+
+The terminal logger formats crash information with clear dividers, color coding (when supported), and special formatting to make issues easier to spot in cluttered logs.

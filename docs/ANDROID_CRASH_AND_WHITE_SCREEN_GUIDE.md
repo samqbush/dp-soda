@@ -18,7 +18,14 @@ This guide consolidates all documentation related to Android white screen issues
   - [Key Features \& Fixes](#key-features--fixes)
   - [Crash Detection \& Recovery System](#crash-detection--recovery-system)
   - [Debugging Tools](#debugging-tools)
+  - [Developer Mode](#developer-mode)
+    - [Activating Developer Mode](#activating-developer-mode)
+    - [Debug Settings UI](#debug-settings-ui)
+    - [Accessing Debug Settings Later](#accessing-debug-settings-later)
   - [Enhanced Terminal Logging](#enhanced-terminal-logging)
+    - [Features](#features)
+    - [Terminal Commands](#terminal-commands)
+    - [UI Integration](#ui-integration)
   - [Testing \& Troubleshooting](#testing--troubleshooting)
   - [Emergency Recovery Options](#emergency-recovery-options)
   - [Build \& Installation](#build--installation)
@@ -67,6 +74,34 @@ The app includes a multi-layered crash detection and white screen prevention sys
 - **Enhanced Android Debugger**: Platform info, memory usage, crash simulation
 - **Quick Export Button**: Emergency crash report export
 - **SafeAppLoader & AndroidSafeWrapper**: Ensures UI loads even if init fails
+
+## Developer Mode
+
+The app includes a Developer Mode that enables various debugging components to help diagnose Android crash and white screen issues.
+
+### Activating Developer Mode
+1. On the main app screen, locate any text element (like the wind status indicator)
+2. Tap 5 times in rapid succession (similar to accessing developer options on Android)
+3. A confirmation dialog will appear asking if you want to enable Developer Mode
+4. After enabling, the Debug Settings UI will appear
+
+### Debug Settings UI
+The Debug Settings UI provides toggles for all available debugging tools:
+
+| Setting | Function |
+|---------|----------|
+| Developer Mode | Master toggle for all debug features |
+| Android Debugger | Simple debugging for common Android issues |
+| Android Crash Logger | Logs and displays detailed crash information |
+| APK Diagnostics | Runs comprehensive tests on the APK build |
+| Enhanced Android Debugger | Advanced debugging with performance monitoring |
+| Quick Export Button | Floating button for emergency crash data export |
+
+Each component can be individually toggled for focused debugging.
+
+### Accessing Debug Settings Later
+- If Developer Mode is already enabled, use the same secret gesture (5 taps) to reopen the Debug Settings UI
+- Settings persist across app restarts via AsyncStorage
 
 ## Enhanced Terminal Logging
 

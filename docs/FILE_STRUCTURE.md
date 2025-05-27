@@ -28,6 +28,10 @@ This document provides an overview of all files in the Wind Trend Analyzer proje
 ### Storage and Persistence
 - `services/storageService.ts` - AsyncStorage wrapper for data caching and persistence
 
+### Debug Settings & Developer Mode
+- `services/debugSettings.ts` - Controls visibility of debugging tools through developer mode
+- `services/terminalLogger.ts` - Enhanced terminal logging for Android debug information
+
 ### Android Crash Detection & Recovery
 - `services/crashMonitor.ts` - Monitors and logs crash events
 - `services/productionCrashDetector.ts` - Production-specific crash detection
@@ -41,6 +45,11 @@ This document provides an overview of all files in the Wind Trend Analyzer proje
 ### Wind Data Components
 - `components/WindDataDisplay.tsx` - Main component for displaying wind data and analysis
 - `components/WindChart.tsx` - Chart visualization for wind trends
+
+### Developer Mode Components
+- `components/DebugSettingsUI.tsx` - UI for toggling debug features and components
+- `components/SecretGestureActivator.tsx` - Invisible component that activates developer mode with a secret gesture
+- `components/AppInitializer.tsx` - Handles app initialization including debug features
 
 ### Crash Recovery Components
 - `components/AndroidCrashLogger.tsx` - Logs and displays Android-specific crashes

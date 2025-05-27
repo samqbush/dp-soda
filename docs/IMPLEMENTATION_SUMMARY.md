@@ -35,11 +35,14 @@
   - Emergency recovery options for critical failures
   - Crash reporting and diagnostic tools
 
-- **Debug & Diagnostic Tools**
+- **Developer Mode & Debug Tools**
+  - Secret gesture activation (tap pattern on specific UI elements)
+  - Configurable debug component visibility
   - Android Crash Logger with detailed reports
   - APK Diagnostics for runtime testing
   - Enhanced Android Debugger with system monitoring
   - Quick Export button for emergency crash reports
+  - Central settings UI for all debug features
 
 ## 🎯 Key Features Matching Your Requirements
 
