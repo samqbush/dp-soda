@@ -45,13 +45,14 @@ export default function HomeScreen() {
           <SafeImage
             source={require('@/assets/images/dawnpatrol.jpeg')}
             style={styles.headerImage}
-            fallbackText="Wind Analyzer"
             backgroundColor="#A1CEDC"
+            contentFit="cover"
           />
         ) : (
           <Image
             source={require('@/assets/images/dawnpatrol.jpeg')}
             style={styles.headerImage}
+            contentFit="cover"
           />
         )
       }>
@@ -76,10 +77,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerImage: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+    width: '100%', 
+    height: '100%',
     position: 'absolute',
     resizeMode: 'cover',
   },
