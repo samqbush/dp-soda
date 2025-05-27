@@ -1,8 +1,6 @@
 # Wind Trend Analyzer - Soda Lake
 
-An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for beach activities. Get reliable predictions based on early morning wind patterns!
-
-![Wind Trend Analyzer App](./assets/images/app-preview.png)
+An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for "dawn patrol". Get reliable predictions based on early morning wind patterns!
 
 ## Features
 
@@ -47,8 +45,6 @@ The Wind Trend Analyzer helps you decide when to head to the beach by analyzing 
 
 ### Main Screen
 
-![Main Screen](./assets/images/main-screen.png)
-
 - **Current Status**: Large "Wake Up! 🌊" or "Sleep In 😴" indicator
 - **Wind Statistics**: View current speed, direction consistency, and quality metrics
 - **Trend Chart**: See wind patterns over the last 12 hours
@@ -57,13 +53,10 @@ The Wind Trend Analyzer helps you decide when to head to the beach by analyzing 
 
 ### Settings Screen
 
-![Settings Screen](./assets/images/settings-screen.png)
-
-- Tap the "Explore" tab to access settings
+- Tap the "Settings" tab to access settings
 - Adjust all wind criteria to match your activity needs
 - Changes take effect immediately with real-time analysis update
 - Reset to defaults with a single tap
-
 
 ## Customizing Your Experience
 
@@ -80,16 +73,10 @@ Tailor the app to your specific needs through the Settings screen:
 ## Frequently Asked Questions
 
 ### Why isn't my app showing current data?
-The app may be in offline mode. Check your internet connection and pull down to refresh.
-
-### How accurate are the predictions?
-The app analyzes actual wind data from WindAlert's monitoring station at Soda Lake. Predictions are based on established wind patterns and verified using the 6am-8am window data.
+The app may be in offline mode. Check your internet connection and click the refresh button.
 
 ### Can I use this for other locations?
-Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado. Support for additional locations is planned for future updates.
-
-### What should I do if I see a white screen on Android?
-The app includes advanced recovery systems. If you encounter a white screen, wait a few moments for the recovery system to engage. If problems persist, see the troubleshooting guide in the app settings.
+Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
 ## Coming Soon
 
@@ -102,15 +89,5 @@ The app includes advanced recovery systems. If you encounter a white screen, wai
 
 ## Contact & Support
 
-For questions, feature requests, or support:
-- Email: support@windtrendanalyzer.com
-- Twitter: @WindTrendApp
-- Visit our website: [windtrendanalyzer.com](https://windtrendanalyzer.com)
+For questions, feature requests, or support open a GitHub issue in this repository
 
-For Android-specific troubleshooting, tap the "Help" button in the app settings or visit our [Android Support Guide](https://windtrendanalyzer.com/android-support).
-
-## Privacy & Terms
-
-This app does not collect personal data. Location permissions are requested only to enhance wind analysis relevance. For our full privacy policy, visit [windtrendanalyzer.com/privacy](https://windtrendanalyzer.com/privacy).
-
-Wind Trend Analyzer © 2025. All rights reserved.

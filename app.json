@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "dp-react",
+    "name": "dp-soda",
     "slug": "dp-soda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dpreact",
+    "scheme": "dpsoda",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
