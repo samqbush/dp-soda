@@ -59,7 +59,14 @@ jobs:
       # Generate the native Android project
       - name: Clean and generate native Android project
         run: |
+          # Run our troubleshooting script first
+          echo "Running React Native troubleshooter..."
+          node scripts/fix-react-native.js
+          
+          echo "Removing existing Android build..."
           rm -rf android
+          
+          echo "Generating native Android project..."
           npx expo prebuild --platform android --clean
         env:
           CI: 1
@@ -109,27 +116,36 @@ jobs:
           echo 'android.useFullClasspathForDexingTransform=true' >> android/gradle.properties
         shell: bash
 
-      # Build the AAB with detailed logging
+      # Build the AAB with a simpler approach
       - name: Build Android App Bundle
         run: |
-          # First run our debug script to gather more information about the environment
-          echo "Running Metro debugging script..."
-          node scripts/metro-debug.js
-          
-          # Add more memory for node and configure environment for better bundling
+          echo "Setting up environmental variables..."
           export DEBUG=metro:*
           export NODE_OPTIONS="--max-old-space-size=8192 --expose-gc"
           export EXPO_DEBUG=true
           export REACT_NATIVE_MAX_WORKERS=2
           
-          # Clear metro cache
-          echo "Clearing metro cache..."
+          echo "Cleaning development environment..."
           rm -rf node_modules/.cache/metro
+          rm -rf android/app/build/generated/assets/react/release
+          rm -rf android/app/build/generated/res/react/release
+          rm -rf android/app/build/intermediates/assets/release/index.android.bundle
           
-          # Try building with extra diagnostic logging
+          echo "Running manual bundle script..."
+          chmod +x scripts/manual-bundle.js
+          node scripts/manual-bundle.js
+          
+          echo "Making bundle executable..."
+          chmod 644 android/app/src/main/assets/index.android.bundle
+          
+          # Skip the JavaScript bundling task in the Gradle build 
+          # since we've done it manually
           cd android
+          echo "javascript.bundle.enabled=false" >> gradle.properties
+          
+          echo "Building Android App Bundle..."
           ./gradlew clean
-          ./gradlew bundleRelease --stacktrace --info
+          ./gradlew bundleRelease -x createBundleReleaseJsAndAssets --stacktrace --info
 
       # Upload the AAB as an artifact
       - name: Upload AAB

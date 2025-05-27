@@ -1,61 +1,76 @@
 // Learn more: https://docs.expo.io/guides/customizing-metro/
-
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const fs = require('fs');
 
 // Get default configuration from Expo
 const defaultConfig = getDefaultConfig(__dirname);
 
-// Create optimized configuration
+// Create a simple and stable configuration - avoid advanced features that might cause issues
 const config = {
   ...defaultConfig,
   
-  // Optimize transformer options
+  // Keep transformer options simple
   transformer: {
     ...defaultConfig.transformer,
     minifierPath: 'metro-minify-terser',
     minifierConfig: {
-      // Terser configuration
+      // Basic terser config
       compress: { 
-        drop_console: false, // Keep console logs for debugging
-        ecma: 2020,
+        drop_console: false,
       },
-      mangle: {
-        safari10: true, // Fixes Safari 10 bugs
-      },
+      mangle: true,
     },
-    
-    // Enable these experimental features for better performance
-    experimentalImportSupport: true,
-    inlineRequires: true,
+    // Disable experimental features for stability
+    experimentalImportSupport: false,
+    inlineRequires: false,
   },
   
-  // Resolver configuration
+  // Simple resolver configuration
   resolver: {
     ...defaultConfig.resolver,
-    // Ensure we only bundle a single copy of React
+    // Map key libraries to specific versions
     extraNodeModules: {
-      react: require.resolve('react'),
-      'react-native': require.resolve('react-native'),
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-native': path.resolve(__dirname, 'node_modules/react-native'),
+      'expo': path.resolve(__dirname, 'node_modules/expo'),
+      '@react-navigation/native': path.resolve(__dirname, 'node_modules/@react-navigation/native'),
+      '@react-navigation/stack': path.resolve(__dirname, 'node_modules/@react-navigation/stack'),
     },
     
-    // Prevent duplicate module bundling
-    disableHierarchicalLookup: true,
-    
-    // Enable metro to properly handle symlinks
+    // Enable symlinks but use cautious settings
     unstable_enableSymlinks: true,
     
-    // Add support for common file extensions
+    // Expand supported extensions
     sourceExts: ['jsx', 'js', 'ts', 'tsx', 'cjs', 'mjs', 'json'],
     
-    // Force resolving of symlinked modules to their real path
+    // Use a simple path resolution
     resolveRequest: (context, moduleName, platform) => {
+      // Handle special cases
+      if (moduleName.startsWith('@/')) {
+        // Map @/ to the project root
+        const relativePath = moduleName.substring(2);
+        const absPath = path.join(__dirname, relativePath);
+        if (fs.existsSync(absPath)) {
+          return { filePath: absPath, type: 'sourceFile' };
+        }
+        if (fs.existsSync(`${absPath}.js`)) {
+          return { filePath: `${absPath}.js`, type: 'sourceFile' };
+        }
+        if (fs.existsSync(`${absPath}.tsx`)) {
+          return { filePath: `${absPath}.tsx`, type: 'sourceFile' };
+        }
+        if (fs.existsSync(`${absPath}.ts`)) {
+          return { filePath: `${absPath}.ts`, type: 'sourceFile' };
+        }
+      }
+      
       // Default resolution
       return defaultConfig.resolver.resolveRequest(context, moduleName, platform);
-    },
+    }
   },
   
-  // Enable caching in CI environment
+  // Use basic caching
   cacheStores: [
     // Default in-memory cache store
     new (require('metro-cache').FileStore)({
@@ -63,21 +78,11 @@ const config = {
     })
   ],
   
-  // Increase resource limits
-  maxWorkers: process.env.CI ? 2 : 4, // Reduce workers in CI environment
+  // Limit resource usage for stability
+  maxWorkers: 2,
   
-  // Improve error reporting
-  reporter: {
-    ...defaultConfig.reporter,
-    update: (event) => {
-      // Log bundle progress
-      if (event.type === 'bundle_build_done') {
-        console.log(`Bundle built in ${event.buildTime}ms`);
-      }
-      // Forward to default reporter
-      defaultConfig.reporter.update(event);
-    }
-  }
+  // Basic reporting
+  reporter: defaultConfig.reporter
 };
 
 module.exports = config;
