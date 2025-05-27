@@ -1,7 +1,7 @@
+import { crashMonitor } from '@/services/crashMonitor';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { Component, ReactNode } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { crashMonitor } from '@/services/crashMonitor';
 
 interface DataCrashDetectorProps {
   children: ReactNode;

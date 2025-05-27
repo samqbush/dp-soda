@@ -1,6 +1,6 @@
+import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { WindDataPoint } from '@/services/windService';
 import React from 'react';
