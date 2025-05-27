@@ -8,10 +8,12 @@ import { SafeImage } from '@/components/SafeImage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindDataDisplay } from '@/components/WindDataDisplay';
+import { productionCrashDetector } from '@/services/productionCrashDetector';
 
 export default function HomeScreen() {
   useEffect(() => {
     console.log('🏠 HomeScreen mounted');
+    productionCrashDetector.logUserAction('home_screen_loaded');
   }, []);
 
   // Track component loaded state for Android

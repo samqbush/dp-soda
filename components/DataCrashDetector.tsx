@@ -130,7 +130,7 @@ export class DataCrashDetector extends Component<DataCrashDetectorProps, DataCra
       Alert.alert('Success', 'All app data cleared. The app will now restart.');
       this.clearError();
     } catch (error) {
-      Alert.alert('Error', 'Failed to clear app data: ' + error.message);
+      Alert.alert('Error', 'Failed to clear app data: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 

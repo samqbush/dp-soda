@@ -7,15 +7,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, LogBox, Platform, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AndroidCrashLogger } from '@/components/AndroidCrashLogger';
 import { AndroidDebugger } from '@/components/AndroidDebugger';
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
+import { ApkCrashDiagnostics } from '@/components/ApkCrashDiagnostics';
 import { AppInitializer } from '@/components/AppInitializer';
+import { EnhancedAndroidDebugger } from '@/components/EnhancedAndroidDebugger';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { GlobalCrashRecovery } from '@/components/GlobalCrashRecovery';
+import { QuickExportButton } from '@/components/QuickExportButton';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
+import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
 
 // Ignore specific warnings in production builds
@@ -30,6 +35,11 @@ if (!__DEV__) {
 // Initialize global crash detection as early as possible
 globalCrashHandler.initialize().catch(error => 
   console.error('Failed to initialize global crash handler:', error)
+);
+
+// Initialize production crash detector for APK debugging
+productionCrashDetector.initialize().catch(error =>
+  console.error('Failed to initialize production crash detector:', error)
 );
 
 // Keep the splash screen visible while we fetch resources
@@ -221,6 +231,10 @@ export default function RootLayout() {
   return (
     <AndroidSafeWrapper>
       <AndroidDebugger enabled={__DEV__ || isStuck} />
+      <AndroidCrashLogger />
+      <ApkCrashDiagnostics />
+      <EnhancedAndroidDebugger />
+      <QuickExportButton />
       <ErrorBoundary>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>

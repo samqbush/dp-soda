@@ -34,7 +34,7 @@ export interface UseWindDataReturn {
   // Actions
   refreshData: () => Promise<void>;
   fetchRealData: () => Promise<void>;
-  loadCachedData: () => Promise<void>;
+  loadCachedData: () => Promise<boolean>;
 }
 
 export const useWindData = (): UseWindDataReturn => {

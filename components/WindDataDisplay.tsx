@@ -8,12 +8,14 @@ import { useWindData } from '@/hooks/useWindData';
 import { crashMonitor } from '@/services/crashMonitor';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
+import { productionCrashDetector } from '@/services/productionCrashDetector';
 import React, { useEffect } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {
   useEffect(() => {
     console.log('🌊 WindDataDisplay mounted');
+    productionCrashDetector.logUserAction('wind_data_display_loaded');
   }, []);
 
   const handleCrash = async (error: Error, info: any) => {
@@ -65,18 +67,24 @@ function WindDataDisplayContent() {
 
   const handleRefresh = async () => {
     try {
+      productionCrashDetector.logUserAction('wind_data_refresh_requested');
       await refreshData();
+      productionCrashDetector.logUserAction('wind_data_refresh_completed');
     } catch (err) {
       console.error('Refresh failed:', err);
+      productionCrashDetector.logUserAction('wind_data_refresh_failed', { error: err instanceof Error ? err.message : String(err) });
       Alert.alert('Error', 'Failed to refresh wind data. Please try again.');
     }
   };
 
   const handleFetchRealData = async () => {
     try {
+      productionCrashDetector.logUserAction('real_data_fetch_requested');
       await fetchRealData();
+      productionCrashDetector.logUserAction('real_data_fetch_completed');
     } catch (err) {
       console.error('Fetch real data failed:', err);
+      productionCrashDetector.logUserAction('real_data_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
       Alert.alert(
         'Error', 
         'Failed to fetch real data. This may be due to CORS restrictions in web environment or network issues.'
