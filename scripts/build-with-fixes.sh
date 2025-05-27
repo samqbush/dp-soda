@@ -1,9 +1,12 @@
 #!/bin/bash
 
-echo "🔧 Building Wind Trend Analyzer with White Screen Fixes"
-echo "======================================================"
+echo "🔧 Building Wind Trend Analyzer with Enhanced Crash Detection & White Screen Fixes"
+echo "================================================================================"
 echo ""
-echo "ℹ️  Note: The same white screen fixes are also integrated into"
+echo "🛡️ NEW: Multi-layer crash detection system added!"
+echo "🔧 Includes all previous white screen fixes"
+echo ""
+echo "ℹ️  Note: The same fixes are also integrated into"
 echo "   the GitHub Actions workflow (.github/workflows/build.yml)"
 echo "   You can push to main branch to trigger an automatic build."
 echo ""

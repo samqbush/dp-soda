@@ -11,9 +11,11 @@ import { AndroidDebugger } from '@/components/AndroidDebugger';
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
 import { AppInitializer } from '@/components/AppInitializer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { GlobalCrashRecovery } from '@/components/GlobalCrashRecovery';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
+import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { initializeStorage } from '@/services/storageService';
 
 // Ignore specific warnings in production builds
@@ -24,6 +26,11 @@ if (!__DEV__) {
     'AsyncStorage has been extracted from react-native',
   ]);
 }
+
+// Initialize global crash detection as early as possible
+globalCrashHandler.initialize().catch(error => 
+  console.error('Failed to initialize global crash handler:', error)
+);
 
 // Keep the splash screen visible while we fetch resources
 // And set a safety timeout to ensure it doesn't get stuck
@@ -62,14 +69,19 @@ export default function RootLayout() {
   // Initialize storage and other critical services
   useEffect(() => {
     const setupApp = async () => {
+      console.log('🚀 App initialization starting...');
       try {
+        console.log('💾 Initializing storage...');
         // Initialize AsyncStorage
         const storageReady = await initializeStorage();
+        console.log('💾 Storage initialization result:', storageReady);
         setIsStorageInitialized(storageReady);
         
         if (!storageReady) {
           console.warn('⚠️ Storage initialization failed');
           setInitError('Storage initialization failed');
+        } else {
+          console.log('✅ Storage initialization successful');
         }
         
       } catch (e) {
@@ -218,6 +230,8 @@ export default function RootLayout() {
           <StatusBar style="auto" />
         </ThemeProvider>
       </ErrorBoundary>
+      {/* Global crash recovery overlay */}
+      <GlobalCrashRecovery />
     </AndroidSafeWrapper>
   );
 }

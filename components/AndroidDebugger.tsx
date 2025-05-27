@@ -1,4 +1,5 @@
 import { getBuildConfig } from '@/config/buildConfig';
+import { globalCrashHandler } from '@/services/globalCrashHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -28,7 +29,8 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
   useEffect(() => {
     if (!shouldShow) return;
 
-    setRenderCount(prev => prev + 1);
+    const currentRenderCount = renderCount + 1;
+    setRenderCount(currentRenderCount);
 
     const gatherDebugInfo = async () => {
       try {
@@ -57,7 +59,7 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
           platform: `${Platform.OS} ${Platform.Version}`,
           buildInfo: getBuildConfig(),
           storageTest,
-          renderCount,
+          renderCount: currentRenderCount,
           memoryWarnings: 0, // Could be enhanced with memory monitoring
           lastError
         };
@@ -69,7 +71,7 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
     };
 
     gatherDebugInfo();
-  }, [shouldShow, renderCount]);
+  }, [shouldShow]); // Removed renderCount from dependencies to prevent infinite loop
 
   if (!shouldShow || !debugInfo) {
     return null;
@@ -131,6 +133,18 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
               {new Date(debugInfo.timestamp).toLocaleTimeString()}
             </Text>
           </View>
+
+          {__DEV__ && (
+            <View style={styles.section}>
+              <Text style={styles.label}>Crash Testing:</Text>
+              <TouchableOpacity 
+                style={styles.testButton}
+                onPress={() => globalCrashHandler.reportTestCrash('AndroidDebugger', 'Test crash triggered')}
+              >
+                <Text style={styles.testButtonText}>🧪 Test Crash</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -181,5 +195,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginTop: 2,
+  },
+  testButton: {
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 5,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

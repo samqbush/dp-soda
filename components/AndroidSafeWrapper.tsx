@@ -61,7 +61,7 @@ export function AndroidSafeWrapper({ children }: { children: React.ReactNode }) 
       // If this runs, it means the component mounted successfully
       clearTimeout(recoveryTimeout);
     };
-  }, [renderKey]);
+  }, []); // Remove renderKey dependency to prevent infinite loop
 
   // Only apply wrapper behavior for Android
   if (Platform.OS !== 'android') {

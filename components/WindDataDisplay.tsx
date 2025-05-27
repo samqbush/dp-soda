@@ -7,6 +7,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
 import { crashMonitor } from '@/services/crashMonitor';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
+import { globalCrashHandler } from '@/services/globalCrashHandler';
 import React, { useEffect } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -19,8 +20,9 @@ export function WindDataDisplay() {
     console.error('🚨 WindDataDisplay crashed:', error);
     console.error('🚨 Crash info:', info);
     
-    // Log crash details
+    // Log crash details to both systems
     await crashMonitor.logCrash('WindDataDisplay', error);
+    await globalCrashHandler.reportTestCrash('WindDataDisplay', error.message);
     
     // Show crash details in diagnostic
     const summary = crashMonitor.getCrashSummary();
@@ -35,6 +37,7 @@ export function WindDataDisplay() {
 }
 
 function WindDataDisplayContent() {
+  console.log('🌊 WindDataDisplayContent rendering...');
 
   const {
     windData,
@@ -47,6 +50,13 @@ function WindDataDisplayContent() {
     fetchRealData,
     criteria
   } = useWindData();
+
+  console.log('🌊 WindDataDisplayContent - useWindData result:', {
+    hasData: !!windData,
+    isLoading,
+    hasError: !!error,
+    lastUpdated
+  });
 
   // const textColor = useThemeColor({}, 'text'); // Removed unused variable
   const tintColor = useThemeColor({}, 'tint');

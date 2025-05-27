@@ -11,6 +11,7 @@ A React Native app built with Expo that monitors wind conditions at Bear Creek L
 - **Configurable Criteria**: User-adjustable thresholds for wind speed, direction consistency, and data quality
 - **Dark Mode Support**: Automatically adapts to system theme
 - **Mobile-First Design**: Optimized for iOS and Android devices
+- **🛡️ Enhanced Crash Detection**: Multi-layer crash recovery system with comprehensive error handling
 
 ## Quickstart (Expo/React Native)
 
@@ -75,9 +76,13 @@ This creates JSON and CSV files with current wind data and analysis.
 ```
 services/
   windService.ts          # Core wind data fetching and analysis
+  globalCrashHandler.ts   # Global crash detection and recovery
+  crashMonitor.ts         # Centralized crash tracking
 hooks/
   useWindData.ts          # React hook for wind data state management
 components/
+  DataCrashDetector.tsx   # Component-level error boundaries
+  GlobalCrashRecovery.tsx # Global crash recovery UI
   WindDataDisplay.tsx     # Main wind data visualization component
   WindDataTest.tsx        # Testing component for development
 scripts/
