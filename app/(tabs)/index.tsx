@@ -43,15 +43,15 @@ export default function HomeScreen() {
       headerImage={
         Platform.OS === 'android' ? (
           <SafeImage
-            source={require('@/assets/images/partial-react-logo.png')}
-            style={styles.reactLogo}
+            source={require('@/assets/images/dawnpatrol.jpeg')}
+            style={styles.headerImage}
             fallbackText="Wind Analyzer"
             backgroundColor="#A1CEDC"
           />
         ) : (
           <Image
-            source={require('@/assets/images/partial-react-logo.png')}
-            style={styles.reactLogo}
+            source={require('@/assets/images/dawnpatrol.jpeg')}
+            style={styles.headerImage}
           />
         )
       }>
@@ -75,11 +75,12 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  reactLogo: {
+  headerImage: {
     height: 178,
     width: 290,
     bottom: 0,
     left: 0,
     position: 'absolute',
+    resizeMode: 'cover',
   },
 });
