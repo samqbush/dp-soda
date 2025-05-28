@@ -312,8 +312,21 @@ export default function SettingsScreen() {
             <View style={styles.testLinkContainer}>
             <ThemedText style={styles.testLinkHeader}>Advanced Options</ThemedText>
             <Link href="/test-alarm" asChild>
-              <TouchableOpacity style={[styles.testButton, { backgroundColor: '#FF9500' }]}>
-              <ThemedText style={styles.testButtonText}>Test Wind Alarm Logic</ThemedText>
+              <TouchableOpacity 
+                style={[
+                  styles.testButton, 
+                  { 
+                    backgroundColor: '#E0F2FF', // Very light blue background
+                    borderWidth: 1,
+                    borderColor: '#81BAF7', // Medium blue border for definition
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }
+                ]}
+                activeOpacity={0.7} // Shows feedback when pressed
+              >
+                <ThemedText style={styles.testButtonText}>⚙️ Test Wind Alarm Logic</ThemedText>
               </TouchableOpacity>
             </Link>
             <ThemedText style={styles.testLinkDescription}>
@@ -462,10 +475,10 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 8,
+    borderColor: 'rgba(0, 0, 0, 0.15)', // Slightly darker border for better visibility
+    borderRadius: 12,
     padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Slightly darker background
   },
   testLinkHeader: {
     fontSize: 16,
@@ -473,14 +486,50 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   testButton: {
-    padding: 12,
+    padding: 14, // Increased padding for a larger touch target
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 8,
+    shadowColor: '#000', // Add shadow for better visibility
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4, // Android shadow
   },
   testButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    color: '#000000', // Black text
+    fontWeight: '700', 
+    fontSize: 15,
+    letterSpacing: 0.5, // Slightly increase letter spacing
+  },
+  buttonIconContainer: {
+    marginRight: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gearIcon: {
+    width: 16,
+    height: 16,
+    position: 'relative',
+  },
+  gearCenter: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'white',
+    top: 5,
+    left: 5,
+  },
+  gearTooth: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    backgroundColor: 'white',
+    top: -2,
+    left: 6,
   },
   testLinkDescription: {
     fontSize: 13,
