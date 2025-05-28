@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, LogBox, Platform, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { AndroidCrashLogger } from '@/components/AndroidCrashLogger';
@@ -235,23 +236,25 @@ export default function RootLayout() {
   }
 
   return (
-    <AndroidSafeWrapper>
-      <AndroidDebugger />
-      <AndroidCrashLogger />
-      <ApkCrashDiagnostics />
-      <EnhancedAndroidDebugger />
-      <QuickExportButton />
-      <ErrorBoundary>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </ErrorBoundary>
-      {/* Global crash recovery overlay */}
-      <GlobalCrashRecovery />
-    </AndroidSafeWrapper>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AndroidSafeWrapper>
+        <AndroidDebugger />
+        <AndroidCrashLogger />
+        <ApkCrashDiagnostics />
+        <EnhancedAndroidDebugger />
+        <QuickExportButton />
+        <ErrorBoundary>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </ErrorBoundary>
+        {/* Global crash recovery overlay */}
+        <GlobalCrashRecovery />
+      </AndroidSafeWrapper>
+    </GestureHandlerRootView>
   );
 }

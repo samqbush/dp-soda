@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
 import type { AlarmCriteria } from '@/services/windService';
+import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -306,6 +307,19 @@ export default function SettingsScreen() {
             The verification window (6am-8am) checks if the predicted conditions actually occurred.
             Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
+
+          {/* Wind Alarm Testing Link */}
+          <View style={styles.testLinkContainer}>
+            <ThemedText style={styles.testLinkHeader}>Advanced Options</ThemedText>
+            <Link href="/test-alarm" asChild>
+              <TouchableOpacity style={[styles.testButton, { backgroundColor: tintColor }]}>
+                <ThemedText style={styles.testButtonText}>Test Wind Alarm Logic</ThemedText>
+              </TouchableOpacity>
+            </Link>
+            <ThemedText style={styles.testLinkDescription}>
+              Test different wind scenarios to verify alarm trigger behavior
+            </ThemedText>
+          </View>
           
           {/* Version display with secret gesture detection */}
           <View style={styles.versionContainer}>
@@ -443,5 +457,34 @@ const styles = StyleSheet.create({
   versionContainer: {
     marginTop: 24,
     alignItems: 'center',
+  },
+  testLinkContainer: {
+    marginTop: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 8,
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+  },
+  testLinkHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  testButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  testButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  testLinkDescription: {
+    fontSize: 13,
+    opacity: 0.7,
+    fontStyle: 'italic',
   }
 });
