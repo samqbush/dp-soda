@@ -308,18 +308,18 @@ export default function SettingsScreen() {
             Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
 
-          {/* Wind Alarm Testing Link */}
-          <View style={styles.testLinkContainer}>
+            {/* Wind Alarm Testing Link */}
+            <View style={styles.testLinkContainer}>
             <ThemedText style={styles.testLinkHeader}>Advanced Options</ThemedText>
             <Link href="/test-alarm" asChild>
-              <TouchableOpacity style={[styles.testButton, { backgroundColor: tintColor }]}>
-                <ThemedText style={styles.testButtonText}>Test Wind Alarm Logic</ThemedText>
+              <TouchableOpacity style={[styles.testButton, { backgroundColor: '#FF9500' }]}>
+              <ThemedText style={styles.testButtonText}>Test Wind Alarm Logic</ThemedText>
               </TouchableOpacity>
             </Link>
             <ThemedText style={styles.testLinkDescription}>
               Test different wind scenarios to verify alarm trigger behavior
             </ThemedText>
-          </View>
+            </View>
           
           {/* Version display with secret gesture detection */}
           <View style={styles.versionContainer}>

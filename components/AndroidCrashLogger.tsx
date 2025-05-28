@@ -3,15 +3,15 @@ import { debugSettings } from '@/services/debugSettings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  AppState,
-  Platform,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    AppState,
+    Platform,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface CrashLog {
@@ -153,7 +153,9 @@ export function AndroidCrashLogger() {
       if (errorMessage.includes('ReferenceError') || 
           errorMessage.includes('TypeError') || 
           errorMessage.includes('SyntaxError') ||
-          errorMessage.includes('RangeError')) {
+          errorMessage.includes('RangeError') ||
+          // Specific check for navigation findLast errors (now fixed with polyfill)
+          errorMessage.includes('findLast is not a function')) {
         logCrash('console_error', new Error(errorMessage));
       }
     };

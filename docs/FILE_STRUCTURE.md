@@ -40,6 +40,9 @@ This document provides an overview of all files in the Wind Trend Analyzer proje
 - `services/diagnosticService.ts` - Runtime diagnostic tools
 - `services/androidSplash.ts` - Custom splash screen with white screen prevention
 
+### Compatibility
+- `services/polyfills.ts` - JavaScript polyfills for older devices (Array.findLast, etc.)
+
 ## Components
 
 ### Wind Data Components

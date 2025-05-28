@@ -110,6 +110,16 @@ Key Android development features:
 - White screen prevention mechanisms
 - Diagnostic tools and crash reporting
 - Production-specific optimizations
+- Compatibility polyfills for older devices
+
+### JavaScript Compatibility
+
+The app includes polyfills for modern JavaScript features to ensure compatibility with older Android devices. These polyfills are loaded early in the app initialization process.
+
+- `services/polyfills.ts` - Contains polyfills for modern JavaScript methods like `Array.prototype.findLast`
+- For details on specific compatibility fixes, see [REACT_NAVIGATION_V7_FIXES.md](../docs/REACT_NAVIGATION_V7_FIXES.md)
+
+When adding new features that use modern JavaScript methods, consider checking if they need polyfills for older Android versions (API level ≤ 29).
 
 ## Developer Mode
 
