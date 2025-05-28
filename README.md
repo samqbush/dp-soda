@@ -38,7 +38,6 @@ The Wind Trend Analyzer helps you decide when to head to the beach by analyzing 
 - **Minimum Wind Speed**: 10 mph (good for most water activities)
 - **Direction Consistency**: 70% (ensures reliable wind patterns)
 - **Required Consecutive Points**: 4 (confirms sustained conditions)
-- **Speed Variation Limit**: 3 mph (avoids gusty, unpredictable wind)
 - **Direction Variation Limit**: 45° (ensures consistent direction)
 
 ## Using the App

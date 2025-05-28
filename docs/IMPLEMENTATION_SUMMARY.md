@@ -63,7 +63,7 @@
   - Minimum average wind speed (default: 10 mph)
   - Direction consistency (default: 70%)
   - Minimum consecutive good data points (default: 4)
-  - Speed/direction deviation thresholds
+  - Direction deviation thresholds
 - Verification logic for 6am-8am window
 - Real-time re-analysis when settings change
 

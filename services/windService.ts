@@ -25,8 +25,9 @@ export interface AlarmCriteria {
   minimumAverageSpeed: number; // mph
   directionConsistencyThreshold: number; // percentage
   minimumConsecutivePoints: number;
-  speedDeviationThreshold: number; // mph
   directionDeviationThreshold: number; // degrees
+  preferredDirection: number; // degrees - the preferred wind direction
+  preferredDirectionRange: number; // degrees - the acceptable range around preferred direction
   alarmEnabled: boolean; // Whether or not the alarm is enabled
   alarmTime: string; // Time in 24-hour format (e.g., "05:00")
 }
@@ -35,8 +36,9 @@ const DEFAULT_CRITERIA: AlarmCriteria = {
   minimumAverageSpeed: 10,
   directionConsistencyThreshold: 70,
   minimumConsecutivePoints: 4,
-  speedDeviationThreshold: 3,
   directionDeviationThreshold: 45,
+  preferredDirection: 315, // Northwest
+  preferredDirectionRange: 45, // +/- 45 degrees from preferred direction
   alarmEnabled: false,
   alarmTime: "05:00" // Default to 5:00 AM
 };
@@ -293,13 +295,23 @@ export const analyzeWindData = (
     criteria
   );
 
+  // Calculate how many directions are in the preferred range
+  const avgDirection = calculateAverageDirection(directions);
+  const isPreferredDirection = isDirectionInPreferredRange(
+    avgDirection, 
+    criteria.preferredDirection, 
+    criteria.preferredDirectionRange
+  );
+
   // Determine if alarm worthy
   const isAlarmWorthy = 
     averageSpeed >= criteria.minimumAverageSpeed &&
     directionConsistency >= criteria.directionConsistencyThreshold &&
-    consecutiveGoodPoints >= criteria.minimumConsecutivePoints;
+    consecutiveGoodPoints >= criteria.minimumConsecutivePoints &&
+    isPreferredDirection;
 
   const analysis = `Avg Speed: ${averageSpeed.toFixed(1)}mph, ` +
+    `Direction: ${avgDirection.toFixed(0)}° (${getDirectionName(avgDirection)}), ` +
     `Direction Consistency: ${directionConsistency.toFixed(1)}%, ` +
     `Consecutive Good Points: ${consecutiveGoodPoints}`;
 
@@ -334,6 +346,70 @@ const calculateDirectionConsistency = (directions: number[]): number => {
   
   // Convert resultant length to consistency percentage
   return resultantLength * 100;
+};
+
+/**
+ * Calculate the average wind direction (circular mean)
+ */
+const calculateAverageDirection = (directions: number[]): number => {
+  if (directions.length === 0) return 0;
+  
+  let sumSin = 0;
+  let sumCos = 0;
+  
+  directions.forEach(dir => {
+    const radians = (dir * Math.PI) / 180;
+    sumSin += Math.sin(radians);
+    sumCos += Math.cos(radians);
+  });
+  
+  // Calculate angle in radians and convert to degrees
+  const radians = Math.atan2(sumSin, sumCos);
+  let degrees = (radians * 180) / Math.PI;
+  
+  // Ensure result is in 0-360 range
+  if (degrees < 0) {
+    degrees += 360;
+  }
+  
+  return degrees;
+};
+
+/**
+ * Check if a direction is within the preferred range
+ */
+const isDirectionInPreferredRange = (
+  direction: number,
+  preferredDirection: number, 
+  range: number
+): boolean => {
+  // No direction or no preferred direction means we don't check
+  if (isNaN(direction) || !preferredDirection) return true;
+  
+  // Calculate the minimum and maximum acceptable directions
+  let minDirection = (preferredDirection - range) % 360;
+  let maxDirection = (preferredDirection + range) % 360;
+  
+  // Handle cases where range crosses 0/360 boundary
+  if (minDirection < 0) minDirection += 360;
+  
+  // Special case for ranges that cross 0/360 boundary
+  if (minDirection > maxDirection) {
+    return direction >= minDirection || direction <= maxDirection;
+  }
+  
+  // Normal case
+  return direction >= minDirection && direction <= maxDirection;
+};
+
+/**
+ * Get cardinal direction name from degrees
+ */
+const getDirectionName = (degrees: number): string => {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                      'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round((degrees % 360) / 22.5) % 16;
+  return directions[index];
 };
 
 /**
@@ -526,7 +602,7 @@ const generateSampleData = (): WindDataPoint[] => {
     const gust = speed + Math.random() * 5;
     
     // Wind direction - make it more consistent during alarm hours on good days
-    let baseDirection = 225; // SW
+    let baseDirection = 315; // NW - optimal for Soda Lake
     let directionVariation = 60;
     
     if (isGoodWindDay && hour >= 3 && hour <= 6) {
