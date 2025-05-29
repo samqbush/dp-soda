@@ -208,56 +208,73 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Settings</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Configuration</ThemedText>
           
           <View style={styles.settingItem}>
-            <View style={styles.toggleRow}>
-              <ThemedText style={styles.settingLabel}>
-                Enable Alarm
-              </ThemedText>
+            <ThemedText style={styles.settingLabel}>
+              Enable Alarm
+            </ThemedText>
+            <ThemedText style={styles.settingDescription}>
+              Turn on/off the automatic morning alarm based on wind conditions
+            </ThemedText>
+            <View style={styles.toggleContainer}>
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
-                  {
-                    backgroundColor: localCriteria.alarmEnabled 
-                      ? tintColor 
-                      : 'rgba(150, 150, 150, 0.3)'
-                  }
+                  { backgroundColor: localCriteria.alarmEnabled ? tintColor : '#ccc' }
                 ]}
                 onPress={() => updateCriteria('alarmEnabled', !localCriteria.alarmEnabled)}
               >
-                <View style={[
-                  styles.toggleCircle,
-                  {
-                    transform: [{
-                      translateX: localCriteria.alarmEnabled ? 18 : 0
-                    }]
-                  }
-                ]} />
+                <ThemedText style={styles.toggleText}>
+                  {localCriteria.alarmEnabled ? 'ON' : 'OFF'}
+                </ThemedText>
               </TouchableOpacity>
             </View>
-            <ThemedText style={styles.settingDescription}>
-              When enabled, the app will notify you if wind conditions are favorable
-            </ThemedText>
           </View>
-
-          <View style={[styles.settingItem, !localCriteria.alarmEnabled && styles.disabledSetting]}>
+          
+          <View style={styles.settingItem}>
             <ThemedText style={styles.settingLabel}>
               Alarm Time
             </ThemedText>
             <ThemedText style={styles.settingDescription}>
-              Time to check wind conditions for alarm decision
+              Set the time when alarm will trigger if conditions are favorable (wind data is checked 5 minutes prior)
             </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.alarmTime}
-              onChangeText={(text) => updateCriteria('alarmTime', text)}
-              placeholder="05:00"
-              placeholderTextColor={textColor + '80'}
-              editable={localCriteria.alarmEnabled}
-            />
-            <ThemedText style={styles.timeNote}>
-              Enter time in 24-hour format (HH:MM), e.g. 05:00 for 5:00 AM
+            <View style={styles.timePickerContainer}>
+              <TextInput
+                style={[styles.timePicker, { color: textColor, borderColor: tintColor, textAlign: 'center' }]}
+                value={localCriteria.alarmTime}
+                onChangeText={(time) => {
+                  // Only update if it's a valid time format or empty
+                  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+                  if (timeRegex.test(time) || time === '') {
+                    updateCriteria('alarmTime', time);
+                  }
+                }}
+                onBlur={() => {
+                  // Validate on blur and reset to default if invalid
+                  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+                  if (!timeRegex.test(localCriteria.alarmTime)) {
+                    updateCriteria('alarmTime', '05:00');
+                    Alert.alert('Invalid Time', 'Time has been reset to 05:00');
+                  }
+                }}
+                placeholder="05:00"
+                placeholderTextColor={textColor + '80'}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+              />
+              <ThemedText style={styles.timePickerHint}>
+                Format: 24-hour (e.g., 05:00)
+              </ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.alarmInfoContainer}>
+            <ThemedText style={styles.alarmInfo}>
+              When enabled, the alarm will check wind conditions at {localCriteria.alarmTime} if the 3am-5am window analysis indicates favorable conditions.
+            </ThemedText>
+            <ThemedText style={[styles.alarmInfo, { marginTop: 8, fontStyle: 'italic' }]}>
+              Note: The app must remain open for the alarm to function. Future updates will add background alarm support.
             </ThemedText>
           </View>
         </View>
@@ -450,22 +467,41 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   toggleButton: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    padding: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
-  toggleCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'white',
+  toggleText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
-  timeNote: {
-    fontSize: 11,
+  timePickerContainer: {
+    marginTop: 8,
+  },
+  timePicker: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    alignSelf: 'flex-start',
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  timePickerHint: {
+    fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
-    fontStyle: 'italic',
+  },
+  alarmInfoContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+  },
+  alarmInfo: {
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.8,
   },
   versionContainer: {
     marginTop: 24,
@@ -535,5 +571,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
     fontStyle: 'italic',
-  }
+  },
+  toggleContainer: {
+    marginTop: 8,
+  },
 });

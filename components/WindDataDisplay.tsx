@@ -3,13 +3,15 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
+import { useAlarmAudio } from '@/hooks/useAlarmAudio';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
+import { AlarmLogger } from '@/services/alarmDebugLogger';
 import { crashMonitor } from '@/services/crashMonitor';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {
@@ -40,6 +42,11 @@ export function WindDataDisplay() {
 
 function WindDataDisplayContent() {
   console.log('🌊 WindDataDisplayContent rendering...');
+  
+  // Alarm state for today
+  const [alarmCheckedToday, setAlarmCheckedToday] = useState(false);
+  const [nextAlarmCheckTime, setNextAlarmCheckTime] = useState<Date | null>(null);
+  const alarmCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     windData,
@@ -50,14 +57,26 @@ function WindDataDisplayContent() {
     lastUpdated,
     refreshData,
     fetchRealData,
-    criteria
+    criteria,
+    setCriteria
   } = useWindData();
+  
+  // Use alarm audio hook
+  const {
+    isPlaying,
+    isSoundEnabled,
+    playAlarm,
+    stopAlarm,
+    turnOffAlarm
+  } = useAlarmAudio();
 
   console.log('🌊 WindDataDisplayContent - useWindData result:', {
     hasData: !!windData,
     isLoading,
     hasError: !!error,
-    lastUpdated
+    lastUpdated,
+    alarmEnabled: criteria.alarmEnabled,
+    alarmTime: criteria.alarmTime
   });
 
   // const textColor = useThemeColor({}, 'text'); // Removed unused variable
@@ -91,6 +110,222 @@ function WindDataDisplayContent() {
       );
     }
   };
+  
+  // Handle stopping the alarm
+  const handleStopAlarm = useCallback(async () => {
+    try {
+      AlarmLogger.info('User manually stopped alarm');
+      await stopAlarm();
+      productionCrashDetector.logUserAction('alarm_stopped_by_user');
+    } catch (err) {
+      console.error('Failed to stop alarm:', err);
+      
+      // Try emergency turn off as fallback
+      try {
+        await turnOffAlarm();
+      } catch (emergencyErr) {
+        console.error('Emergency alarm turn off failed:', emergencyErr);
+        Alert.alert('Error', 'Failed to stop alarm. Please restart the app.');
+      }
+    }
+  }, [stopAlarm, turnOffAlarm]);
+  
+  // Toggle alarm enabled state
+  const toggleAlarmEnabled = useCallback(async () => {
+    try {
+      const newState = !criteria.alarmEnabled;
+      
+      // If turning off and alarm is playing, stop it
+      if (!newState && isPlaying) {
+        await stopAlarm();
+      }
+      
+      // Update criteria with new alarm state
+      await setCriteria({ alarmEnabled: newState });
+      
+      // Set up or clear alarm timer based on new state
+      if (newState) {
+        scheduleNextAlarmCheck();
+      } else if (alarmCheckTimerRef.current) {
+        clearTimeout(alarmCheckTimerRef.current);
+        alarmCheckTimerRef.current = null;
+        setNextAlarmCheckTime(null);
+      }
+      
+      productionCrashDetector.logUserAction('alarm_enabled_toggled', { newState });
+    } catch (err) {
+      console.error('Failed to toggle alarm:', err);
+      Alert.alert('Error', 'Failed to update alarm settings.');
+    }
+  }, [criteria.alarmEnabled, isPlaying, setCriteria, stopAlarm]);
+  
+  // Check if it's time to trigger the alarm
+  const checkAlarmConditions = useCallback(async () => {
+    if (!criteria.alarmEnabled) {
+      console.log('Alarm is disabled, skipping check');
+      return;
+    }
+    
+    try {
+      console.log('🔔 Checking alarm conditions...');
+      productionCrashDetector.logUserAction('alarm_check_started');
+      
+      // Fetch fresh data
+      await refreshData();
+      
+      // Check if conditions are favorable
+      if (analysis?.isAlarmWorthy) {
+        console.log('🔔 Alarm conditions met - triggering alarm!');
+        AlarmLogger.success('Alarm conditions met - triggering alarm', {
+          averageSpeed: analysis.averageSpeed,
+          directionConsistency: analysis.directionConsistency,
+          consecutiveGoodPoints: analysis.consecutiveGoodPoints
+        });
+        
+        // Play alarm sound
+        await playAlarm(0.7); // Start at 70% volume
+        
+        productionCrashDetector.logUserAction('alarm_triggered', {
+          averageSpeed: analysis.averageSpeed,
+          directionConsistency: analysis.directionConsistency,
+          consecutiveGoodPoints: analysis.consecutiveGoodPoints
+        });
+      } else {
+        console.log('🔔 Alarm conditions not met - no alarm');
+        AlarmLogger.info('Alarm conditions not met', {
+          averageSpeed: analysis?.averageSpeed || 0,
+          directionConsistency: analysis?.directionConsistency || 0,
+          consecutiveGoodPoints: analysis?.consecutiveGoodPoints || 0
+        });
+        
+        productionCrashDetector.logUserAction('alarm_conditions_not_met');
+      }
+      
+      // Mark as checked for today
+      setAlarmCheckedToday(true);
+      
+      // Schedule for tomorrow
+      scheduleNextAlarmCheck(true);
+    } catch (err) {
+      console.error('❌ Error checking alarm conditions:', err);
+      productionCrashDetector.logUserAction('alarm_check_failed', {
+        error: err instanceof Error ? err.message : String(err)
+      });
+      
+      // Still schedule next check in case of error
+      scheduleNextAlarmCheck(true);
+    }
+  }, [criteria.alarmEnabled, refreshData, analysis, playAlarm]);
+
+  // Calculate when to check alarm conditions (5 minutes before alarm time)
+  const calculateNextAlarmCheckTime = useCallback(() => {
+    if (!criteria.alarmEnabled || !criteria.alarmTime) {
+      return null;
+    }
+    
+    // Parse alarm time (HH:MM format)
+    const [hours, minutes] = criteria.alarmTime.split(':').map(Number);
+    
+    // Create a date for today with the specified time
+    const now = new Date();
+    const alarmTime = new Date();
+    alarmTime.setHours(hours, minutes, 0, 0);
+    
+    // Subtract 5 minutes for the check time
+    const checkTime = new Date(alarmTime);
+    checkTime.setMinutes(checkTime.getMinutes() - 5);
+    
+    // If the check time has already passed today, schedule for tomorrow
+    if (checkTime < now) {
+      checkTime.setDate(checkTime.getDate() + 1);
+    }
+    
+    return checkTime;
+  }, [criteria.alarmEnabled, criteria.alarmTime]);
+  
+  // Schedule the next alarm check
+  const scheduleNextAlarmCheck = useCallback((forceReschedule = false) => {
+    // Clear any existing timer
+    if (alarmCheckTimerRef.current) {
+      clearTimeout(alarmCheckTimerRef.current);
+      alarmCheckTimerRef.current = null;
+    }
+    
+    if (!criteria.alarmEnabled) {
+      console.log('Alarm is disabled, not scheduling check');
+      setNextAlarmCheckTime(null);
+      return;
+    }
+    
+    // Calculate next check time
+    const nextCheckTime = calculateNextAlarmCheckTime();
+    if (!nextCheckTime) {
+      return;
+    }
+    
+    // If already checked today and not forcing reschedule, schedule for tomorrow
+    if (alarmCheckedToday && !forceReschedule) {
+      nextCheckTime.setDate(nextCheckTime.getDate() + 1);
+    }
+    
+    // Calculate milliseconds until next check
+    const now = new Date();
+    const msUntilCheck = nextCheckTime.getTime() - now.getTime();
+    
+    // If we're very close to the check time (within 30 seconds) or past it slightly,
+    // check immediately to avoid missing the alarm
+    if (msUntilCheck < 30000 && msUntilCheck > -60000) {
+      console.log('🔔 Close to alarm check time, checking now');
+      checkAlarmConditions();
+      return;
+    }
+    
+    console.log(`🔔 Scheduling next alarm check at ${nextCheckTime.toLocaleString()} (in ${Math.round(msUntilCheck / 60000)} minutes)`);
+    
+    // Set up timer
+    alarmCheckTimerRef.current = setTimeout(() => {
+      checkAlarmConditions();
+    }, msUntilCheck);
+    
+    // Update state for UI
+    setNextAlarmCheckTime(nextCheckTime);
+    
+  }, [criteria.alarmEnabled, calculateNextAlarmCheckTime, alarmCheckedToday, checkAlarmConditions]);
+  
+  // Reset alarm checked status at midnight
+  useEffect(() => {
+    const resetAlarmCheckedStatus = () => {
+      const now = new Date();
+      // If it's a new day (after midnight), reset checked status
+      if (now.getHours() === 0 && now.getMinutes() < 5) {
+        console.log('🔄 Resetting alarm checked status (new day)');
+        setAlarmCheckedToday(false);
+      }
+    };
+    
+    // Check every hour if alarm status should be reset
+    const intervalId = setInterval(resetAlarmCheckedStatus, 60 * 60 * 1000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+  
+  // Initial setup of alarm check timer
+  useEffect(() => {
+    // Clean up any existing timer before setting a new one
+    return () => {
+      if (alarmCheckTimerRef.current) {
+        clearTimeout(alarmCheckTimerRef.current);
+        alarmCheckTimerRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Schedule alarm check whenever criteria or checked status changes
+  useEffect(() => {
+    scheduleNextAlarmCheck();
+  }, [criteria.alarmEnabled, criteria.alarmTime, alarmCheckedToday, scheduleNextAlarmCheck]);
 
   const formatTime = (date: Date | null) => {
     if (!date) return 'Never';
@@ -186,11 +421,26 @@ function WindDataDisplayContent() {
           <ThemedText style={styles.lastUpdated}>
             Last updated: {formatTime(lastUpdated)}
           </ThemedText>
-          {criteria?.alarmEnabled && (
-            <View style={styles.alarmIndicator}>
-              <ThemedText style={styles.alarmIndicatorText}>⏰ {criteria.alarmTime}</ThemedText>
-            </View>
-          )}
+          <TouchableOpacity 
+            style={[
+              styles.alarmIndicator, 
+              { backgroundColor: criteria.alarmEnabled ? '#FF9500' : '#666' }
+            ]}
+            onPress={toggleAlarmEnabled}
+          >
+            <ThemedText style={styles.alarmIndicatorText}>
+              ⏰ {criteria.alarmEnabled ? criteria.alarmTime : 'OFF'}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* Display next scheduled alarm check if enabled */}
+      {criteria.alarmEnabled && nextAlarmCheckTime && (
+        <View style={styles.alarmScheduleRow}>
+          <ThemedText style={styles.alarmScheduleText}>
+            Next alarm check: {formatTime(nextAlarmCheckTime)}
+          </ThemedText>
         </View>
       )}
 
@@ -232,6 +482,18 @@ function WindDataDisplayContent() {
             {analysis.analysis}
           </ThemedText>
         </View>
+      )}
+      
+      {/* Show stop button when alarm is playing */}
+      {isPlaying && (
+        <TouchableOpacity
+          style={styles.stopAlarmButton}
+          onPress={handleStopAlarm}
+        >
+          <ThemedText style={styles.stopAlarmButtonText}>
+            🔕 STOP ALARM
+          </ThemedText>
+        </TouchableOpacity>
       )}
 
       {verification && (
@@ -285,6 +547,14 @@ function WindDataDisplayContent() {
           <ThemedText style={styles.devInfoText}>
             Platform: {Platform.OS} {Platform.Version}
           </ThemedText>
+          <View style={styles.devInfoRow}>
+            <ThemedText style={styles.devInfoText}>
+              Alarm enabled: {criteria.alarmEnabled ? 'Yes' : 'No'}
+            </ThemedText>
+            <ThemedText style={styles.devInfoText}>
+              Alarm time: {criteria.alarmTime}
+            </ThemedText>
+          </View>
         </View>
       )}
     </ThemedView>
@@ -337,7 +607,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   lastUpdated: {
     fontSize: 12,
@@ -352,6 +622,26 @@ const styles = StyleSheet.create({
   alarmIndicatorText: {
     color: 'white',
     fontSize: 12,
+    fontWeight: 'bold',
+  },
+  alarmScheduleRow: {
+    marginBottom: 12,
+  },
+  alarmScheduleText: {
+    fontSize: 12,
+    opacity: 0.7,
+    textAlign: 'right',
+  },
+  stopAlarmButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  stopAlarmButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
   },
   analysisContainer: {
@@ -454,5 +744,11 @@ const styles = StyleSheet.create({
   devInfoText: {
     fontSize: 10,
     opacity: 0.6,
+  },
+  devInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginTop: 4,
   },
 });
