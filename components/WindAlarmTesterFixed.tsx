@@ -200,17 +200,17 @@ export function WindAlarmTesterFixed() {
   const playAlarmSound = async () => {
     // Don't play if sound is disabled or we're in snooze mode
     if (!soundEnabled || snoozeEnabled) {
-      console.log("Sound is disabled or alarm is snoozed - not playing");
-      return;
+      console.log("⚠️ Sound is disabled or alarm is snoozed - not playing");
+      return false;
     }
     
     // If already playing, don't restart
     if (isPlaying) {
-      console.log("Alarm already playing - not restarting");
-      return;
+      console.log("ℹ️ Alarm already playing - not restarting");
+      return true;
     }
     
-    console.log("💫 Attempting to play alarm sound...");
+    console.log("🎵 Attempting to play alarm sound...");
     
     try {
       // Vibration pattern for alarm (if supported)
@@ -220,7 +220,7 @@ export function WindAlarmTesterFixed() {
           // Use repeating vibration pattern
           Vibration.vibrate([0, 300, 150, 300], true); // true means repeat
         } catch (err) {
-          console.log('Vibration not supported');
+          console.log('⚠️ Vibration not supported:', err);
         }
       }
       
@@ -243,11 +243,13 @@ export function WindAlarmTesterFixed() {
           if (isScreenReaderEnabled) {
             AccessibilityInfo.announceForAccessibility('Alarm is now playing');
           }
+          
+          return true;
         } else {
           console.log("⚠️ Sound somehow unloaded, reloading...");
           // If sound is somehow unloaded, reload it
           soundRef.current = null;
-          playAlarmSound(); // Recursive call to load and play
+          return playAlarmSound(); // Recursive call to load and play
         }
       } else {
         // Load the sound first time
@@ -291,18 +293,18 @@ export function WindAlarmTesterFixed() {
             sound.setPositionAsync(0)
               .then(() => sound.playAsync())
               .catch(err => {
-                console.error('Error restarting sound (method 1):', err);
+                console.error('❌ Error restarting sound (method 1):', err);
                 
                 // Fallback method
                 try {
                   sound.replayAsync();
                 } catch (replayErr) {
-                  console.error('Error with replayAsync (method 2):', replayErr);
+                  console.error('❌ Error with replayAsync (method 2):', replayErr);
                   
                   // Last resort - create a new instance if all else fails
                   setTimeout(() => {
                     if (isPlaying) {
-                      console.log("Using emergency playback restart");
+                      console.log("🚨 Using emergency playback restart");
                       soundRef.current = null;
                       playAlarmSound();
                     }
@@ -316,58 +318,107 @@ export function WindAlarmTesterFixed() {
             console.error('❌ Sound playback error:', status.error);
           }
         });
+        
+        return true;
       }
     } catch (error) {
-      console.error('Error playing alarm sound', error);
+      console.error('❌ Error playing alarm sound', error);
       Alert.alert(
         'Sound Error', 
         'Could not play alarm sound. Please check if your device has audio enabled.',
         [{ text: 'OK' }]
       );
       setIsPlaying(false);
+      return false;
     }
   };
 
   const stopAlarmSound = async () => {
-    if (soundRef.current) {
-      try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          await soundRef.current.stopAsync();
-        }
-        setIsPlaying(false);
-        
-        // Make sure to stop vibration
-        if (Platform.OS === 'ios' || Platform.OS === 'android') {
-          try {
-            console.log("Stopping vibration");
-            Vibration.cancel();
-          } catch (err) {
-            console.log('Error canceling vibration');
-          }
-        }
-        
-        // For screen readers
-        if (isScreenReaderEnabled) {
-          AccessibilityInfo.announceForAccessibility('Alarm stopped');
-        }
-      } catch (error) {
-        console.error('Error stopping sound', error);
-        // Force the UI to update even if stopping failed
-        setIsPlaying(false);
-        
-        // Still try to stop vibration even if sound stopping failed
-        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    try {
+      console.log("🛑 Attempting to stop alarm sound...");
+      
+      // Update UI state immediately for responsive feedback
+      setIsPlaying(false);
+      
+      // First, stop vibration immediately for immediate feedback
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        try {
+          console.log("📳 Stopping vibration");
           Vibration.cancel();
+        } catch (err) {
+          console.log('Error canceling vibration:', err);
         }
       }
-    } else {
-      // If there's no sound reference but we think alarm is playing,
-      // make sure to update UI state and stop vibration
+      
+      // Then try to stop the sound if it exists
+      if (soundRef.current) {
+        try {
+          console.log("🔊 Getting sound status...");
+          const status = await soundRef.current.getStatusAsync().catch(e => {
+            console.log("Error getting sound status:", e);
+            return { isLoaded: false };
+          });
+          
+          if (status.isLoaded) {
+            console.log("💤 Stopping loaded sound...");
+            
+            // Use Promise.all to run these operations in parallel for quicker response
+            await Promise.all([
+              // First pause it for immediate feedback
+              soundRef.current.pauseAsync().catch(e => console.log("Error pausing sound:", e)),
+              
+              // Also try to disable looping to make sure it stays stopped
+              soundRef.current.setIsLoopingAsync(false).catch(() => {})
+            ]);
+            
+            // Then fully stop it
+            await soundRef.current.stopAsync().catch(e => console.log("Error stopping sound:", e));
+            
+            // Also try to reset position just to be safe
+            await soundRef.current.setPositionAsync(0).catch(() => {});
+            
+            console.log("✅ Sound stopped successfully");
+          } else {
+            console.log("⚠️ Sound was not loaded, no need to stop");
+          }
+        } catch (soundError) {
+          console.error("❌ Error managing sound:", soundError);
+          
+          // As a last resort, try to unload the sound
+          try {
+            await soundRef.current.unloadAsync();
+            console.log("🧹 Sound unloaded as fallback");
+          } catch (unloadError) {
+            console.error("Failed to unload sound:", unloadError);
+          }
+        }
+      } else {
+        console.log("⚠️ No sound reference found");
+      }
+      
+      // For screen readers
+      if (isScreenReaderEnabled) {
+        AccessibilityInfo.announceForAccessibility('Alarm stopped');
+      }
+      
+      console.log("🎯 Stop alarm process completed");
+      return true; // Successfully stopped
+    } catch (error) {
+      console.error('❌ Error stopping sound', error);
+      
+      // Force the UI to update even if stopping failed
       setIsPlaying(false);
+      
+      // Still try to stop vibration even if sound stopping failed
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
         Vibration.cancel();
       }
+      
+      // If all else fails, try to create a new sound instance next time
+      soundRef.current = null;
+      
+      // Return false to indicate failure, but we still updated UI
+      return false;
     }
   };
 
@@ -478,20 +529,53 @@ export function WindAlarmTesterFixed() {
   };
   
   // Turn off alarm completely
-  const turnOffAlarm = () => {
-    stopAlarmSound();
-    setSoundEnabled(false);
-    
-    // If snooze timer is active, clear it
-    if (snoozeTimerRef.current) {
-      clearTimeout(snoozeTimerRef.current);
-      setSnoozeEnabled(false);
-      setSnoozeEndTime(null);
-    }
-    
-    // Provide feedback for screen reader users
-    if (isScreenReaderEnabled) {
-      AccessibilityInfo.announceForAccessibility('Alarm turned off');
+  const turnOffAlarm = async () => {
+    try {
+      console.log("🛑 Turning off alarm completely...");
+      
+      // Stop vibration immediately
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        Vibration.cancel();
+      }
+      
+      // Ensure the sound is properly stopped
+      if (soundRef.current) {
+        try {
+          const status = await soundRef.current.getStatusAsync().catch(() => ({ isLoaded: false }));
+          if (status.isLoaded) {
+            await soundRef.current.stopAsync().catch(e => console.log("Error stopping sound:", e));
+            await soundRef.current.setIsLoopingAsync(false).catch(() => {});
+            console.log("✅ Sound stopped successfully");
+          }
+        } catch (error) {
+          console.error("Error stopping sound:", error);
+        }
+      }
+      
+      // Update UI state
+      setIsPlaying(false);
+      setSoundEnabled(false);
+      
+      // Clear any snooze timer
+      if (snoozeTimerRef.current) {
+        clearTimeout(snoozeTimerRef.current);
+        setSnoozeEnabled(false);
+        setSnoozeEndTime(null);
+        console.log("⏱️ Cleared snooze timer");
+      }
+      
+      // Provide feedback for screen reader users
+      if (isScreenReaderEnabled) {
+        AccessibilityInfo.announceForAccessibility('Alarm turned off completely');
+      }
+      
+      console.log('✅ Alarm turned off completely');
+    } catch (error) {
+      console.error("❌ Error in turnOffAlarm:", error);
+      
+      // Ensure UI state is updated even if there was an error
+      setIsPlaying(false);
+      setSoundEnabled(false);
     }
   };
   
@@ -692,20 +776,12 @@ export function WindAlarmTesterFixed() {
                       </ThemedText>
                     </ThemedText>
                     
-                    {isPlaying && (
-                      <TouchableOpacity 
-                        onPress={stopAlarmSound}
-                        style={styles.stopButton}
-                        accessibilityLabel="Stop alarm sound"
-                        accessibilityHint="Double tap to stop the alarm sound"
-                      >
-                        <Ionicons name="stop-circle" size={28} color="#FF4040" />
-                      </TouchableOpacity>
-                    )}
-                    
                     {!isPlaying && (
                       <TouchableOpacity 
-                        onPress={playAlarmSound}
+                        onPress={() => {
+                          console.log("🟢 Play button pressed");
+                          playAlarmSound().catch(err => console.error("Error in play button press:", err));
+                        }}
                         style={styles.playButton}
                         accessibilityLabel="Play alarm sound"
                         accessibilityHint="Double tap to play the alarm sound"
@@ -739,7 +815,45 @@ export function WindAlarmTesterFixed() {
                       {/* Turn off button */}
                       <TouchableOpacity
                         style={styles.turnOffButton}
-                        onPress={turnOffAlarm}
+                        onPress={async () => {
+                          console.log("🔴 Turn Off Alarm button pressed");
+                          
+                          try {
+                            // Stop vibration immediately for responsive feedback
+                            if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                              Vibration.cancel();
+                            }
+                            
+                            // Update UI state immediately for responsive feedback
+                            setIsPlaying(false);
+                            setSoundEnabled(false);
+                            
+                            // If snooze timer is active, clear it
+                            if (snoozeTimerRef.current) {
+                              clearTimeout(snoozeTimerRef.current);
+                              setSnoozeEnabled(false);
+                              setSnoozeEndTime(null);
+                            }
+                            
+                            // Then handle the sound stopping async operation
+                            if (soundRef.current) {
+                              const status = await soundRef.current.getStatusAsync().catch(() => ({ isLoaded: false }));
+                              if (status.isLoaded) {
+                                await soundRef.current.stopAsync().catch(() => {});
+                                console.log("✅ Sound stopped successfully");
+                              }
+                            }
+                            
+                            // For screen readers
+                            if (isScreenReaderEnabled) {
+                              AccessibilityInfo.announceForAccessibility('Alarm turned off completely');
+                            }
+                            
+                            console.log('✅ Alarm turned off completely');
+                          } catch (error) {
+                            console.error("❌ Error turning off alarm:", error);
+                          }
+                        }}
                         accessibilityLabel="Turn off alarm"
                         accessibilityHint="Double tap to completely turn off alarm"
                       >
@@ -879,7 +993,10 @@ export function WindAlarmTesterFixed() {
                 </View>
                 <TouchableOpacity 
                   style={styles.debugButton}
-                  onPress={playAlarmSound}
+                  onPress={() => {
+                    console.log("🔵 Force Play Sound button pressed");
+                    playAlarmSound().catch(err => console.error("Error in force play button press:", err));
+                  }}
                 >
                   <ThemedText style={styles.debugButtonText}>Force Play Sound</ThemedText>
                 </TouchableOpacity>
