@@ -1,4 +1,4 @@
-# Wind Trend Analyzer - Soda Lake
+# Dawn Patrol Alarm - Soda Lake
 
 An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for "dawn patrol". Get reliable predictions based on early morning wind patterns!
 
@@ -24,7 +24,7 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 
 ## How It Works
 
-The Wind Trend Analyzer helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
+The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
 
 ### Smart Wake-Up Decisions
 

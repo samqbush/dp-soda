@@ -1,4 +1,4 @@
-name: Build Wind Trend Analyzer
+name: Build Dawn Patrol Alarm
 
 on:
   pull_request:

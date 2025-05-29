@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { SafeImage } from '@/components/SafeImage';
 
@@ -57,8 +56,7 @@ export default function HomeScreen() {
         )
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Wind Trend Analyzer</ThemedText>
-        <HelloWave />
+        <ThemedText type="title">Dawn Patrol Alarm</ThemedText>
       </ThemedView>
       
       <WindDataDisplay />

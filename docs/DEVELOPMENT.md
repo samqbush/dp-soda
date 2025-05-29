@@ -1,10 +1,10 @@
-# Wind Trend Analyzer - Developer Documentation
+# Dawn Patrol Alarm - Developer Documentation
 
-This document contains information for developers working on the Wind Trend Analyzer project. For end-user documentation, see [README.md](./README.md).
+This document contains information for developers working on the Dawn Patrol Alarm project. For end-user documentation, see [README.md](./README.md).
 
 ## Project Overview
 
-The Wind Trend Analyzer is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
+The Dawn Patrol Alarm is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
 
 ## Development Environment
 

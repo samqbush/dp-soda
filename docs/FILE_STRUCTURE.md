@@ -1,6 +1,6 @@
-# Wind Trend Analyzer File Structure
+# Dawn Patrol Alarm File Structure
 
-This document provides an overview of all files in the Wind Trend Analyzer project, organized by their purpose and functionality.
+This document provides an overview of all files in the Dawn Patrol Alarm project, organized by their purpose and functionality.
 
 ## Core App Structure
 

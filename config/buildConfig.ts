@@ -1,5 +1,5 @@
 /**
- * Build configuration for the Wind Trend Analyzer app
+ * Build configuration for the Dawn Patrol Alarm app
  * This file helps with debugging release builds and providing build info
  */
 

@@ -1,7 +1,7 @@
 # GitHub Copilot Custom Instructions
 
 ## Project Context
-- This repository is for a wind trend analyzer focused on Soda Lake (Soda Lake Dam 1), Colorado. 
+- This repository is for Dawn Patrol Alarm focused on Soda Lake (Soda Lake Dam 1), Colorado. 
 - It is an Expo/React Native application that scrapes wind data from WindAlert, analyzes and visualizes early morning wind trends (especially 3am–5am), and determines if conditions are favorable for beach activities.
 
 ## Build and Test Instructions
