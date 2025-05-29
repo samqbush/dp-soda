@@ -15,6 +15,7 @@ This document provides an overview of all files in the Dawn Patrol Alarm project
 ### App Navigation and Layout
 - `app/_layout.tsx` - Root layout for the entire application
 - `app/+not-found.tsx` - 404 page for invalid routes
+- `app/test-alarm.tsx` - Page for testing wind alarm functionality
 - `app/(tabs)/_layout.tsx` - Tab-based navigation layout
 - `app/(tabs)/index.tsx` - Home tab with main wind data display
 - `app/(tabs)/explore.tsx` - Settings tab for configuring wind criteria
@@ -24,6 +25,8 @@ This document provides an overview of all files in the Dawn Patrol Alarm project
 ### Wind Data Services
 - `services/windService.ts` - Core wind data fetching, processing and analysis
 - `services/fallbackData.ts` - Emergency fallback wind data for offline use
+- `services/alarmAudioService.ts` - Audio service for alarm sounds and state management
+- `services/alarmDebugLogger.ts` - Logging service for alarm-related events and debug information
 
 ### Storage and Persistence
 - `services/storageService.ts` - AsyncStorage wrapper for data caching and persistence
@@ -48,6 +51,8 @@ This document provides an overview of all files in the Dawn Patrol Alarm project
 ### Wind Data Components
 - `components/WindDataDisplay.tsx` - Main component for displaying wind data and analysis
 - `components/WindChart.tsx` - Chart visualization for wind trends
+- `components/WindAlarmTesterRefactored.tsx` - Component for testing alarm functionality with different scenarios
+- `components/AlarmImplementationComparison.tsx` - Wrapper component for the alarm tester
 
 ### Developer Mode Components
 - `components/DebugSettingsUI.tsx` - UI for toggling debug features and components
@@ -89,6 +94,9 @@ This document provides an overview of all files in the Dawn Patrol Alarm project
 
 ### Data Hooks
 - `hooks/useWindData.ts` - Custom hook for managing wind data state and analysis
+- `hooks/useAlarmAudio.ts` - Custom hook for managing alarm audio playback and state
+- `hooks/useWindAnalyzer.ts` - Custom hook for wind data analysis and scenario testing
+- `hooks/useWindAlarmReducer.ts` - Reducer hook for centralized alarm state management
 
 ## Assets
 - `assets/fonts/` - Custom font files
@@ -96,6 +104,9 @@ This document provides an overview of all files in the Dawn Patrol Alarm project
 
 ## Scripts
 - `scripts/fetch-wind-data.mjs` - Standalone script for fetching and analyzing wind data
+
+## Utils
+- `utils/testWindData.ts` - Generates test wind data scenarios for alarm testing
 
 ## Documentation
 - `README.md` - Project overview and getting started guide

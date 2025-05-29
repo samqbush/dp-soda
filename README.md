@@ -43,6 +43,19 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 - **Manual Refresh**: Pull down to update wind data
 - **Last Updated**: Time of most recent data fetch
 
+### Alarm Tester
+
+- **Test Different Scenarios**: Try different wind conditions to see how the alarm responds
+- **Customize Parameters**: Adjust minimum wind speed, direction consistency, and other criteria
+- **Real-time Feedback**: See immediate analysis results as you change settings
+- **Audio Testing**: Test alarm sounds with volume control
+- **Scenario Library**: Choose from pre-configured test scenarios:
+  - Good morning conditions (should trigger alarm)
+  - Weak morning winds (should not trigger alarm) 
+  - Inconsistent wind direction
+  - Wrong wind direction (opposite of preferred)
+  - Few good consecutive data points
+
 ### Settings Screen
 
 - Tap the "Settings" tab to access settings
@@ -69,6 +82,18 @@ The app may be in offline mode. Check your internet connection and click the ref
 
 ### Can I use this for other locations?
 Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
+
+## Technical Features
+
+### Modern Architecture
+
+- **Service-based Audio System**: Dedicated audio service with race condition prevention
+- **Custom React Hooks**: Separation of concerns for improved code maintainability
+  - `useAlarmAudio`: Handles all audio playback and state
+  - `useWindAnalyzer`: Manages wind data analysis and scenarios
+  - `useWindAlarmReducer`: Centralizes state management for clean component logic
+- **Error Resilience**: Comprehensive error handling and recovery mechanisms
+- **Multiple Test Scenarios**: Pre-configured tests for various wind conditions
 
 ## Coming Soon
 

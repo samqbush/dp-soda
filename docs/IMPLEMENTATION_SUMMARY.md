@@ -17,6 +17,10 @@
   - Theme management with dark/light mode support
   - Automatic data refresh and caching
   - Error handling with user-friendly messages
+  - Specialized hooks for audio and alarm functionality:
+    - `useAlarmAudio`: Audio playback state management
+    - `useWindAnalyzer`: Wind data analysis logic
+    - `useWindAlarmReducer`: Centralized state management
 
 ### User Interface
 - **Main Display Components**
@@ -26,6 +30,13 @@
   - Manual refresh and data management
   - Configurable settings interface
   - Dark mode support throughout the application
+  
+- **Alarm Tester**
+  - Interactive testing interface for wind alarm functionality
+  - Pre-configured test scenarios (good conditions, weak winds, etc.)
+  - Real-time parameter adjustment with immediate feedback
+  - Audio testing with volume control and snooze functionality
+  - Educational interface explaining alarm criteria and decisions
 
 ### Android Crash & White Screen Prevention
 - **Enhanced Crash Detection & Recovery**
