@@ -8,9 +8,11 @@ const SPOT_ID = '149264'; // (Soda Lake Dam 1)
 
 export interface WindDataPoint {
   time: string;
-  windSpeed: string;
-  windGust: string;
-  windDirection: string;
+  timestamp?: string | number; // Optional timestamp field for compatibility
+  windSpeed: string | number; // Allow either string or number
+  windSpeedMph?: number;      // Optional convenience field for mph value
+  windGust: string | number;  // Allow either string or number
+  windDirection: string | number; // Allow either string or number
 }
 
 export interface WindAnalysis {
@@ -273,7 +275,12 @@ export const analyzeWindData = (
 
   // Calculate average wind speed
   const speeds = alarmWindowData
-    .map(point => parseFloat(point.windSpeed))
+    .map(point => {
+      // Handle both string and number types for windSpeed
+      return typeof point.windSpeed === 'string' 
+        ? parseFloat(point.windSpeed) 
+        : point.windSpeed;
+    })
     .filter(speed => !isNaN(speed));
   
   const averageSpeed = speeds.length > 0 
@@ -429,7 +436,10 @@ const countConsecutiveGoodPoints = (
   console.log(`Data points to analyze: ${data.length}`);
   
   for (const point of data) {
-    const speed = parseFloat(point.windSpeed);
+    // Handle both string and number types for windSpeed
+    const speed = typeof point.windSpeed === 'string'
+      ? parseFloat(point.windSpeed)
+      : point.windSpeed;
     const isGoodPoint = !isNaN(speed) && speed >= criteria.minimumAverageSpeed;
     const pointTime = new Date(point.time);
 

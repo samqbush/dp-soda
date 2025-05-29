@@ -112,17 +112,26 @@ function WindChartContent({ data, title }: WindChartProps) {
 
   // Prepare chart data with better error handling
   const speeds = recentData.map(point => {
-    const speed = parseFloat(point.windSpeed);
+    // Handle both string and number types for windSpeed
+    const speed = typeof point.windSpeed === 'string' 
+      ? parseFloat(point.windSpeed) 
+      : point.windSpeed;
     return isNaN(speed) ? 0 : Math.max(0, speed);
   });
   
   const gusts = recentData.map(point => {
-    const gust = parseFloat(point.windGust);
+    // Handle both string and number types for windGust
+    const gust = typeof point.windGust === 'string' 
+      ? parseFloat(point.windGust) 
+      : point.windGust;
     return isNaN(gust) ? 0 : Math.max(0, gust);
   });
 
   const directions = recentData.map(point => {
-    const dir = parseFloat(point.windDirection);
+    // Handle both string and number types for windDirection
+    const dir = typeof point.windDirection === 'string' 
+      ? parseFloat(point.windDirection) 
+      : point.windDirection;
     return isNaN(dir) ? null : dir;
   });
 
@@ -241,7 +250,11 @@ function WindChartContent({ data, title }: WindChartProps) {
       }
       
       const x = chartLeft + (i / (recentData.length - 1)) * chartInnerWidth;
-      const y = chartTop + (1 - (parseFloat(point.windSpeed) / maxSpeed)) * chartInnerHeight;
+      // Handle both string and number types for windSpeed
+      const speedValue = typeof point.windSpeed === 'string' 
+        ? parseFloat(point.windSpeed) 
+        : point.windSpeed;
+      const y = chartTop + (1 - (speedValue / maxSpeed)) * chartInnerHeight;
       
       return {
         x,

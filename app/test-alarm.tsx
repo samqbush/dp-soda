@@ -1,18 +1,16 @@
+import { AlarmImplementationComparison } from '@/components/AlarmImplementationComparison';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { WindAlarmTesterFixed } from '@/components/WindAlarmTesterFixed';
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 export default function TestAlarmScreen() {
   return (
     <ThemedView style={styles.container}>
       <ErrorBoundary>
-        <ThemedText style={styles.title}>Wind Alarm Testing</ThemedText>
-        <ScrollView style={styles.scrollView}>
-          <WindAlarmTesterFixed />
-        </ScrollView>
+        <ThemedText style={styles.title}>Wind Alarm Tester</ThemedText>
+        <AlarmImplementationComparison />
       </ErrorBoundary>
     </ThemedView>
   );
