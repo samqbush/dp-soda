@@ -74,22 +74,14 @@ eas build --platform android --profile production
 
 ## Testing
 
-### Running Tests
+TODO: Develop unit tests
 
-```bash
-# Run all tests
-npm test
+### Lint
 
-# Run specific tests
-npm test -- -t "WindService"
+```shell
+npm run lint
+npx tsc --noEmit
 ```
-
-### Testing Components
-
-The `components/WindDataTest.tsx` component can be used for debugging and testing wind service functionality:
-- Tests API connectivity
-- Validates data parsing and analysis
-- Shows console-style output for debugging
 
 ### Standalone Script
 

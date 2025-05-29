@@ -4,23 +4,16 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 
 ## Features
 
-- **Morning Wind Predictions**: Wake up or sleep in based on actual wind conditions
+- **Morning Wind Alarm**: Wake up or sleep in based on actual wind conditions
 - **Smart Analysis**: Uses 3am-5am window to analyze if conditions will be favorable
 - **Verification System**: Confirms predictions using 6am-8am window data
 - **Fully Configurable**: Customize all wind criteria to match your preferences
-- **Works Offline**: Access previous predictions even without internet connection
-- **Dark Mode**: Easy on the eyes for early morning checks
-- **Reliable Operation**: Enhanced stability with crash detection and recovery
 
 ## Getting Started
 
 ### Download Options
 
-- **Android**: Download the latest APK from the [Releases](https://github.com/yourusername/wind-trend-analyzer/releases) page
-- **iOS**: Coming soon to the App Store
-- **Expo Go**: Scan the QR code below to open in Expo Go app
-
-![Expo QR Code](./assets/images/expo-qr-code.png)
+- Private Link
 
 ## How It Works
 
@@ -30,7 +23,7 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 
 1. **Morning Analysis**: The app checks wind conditions during the crucial 3am-5am window
 2. **Decision Making**: Based on speed, consistency, and direction, it determines if conditions are favorable
-3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation
+3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation with alarm
 4. **Verification**: The app also checks the 6am-8am window to validate its predictions
 
 ### Default Settings (All Customizable)
@@ -81,10 +74,6 @@ Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
 - Push notifications for ideal conditions
 - Historical accuracy tracking
-- Integration with weather forecasts
-- Multiple location support
-- Enhanced visualization options
-- Social sharing capabilities
 
 ## Contact & Support
 

@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
-  const { criteria, setCriteria, refreshData } = useWindData();
+  const { criteria, setCriteria } = useWindData();
   const [localCriteria, setLocalCriteria] = useState<AlarmCriteria>(criteria);
   const [hasChanges, setHasChanges] = useState(false);
 

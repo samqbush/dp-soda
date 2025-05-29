@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Alert,
@@ -41,8 +41,7 @@ const WIND_SCENARIOS = {
 
 type ScenarioKey = keyof typeof WIND_SCENARIOS;
 
-// Snooze durations in minutes
-const SNOOZE_OPTIONS = [5, 10, 15];
+// Removed unused SNOOZE_OPTIONS variable
 
 export function WindAlarmTesterFixed() {
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>('goodEarlyMorning');
@@ -78,7 +77,7 @@ export function WindAlarmTesterFixed() {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   
   // Colors
-  const backgroundColor = useThemeColor({}, 'background');
+  // Removing unused backgroundColor variable
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
@@ -89,314 +88,110 @@ export function WindAlarmTesterFixed() {
     outputRange: ['#FF4040', '#FF9000']
   });
 
-  // Check for screen reader
-  useEffect(() => {
-    AccessibilityInfo.isScreenReaderEnabled().then(
-      screenReaderEnabled => {
-        setIsScreenReaderEnabled(screenReaderEnabled);
-      }
-    );
-  }, []);
-
-  // Update analysis when scenario or criteria changes
-  useEffect(() => {
-    analyzeScenario();
-  }, [selectedScenario, criteria]);
-  
-  // Generate custom scenario data when custom inputs change
-  useEffect(() => {
-    if (selectedScenario === 'custom') {
-      const speed = parseFloat(customSpeed) || 10;
-      const direction = parseFloat(customDirection) || 315;
-      const variation = parseFloat(customVariation) || 20;
-      
-      WIND_SCENARIOS.custom = generateCustomData(speed, direction, variation);
-      analyzeScenario();
-    }
-  }, [customSpeed, customDirection, customVariation, selectedScenario]);
-
-  // Start pulsing animation when alarm is playing
-  useEffect(() => {
-    if (isPlaying) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: false,
-          })
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(0);
-    }
-  }, [isPlaying]);
-
-  // Update sound volume when volume changes
-  useEffect(() => {
-    if (soundRef.current && isPlaying) {
-      soundRef.current.setVolumeAsync(volume).catch(err => {
-        console.error('Error setting volume:', err);
-      });
-    }
-  }, [volume]);
-
-  const analyzeScenario = () => {
-    const data = WIND_SCENARIOS[selectedScenario];
-    
-    // Create a date to test early morning hours (3am-5am)
-    const testDate = new Date();
-    testDate.setHours(4, 30, 0, 0); // 4:30 AM
-    
-    console.log(`Analyzing scenario "${selectedScenario}" with ${data.length} data points`);
-    console.log(`First data point:`, data[0]);
-    
-    // Debug: Check if any points fall within the 3am-5am window
-    const alarmStart = new Date();
-    alarmStart.setHours(3, 0, 0, 0);
-    const alarmEnd = new Date();
-    alarmEnd.setHours(5, 0, 0, 0);
-    
-    const earlyMorningPoints = data.filter(point => {
-      const pointTime = new Date(point.time);
-      return pointTime.getHours() >= 3 && pointTime.getHours() <= 5; 
-    });
-    
-    console.log(`Found ${earlyMorningPoints.length} points in early morning window`);
-    if (earlyMorningPoints.length > 0) {
-      console.log('Sample early morning point:', earlyMorningPoints[0]);
-    }
-    
-    const newAnalysis = analyzeWindData(data, criteria, testDate);
-    console.log(`Analysis result:`, newAnalysis);
-    setAnalysis(newAnalysis);
-    
-    // Also verify conditions for the 6am-8am window
-    const newVerification = verifyWindConditions(data, criteria, testDate);
-    console.log(`Verification result:`, newVerification);
-    setVerification(newVerification);
-    
-    // For immediate testing - if it should be alarm worthy, play the sound
-    if (newAnalysis.isAlarmWorthy && soundEnabled && !isPlaying) {
-      console.log('Analysis indicates alarm worthy - playing sound');
-      setTimeout(() => playAlarmSound(), 500);
-    }
-  };
-
-  const handleCriteriaChange = (key: keyof AlarmCriteria, value: any) => {
-    setCriteria({ ...criteria, [key]: value });
-  };
-
-  const getAlarmStatusColor = (isAlarmWorthy?: boolean) => {
-    return isAlarmWorthy ? '#4CAF50' : '#FF9800';
-  };
-
-  // Load and play alarm sound
-  const playAlarmSound = async () => {
+  // Forward declarations of functions that need to be referenced in useCallback dependencies
+  const playAlarmSound = useCallback(async () => {
     // Don't play if sound is disabled or we're in snooze mode
     if (!soundEnabled || snoozeEnabled) {
-      console.log("⚠️ Sound is disabled or alarm is snoozed - not playing");
+      console.log('Sound disabled or in snooze mode, not playing');
       return false;
     }
-    
-    // If already playing, don't restart
-    if (isPlaying) {
-      console.log("ℹ️ Alarm already playing - not restarting");
-      return true;
-    }
-    
-    console.log("🎵 Attempting to play alarm sound...");
-    
-    try {
-      // Vibration pattern for alarm (if supported)
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        try {
-          console.log("📳 Triggering vibration");
-          // Use repeating vibration pattern
-          Vibration.vibrate([0, 300, 150, 300], true); // true means repeat
-        } catch (err) {
-          console.log('⚠️ Vibration not supported:', err);
-        }
-      }
-      
-      if (soundRef.current) {
-        // If we already have a sound loaded, just play it
-        console.log("🔊 Sound object exists, checking status...");
-        const status = await soundRef.current.getStatusAsync();
-        console.log("Sound status:", status);
-        
-        if (status.isLoaded) {
-          console.log("🔁 Sound is loaded, playing from beginning");
-          await soundRef.current.setPositionAsync(0); // Start from beginning
-          await soundRef.current.setVolumeAsync(volume); // Set volume (0.0 to 1.0)
-          await soundRef.current.setIsLoopingAsync(true); // Ensure looping is enabled
-          const playResult = await soundRef.current.playAsync();
-          console.log("▶️ Play result:", playResult);
-          setIsPlaying(true);
-          
-          // For screen readers
-          if (isScreenReaderEnabled) {
-            AccessibilityInfo.announceForAccessibility('Alarm is now playing');
-          }
-          
-          return true;
-        } else {
-          console.log("⚠️ Sound somehow unloaded, reloading...");
-          // If sound is somehow unloaded, reload it
-          soundRef.current = null;
-          return playAlarmSound(); // Recursive call to load and play
-        }
-      } else {
-        // Load the sound first time
-        console.log("🔄 Loading alarm sound for the first time...");
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true, // Keep playing in background
-          shouldDuckAndroid: true,
-        });
-        
-        console.log("📂 Creating sound from asset...");
-        const soundAsset = require('../assets/sounds/alarm.mp3');
-        console.log("Sound asset:", soundAsset);
-        
-        const { sound } = await Audio.Sound.createAsync(
-          soundAsset,
-          { 
-            shouldPlay: true, 
-            isLooping: true, // Ensure looping is enabled
-            volume: volume 
-          }
-        );
-        console.log("✅ Sound loaded successfully");
-        soundRef.current = sound;
-        setIsPlaying(true);
-        
-        // For screen readers
-        if (isScreenReaderEnabled) {
-          AccessibilityInfo.announceForAccessibility('Alarm is now playing');
-        }
-        
-        // Set up finished handler with improved looping
-        sound.setOnPlaybackStatusUpdate((status: any) => {
-          console.log("🔄 Playback status update:", status);
-          
-          // Force continuous playback with multiple fallback methods
-          if (status.didJustFinish && isPlaying) {
-            console.log("🏁 Sound finished playing - manually restarting");
-            
-            // Try to use the proper method first
-            sound.setPositionAsync(0)
-              .then(() => sound.playAsync())
-              .catch(err => {
-                console.error('❌ Error restarting sound (method 1):', err);
-                
-                // Fallback method
-                try {
-                  sound.replayAsync();
-                } catch (replayErr) {
-                  console.error('❌ Error with replayAsync (method 2):', replayErr);
-                  
-                  // Last resort - create a new instance if all else fails
-                  setTimeout(() => {
-                    if (isPlaying) {
-                      console.log("🚨 Using emergency playback restart");
-                      soundRef.current = null;
-                      playAlarmSound();
-                    }
-                  }, 300);
-                }
-              });
-          }
-          
-          // Log any errors
-          if (status.error) {
-            console.error('❌ Sound playback error:', status.error);
-          }
-        });
-        
-        return true;
-      }
-    } catch (error) {
-      console.error('❌ Error playing alarm sound', error);
-      Alert.alert(
-        'Sound Error', 
-        'Could not play alarm sound. Please check if your device has audio enabled.',
-        [{ text: 'OK' }]
-      );
-      setIsPlaying(false);
-      return false;
-    }
-  };
 
-  const stopAlarmSound = async () => {
     try {
-      console.log("🛑 Attempting to stop alarm sound...");
+      console.log('🔊 Playing alarm sound...');
       
-      // Update UI state immediately for responsive feedback
-      setIsPlaying(false);
-      
-      // First, stop vibration immediately for immediate feedback
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        try {
-          console.log("📳 Stopping vibration");
-          Vibration.cancel();
-        } catch (err) {
-          console.log('Error canceling vibration:', err);
-        }
-      }
-      
-      // Then try to stop the sound if it exists
+      // First stop any existing sound
       if (soundRef.current) {
         try {
-          console.log("🔊 Getting sound status...");
-          const status = await soundRef.current.getStatusAsync().catch(e => {
-            console.log("Error getting sound status:", e);
-            return { isLoaded: false };
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        } catch (err) {
+          console.warn('Error cleaning up previous sound:', err);
+        }
+        soundRef.current = null;
+      }
+      
+      // Configure audio session for alarm
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true, // Allow playing when device is on silent
+        staysActiveInBackground: true, // Keep playing when app is in background
+        shouldDuckAndroid: false, // Don't lower volume of other apps
+      });
+      
+      const { sound } = await Audio.Sound.createAsync(
+        require('@/assets/sounds/alarm.mp3'),
+        {
+          shouldPlay: true,
+          isLooping: true,
+          volume: volume
+        }
+      );
+      
+      soundRef.current = sound;
+      setIsPlaying(true);
+      
+      // For accessibility
+      if (isScreenReaderEnabled) {
+        AccessibilityInfo.announceForAccessibility('Alarm activated! Wind conditions are favorable!');
+      }
+      
+      // Start vibration pattern for additional alert
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        Vibration.vibrate([500, 1000, 500, 1000], true);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to play sound', error);
+      setIsPlaying(false);
+      return false;
+    }
+  }, [soundEnabled, snoozeEnabled, volume, isScreenReaderEnabled]);
+
+  const stopAlarmSound = useCallback(async () => {
+    try {
+      console.log("🔇 Stopping alarm sound...");
+      setIsPlaying(false);
+      
+      // Stop vibration
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        Vibration.cancel();
+      }
+      
+      if (soundRef.current) {
+        console.log("📱 Sound ref exists, stopping...");
+        try {
+          // Getting current status
+          const status = await soundRef.current.getStatusAsync().catch(() => {
+            console.log("⚠️ Could not get sound status");
+            return null;
           });
           
-          if (status.isLoaded) {
-            console.log("💤 Stopping loaded sound...");
+          console.log("🎵 Current sound status:", status);
+          if (status && status.isLoaded) {
+            // Multiple steps for a more reliable stop
+            await soundRef.current.pauseAsync().catch(() => console.log("Error pausing sound"));
             
-            // First pause it for immediate feedback (might help prevent race conditions)
-            await soundRef.current.pauseAsync().catch(e => console.log("Error pausing sound:", e));
+            await soundRef.current.setIsLoopingAsync(false).catch(() => console.log("Error disabling loop"));
             
-            // Disable looping to ensure it won't restart
-            await soundRef.current.setIsLoopingAsync(false).catch(e => console.log("Error disabling loop:", e));
+            await soundRef.current.stopAsync().catch(() => console.log("Error stopping sound"));
             
-            // Then fully stop it 
-            await soundRef.current.stopAsync().catch(e => console.log("Error stopping sound:", e));
+            await soundRef.current.setPositionAsync(0).catch(() => console.log("Error resetting position"));
             
-            // Reset position to beginning
-            await soundRef.current.setPositionAsync(0).catch(e => console.log("Error resetting position:", e));
+            await soundRef.current.setVolumeAsync(0).catch(() => console.log("Error setting volume to 0"));
             
-            // Set volume to 0 as an extra measure
-            await soundRef.current.setVolumeAsync(0).catch(e => console.log("Error setting volume to 0:", e));
-            
-            // Completely unload the sound to ensure it's truly stopped
-            await soundRef.current.unloadAsync().catch(e => console.log("Error unloading sound:", e));
-            
-            // Set soundRef to null to force reload next time
-            soundRef.current = null;
+            await soundRef.current.unloadAsync().catch(() => console.log("Error unloading sound"));
             
             console.log("✅ Sound stopped and unloaded successfully");
           } else {
-            console.log("⚠️ Sound was not loaded, unloading anyway");
-            // Try unloading even if reported as not loaded
+            console.log("⚠️ Sound not loaded, attempting unload anyway");
             await soundRef.current.unloadAsync().catch(() => {});
-            soundRef.current = null;
           }
         } catch (soundError) {
-          console.error("❌ Error managing sound:", soundError);
+          console.error("❌ Error handling sound object:", soundError);
           
-          // As a last resort, try to unload the sound
+          // Still try to unload even if other operations failed
           try {
             await soundRef.current.unloadAsync();
-            console.log("🧹 Sound unloaded as fallback");
           } catch (unloadError) {
             console.error("Failed to unload sound:", unloadError);
           }
@@ -446,7 +241,7 @@ export function WindAlarmTesterFixed() {
           staysActiveInBackground: false,
           shouldDuckAndroid: false,
         });
-      } catch (e) { /* Ignore errors here */ }
+      } catch { /* Ignore errors here */ }
       
       // Always null the reference to force reload next time
       soundRef.current = null;
@@ -454,6 +249,113 @@ export function WindAlarmTesterFixed() {
       // Return false to indicate failure, but we still updated UI
       return false;
     }
+  }, [isScreenReaderEnabled]);
+  
+  const analyzeScenario = useCallback(() => {
+    const data = WIND_SCENARIOS[selectedScenario];
+    
+    // Create a date to test early morning hours (3am-5am)
+    const testDate = new Date();
+    testDate.setHours(4, 30, 0, 0); // 4:30 AM
+    
+    console.log(`Analyzing scenario "${selectedScenario}" with ${data.length} data points`);
+    console.log(`First data point:`, data[0]);
+    
+    // Debug: Check if any points fall within the 3am-5am window
+    const alarmStart = new Date();
+    alarmStart.setHours(3, 0, 0, 0);
+    const alarmEnd = new Date();
+    alarmEnd.setHours(5, 0, 0, 0);
+    
+    const earlyMorningPoints = data.filter(point => {
+      const pointTime = new Date(point.time);
+      return pointTime.getHours() >= 3 && pointTime.getHours() <= 5; 
+    });
+    
+    console.log(`Found ${earlyMorningPoints.length} points in early morning window`);
+    if (earlyMorningPoints.length > 0) {
+      console.log('Sample early morning point:', earlyMorningPoints[0]);
+    }
+    
+    const newAnalysis = analyzeWindData(data, criteria, testDate);
+    console.log(`Analysis result:`, newAnalysis);
+    setAnalysis(newAnalysis);
+    
+    // Also verify conditions for the 6am-8am window
+    const newVerification = verifyWindConditions(data, criteria, testDate);
+    console.log(`Verification result:`, newVerification);
+    setVerification(newVerification);
+    
+    // For immediate testing - if it should be alarm worthy, play the sound
+    if (newAnalysis.isAlarmWorthy && soundEnabled && !isPlaying) {
+      console.log('Analysis indicates alarm worthy - playing sound');
+      setTimeout(() => playAlarmSound(), 500);
+    }
+  }, [selectedScenario, criteria, soundEnabled, isPlaying, playAlarmSound]);
+
+  // Check for screen reader
+  useEffect(() => {
+    AccessibilityInfo.isScreenReaderEnabled().then(
+      screenReaderEnabled => {
+        setIsScreenReaderEnabled(screenReaderEnabled);
+      }
+    );
+  }, []);
+
+  // Update analysis when scenario or criteria changes
+  useEffect(() => {
+    analyzeScenario();
+  }, [selectedScenario, criteria, analyzeScenario]);
+  
+  // Generate custom scenario data when custom inputs change
+  useEffect(() => {
+    if (selectedScenario === 'custom') {
+      const speed = parseFloat(customSpeed) || 10;
+      const direction = parseFloat(customDirection) || 315;
+      const variation = parseFloat(customVariation) || 20;
+      
+      WIND_SCENARIOS.custom = generateCustomData(speed, direction, variation);
+      analyzeScenario();
+    }
+  }, [customSpeed, customDirection, customVariation, selectedScenario, analyzeScenario]);
+
+  // Start pulsing animation when alarm is playing
+  useEffect(() => {
+    if (isPlaying) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: false,
+          })
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(0);
+    }
+  }, [isPlaying, pulseAnim]);
+
+  // Update sound volume when volume changes
+  useEffect(() => {
+    if (soundRef.current && isPlaying) {
+      soundRef.current.setVolumeAsync(volume).catch(err => {
+        console.error('Error setting volume:', err);
+      });
+    }
+  }, [volume, isPlaying]);
+
+  const handleCriteriaChange = (key: keyof AlarmCriteria, value: any) => {
+    setCriteria({ ...criteria, [key]: value });
+  };
+
+  const getAlarmStatusColor = (isAlarmWorthy?: boolean) => {
+    return isAlarmWorthy ? '#4CAF50' : '#FF9800';
   };
 
   // Clean up the sound when component unmounts
@@ -488,7 +390,7 @@ export function WindAlarmTesterFixed() {
     } else if (!analysis?.isAlarmWorthy && isPlaying) {
       stopAlarmSound();
     }
-  }, [analysis?.isAlarmWorthy, soundEnabled, isPlaying]);
+  }, [analysis?.isAlarmWorthy, soundEnabled, isPlaying, playAlarmSound, stopAlarmSound]);
 
   // Continuous playback checker - ensures alarm keeps making sound
   useEffect(() => {
@@ -634,7 +536,7 @@ export function WindAlarmTesterFixed() {
       // Still try to force reset even if other steps failed
       try {
         await forceResetAudio();
-      } catch (e) { /* Ignore errors here */ }
+      } catch { /* Ignore errors here */ }
     }
   };
   
@@ -660,7 +562,7 @@ export function WindAlarmTesterFixed() {
         try {
           await soundRef.current.stopAsync().catch(() => {});
           await soundRef.current.unloadAsync().catch(() => {});
-        } catch (e) {
+        } catch {
           // Ignore errors
         }
       }
