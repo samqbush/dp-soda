@@ -99,18 +99,31 @@ jobs:
             sed -i '/<application/a\        <meta-data android:name="build_timestamp" android:value="'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" />' android/app/src/main/AndroidManifest.xml
           fi
 
+      # Extract app version from app.json
+      - name: 🏷️ Extract app version from app.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.expo.version' app.json)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       # Build the AAB
       - name: 🏗️ Build Android App Bundle
         run: |
           cd android
           ./gradlew bundleRelease
 
+      # Rename AAB to include version
+      - name: 🏷️ Rename AAB with version
+        run: |
+          mv android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
+
       # Upload the AAB as an artifact
       - name: 📤 Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: dp-soda${{ env.APP_VERSION }}
+          path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
 
       # Convert AAB to APKs for device testing
       - name: 📥 Download Bundletool
@@ -120,7 +133,7 @@ jobs:
       - name: 📱 Generate Universal APK from AAB
         run: |
           java -jar bundletool.jar build-apks \
-            --bundle=android/app/build/outputs/bundle/release/app-release.aab \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
             --output=android/app/build/outputs/bundle/release/app-release.apks \
             --ks=android/app/upload-keystore.jks \
             --ks-key-alias=upload-key \
@@ -132,13 +145,13 @@ jobs:
         run: |
           cd android/app/build/outputs/bundle/release
           unzip -j app-release.apks universal.apk
-          mv universal.apk app-release-universal.apk
+          mv universal.apk dp-soda${{ env.APP_VERSION }}.apk
 
       - name: 📤 Upload Universal APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: app-universal-apk
-          path: android/app/build/outputs/bundle/release/app-release-universal.apk
+          name: dp-soda-apk
+          path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
 
       # Add a brief build summary
       - name: 📋 Build Summary
