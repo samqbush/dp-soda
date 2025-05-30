@@ -81,24 +81,22 @@ jobs:
 
       # Configure app/build.gradle for proper signing - improved approach
       - name: 🔏 Configure signing in build.gradle
-        run: |
+        run: >
           if [ -f "android/app/build.gradle" ]; then
             # Create a backup of the original file
-            cp android/app/build.gradle android/app/build.gradle.bak
+            cp android/app/build.gradle android/app/build.gradle.bak;
             
             # Create a temporary file with our desired signing config
-            cat << 'EOF' > /tmp/signing_config.gradle
-signingConfigs {
-    release {
-        storeFile file(project.storeFile)
-        storePassword project.storePassword
-        keyAlias project.keyAlias
-        keyPassword project.keyPassword
-        v1SigningEnabled true
-        v2SigningEnabled true
-    }
-}
-EOF
+            echo 'signingConfigs {
+              release {
+                storeFile file(project.storeFile)
+                storePassword project.storePassword
+                keyAlias project.keyAlias
+                keyPassword project.keyPassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+              }
+            }' > /tmp/signing_config.gradle;
             
             # Insert signing config right after "android {" line
             sed -i '/android\s*{/r /tmp/signing_config.gradle' android/app/build.gradle
