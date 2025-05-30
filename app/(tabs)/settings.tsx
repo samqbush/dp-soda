@@ -3,6 +3,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
+import { debugSettings } from '@/services/debugSettings';
 import type { AlarmCriteria } from '@/services/windService';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -325,36 +326,13 @@ export default function SettingsScreen() {
             Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
 
-            {/* Wind Alarm Testing Link */}
-            <View style={styles.testLinkContainer}>
-            <ThemedText style={styles.testLinkHeader}>Advanced Options</ThemedText>
-            <Link href="/test-alarm" asChild>
-              <TouchableOpacity 
-                style={[
-                  styles.testButton, 
-                  { 
-                    backgroundColor: '#E0F2FF', // Very light blue background
-                    borderWidth: 1,
-                    borderColor: '#81BAF7', // Medium blue border for definition
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }
-                ]}
-                activeOpacity={0.7} // Shows feedback when pressed
-              >
-                <ThemedText style={styles.testButtonText}>⚙️ Test Wind Alarm Logic</ThemedText>
-              </TouchableOpacity>
-            </Link>
-            <ThemedText style={styles.testLinkDescription}>
-              Test different wind scenarios to verify alarm trigger behavior
-            </ThemedText>
-            </View>
+          {/* Developer Settings - Only shown when in developer mode */}
+          <DevModeTestLink />
+        </View>
           
-          {/* Version display with secret gesture detection */}
-          <View style={styles.versionContainer}>
-            <VersionDisplay />
-          </View>
+        {/* Version display with secret gesture detection */}
+        <View style={styles.versionContainer}>
+          <VersionDisplay />
         </View>
       </ThemedView>
     </ScrollView>
@@ -576,3 +554,67 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+// Component for Wind Alarm Test link that's only visible in developer mode
+function DevModeTestLink() {
+  const [isVisible, setIsVisible] = useState(false);
+  
+  useEffect(() => {
+    // Check if developer mode is enabled and Wind Alarm Tester is visible
+    const checkVisibility = async () => {
+      try {
+        const isDeveloperMode = await debugSettings.isDeveloperModeEnabled();
+        const isComponentVisible = await debugSettings.isComponentVisible('showWindAlarmTester');
+        setIsVisible(isDeveloperMode && isComponentVisible);
+      } catch (error) {
+        console.error('Error checking Wind Alarm Tester visibility:', error);
+        setIsVisible(false);
+      }
+    };
+    
+    checkVisibility();
+    
+    // Set up a subscription to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges(
+      'showWindAlarmTester',
+      async () => {
+        await checkVisibility();
+      }
+    );
+    
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+  
+  if (!isVisible) {
+    return null;
+  }
+  
+  return (
+    <View style={styles.testLinkContainer}>
+      <ThemedText style={styles.testLinkHeader}>Developer Options</ThemedText>
+      <Link href="/test-alarm" asChild>
+        <TouchableOpacity 
+          style={[
+            styles.testButton, 
+            { 
+              backgroundColor: '#FFF0E0', // Light orange background to indicate dev feature
+              borderWidth: 1,
+              borderColor: '#FFAA5A', // Medium orange border
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }
+          ]}
+          activeOpacity={0.7}
+        >
+          <ThemedText style={styles.testButtonText}>🔧 Wind Alarm Tester (Developer)</ThemedText>
+        </TouchableOpacity>
+      </Link>
+      <ThemedText style={styles.testLinkDescription}>
+        Developer tool: Test different wind scenarios to verify alarm trigger behavior
+      </ThemedText>
+    </View>
+  );
+}

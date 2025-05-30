@@ -64,7 +64,6 @@ function WindDataDisplayContent() {
   // Use alarm audio hook
   const {
     isPlaying,
-    isSoundEnabled,
     playAlarm,
     stopAlarm,
     turnOffAlarm
@@ -157,6 +156,7 @@ function WindDataDisplayContent() {
       console.error('Failed to toggle alarm:', err);
       Alert.alert('Error', 'Failed to update alarm settings.');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteria.alarmEnabled, isPlaying, setCriteria, stopAlarm]);
   
   // Check if it's time to trigger the alarm
@@ -215,6 +215,7 @@ function WindDataDisplayContent() {
       // Still schedule next check in case of error
       scheduleNextAlarmCheck(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteria.alarmEnabled, refreshData, analysis, playAlarm]);
 
   // Calculate when to check alarm conditions (5 minutes before alarm time)

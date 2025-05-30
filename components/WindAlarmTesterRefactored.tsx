@@ -68,7 +68,7 @@ export function WindAlarmTesterRefactored() {
     windData,
     isLoading,
     error: windDataError,
-    settings: analyzerSettings,
+    // settings property omitted since it's not used
     updateSettings
   } = useWindAnalyzer();
   
@@ -88,7 +88,7 @@ export function WindAlarmTesterRefactored() {
   // Colors
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
-  const cardColor = useThemeColor({}, 'card');
+  // const cardColor = useThemeColor({}, 'card'); // Removed unused variable
 
   // Screen reader detection
   useEffect(() => {
@@ -244,18 +244,18 @@ export function WindAlarmTesterRefactored() {
     windData
   ]);
 
-  // Apply a snooze
-  const handleSnooze = useCallback((minutes: number) => {
-    dispatch({ 
-      type: 'SET_SNOOZE', 
-      payload: { enabled: true, minutes } 
-    });
+  // Apply a snooze (commented out as it's currently unused)
+  // const handleSnooze = useCallback((minutes: number) => {
+  //   dispatch({ 
+  //     type: 'SET_SNOOZE', 
+  //     payload: { enabled: true, minutes } 
+  //   });
     
-    // If alarm is active, stop it
-    if (isPlaying) {
-      stopAlarm();
-    }
-  }, [isPlaying, stopAlarm]);
+  //   // If alarm is active, stop it
+  //   if (isPlaying) {
+  //     stopAlarm();
+  //   }
+  // }, [isPlaying, stopAlarm]);
 
   // Handle activation of a test scenario
   const activateTestScenario = useCallback((scenarioKey: string) => {
