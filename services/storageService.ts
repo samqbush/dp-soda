@@ -63,7 +63,7 @@ export const initializeStorage = async (): Promise<boolean> => {
         setTimeout(() => {
           console.warn('⚠️ AsyncStorage test timed out - assuming failure');
           resolve(false);
-        }, 3000);
+        }, 5000); // Increased timeout from 3000ms to 5000ms
       }
       
       const result = await testAsyncStorage();

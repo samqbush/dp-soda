@@ -1,3 +1,5 @@
+// TODO: Migrate from expo-av to expo-audio before SDK 54 (current API is deprecated)
+// See warning: "Expo AV has been deprecated and will be removed in SDK 54. Please use the `expo-audio` and `expo-video` packages"
 import { Audio } from 'expo-av';
 import { AccessibilityInfo, Platform, Vibration } from 'react-native';
 import { AlarmLogger } from './alarmDebugLogger';
