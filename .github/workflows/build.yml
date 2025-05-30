@@ -113,26 +113,24 @@ jobs:
               # Write the first part of the file up to buildTypes
               sed -n "1,$((BUILDTYPES_LINE-1))p" android/app/build.gradle > "$TEMP_FILE"
               
-              # Insert signingConfigs BEFORE buildTypes
-              cat >> "$TEMP_FILE" << 'EOF'
-    signingConfigs {
-        debug {
-            storeFile file("debug.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
-        }
-        release {
-            storeFile file("upload-keystore.jks")
-            storePassword project.storePassword
-            keyAlias project.keyAlias
-            keyPassword project.keyPassword
-            v1SigningEnabled true
-            v2SigningEnabled true
-        }
-    }
-
-EOF
+              # Insert signingConfigs BEFORE buildTypes using echo statements
+              echo '    signingConfigs {' >> "$TEMP_FILE"
+              echo '        debug {' >> "$TEMP_FILE"
+              echo '            storeFile file("debug.keystore")' >> "$TEMP_FILE"
+              echo '            storePassword "android"' >> "$TEMP_FILE"
+              echo '            keyAlias "androiddebugkey"' >> "$TEMP_FILE"
+              echo '            keyPassword "android"' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '        release {' >> "$TEMP_FILE"
+              echo '            storeFile file("upload-keystore.jks")' >> "$TEMP_FILE"
+              echo '            storePassword project.storePassword' >> "$TEMP_FILE"
+              echo '            keyAlias project.keyAlias' >> "$TEMP_FILE"
+              echo '            keyPassword project.keyPassword' >> "$TEMP_FILE"
+              echo '            v1SigningEnabled true' >> "$TEMP_FILE"
+              echo '            v2SigningEnabled true' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '    }' >> "$TEMP_FILE"
+              echo '' >> "$TEMP_FILE"
               
               # Append the rest of the file starting with buildTypes
               sed -n "${BUILDTYPES_LINE},\$p" android/app/build.gradle >> "$TEMP_FILE"
