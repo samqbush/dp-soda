@@ -79,6 +79,39 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
+      # Configure app/build.gradle for proper signing
+      - name: 🔏 Configure signing in build.gradle
+        run: |
+          if [ -f "android/app/build.gradle" ]; then
+            # Check if signingConfigs section already exists
+            if ! grep -q "signingConfigs {" android/app/build.gradle; then
+              # Insert signingConfigs section before android { section
+              sed -i '/android {/i \
+              signingConfigs {\
+                  release {\
+                      storeFile file(project.storeFile)\
+                      storePassword project.storePassword\
+                      keyAlias project.keyAlias\
+                      keyPassword project.keyPassword\
+                      v1SigningEnabled true\
+                      v2SigningEnabled true\
+                  }\
+              }\
+              ' android/app/build.gradle
+            fi
+            
+            # Ensure release buildType uses our signing config
+            if ! grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+              sed -i '/buildTypes {/,/}/s/release {/release {\
+                signingConfig signingConfigs.release/' android/app/build.gradle
+            fi
+            
+            echo "Signing configuration added to build.gradle"
+          else
+            echo "Error: android/app/build.gradle not found"
+            exit 1
+          fi
+
       # Update gradle.properties for better build performance
       - name: ⚙️ Configure Gradle for production build
         run: |
@@ -122,7 +155,7 @@ jobs:
       - name: 📤 Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: dp-soda${{ env.APP_VERSION }}
+          name: dp-soda-aab
           path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
 
       # Convert AAB to APKs for device testing
@@ -162,8 +195,12 @@ jobs:
           echo "- **AAB**: For Google Play Store submission" >> $GITHUB_STEP_SUMMARY
           echo "- **Universal APK**: For direct device installation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔐 App Signing Information:" >> $GITHUB_STEP_SUMMARY
+          echo "- This build is signed with your upload key" >> $GITHUB_STEP_SUMMARY
+          echo "- Ready for Google Play App Signing enrollment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the \`app-universal-apk\` artifact" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the \`dp-soda-apk\` artifact" >> $GITHUB_STEP_SUMMARY
           echo "2. Install on your Android device" >> $GITHUB_STEP_SUMMARY
           echo "3. Run the app and verify functionality" >> $GITHUB_STEP_SUMMARY
 
