@@ -11,6 +11,7 @@ interface TestScenario {
     directionConsistency: number;
     favorablePoints: number;
     quality: number;
+    windDirection?: number; // Optional wind direction for direction testing
   };
 }
 
@@ -41,7 +42,8 @@ export const useWindAnalyzer = () => {
         averageSpeed: 15.2,
         directionConsistency: 92,
         favorablePoints: 7,
-        quality: 89
+        quality: 89,
+        windDirection: 315 // Northwest - aligned with default preferred direction
       }
     },
     borderline: {
@@ -51,7 +53,8 @@ export const useWindAnalyzer = () => {
         averageSpeed: 10.1,
         directionConsistency: 72,
         favorablePoints: 4,
-        quality: 65
+        quality: 65,
+        windDirection: 300 // Close to preferred direction (within range)
       }
     },
     unfavorable: {
@@ -61,7 +64,8 @@ export const useWindAnalyzer = () => {
         averageSpeed: 7.5,
         directionConsistency: 55,
         favorablePoints: 2,
-        quality: 35
+        quality: 35,
+        windDirection: 315 // Good direction but low speed
       }
     },
     inconsistent: {
@@ -71,7 +75,19 @@ export const useWindAnalyzer = () => {
         averageSpeed: 14.8,
         directionConsistency: 45,
         favorablePoints: 3,
-        quality: 55
+        quality: 55,
+        windDirection: 315 // Correct direction but inconsistent
+      }
+    },
+    wrongDirection: {
+      name: 'Wrong Direction',
+      description: 'Good speed but completely wrong direction',
+      conditions: {
+        averageSpeed: 15.5,
+        directionConsistency: 90,
+        favorablePoints: 6,
+        quality: 70,
+        windDirection: 135 // Southeast - opposite of preferred direction
       }
     }
   }), []);
@@ -169,13 +185,21 @@ export const useWindAnalyzer = () => {
           ? parseFloat(point.windDirection)
           : point.windDirection;
         
-        // Check direction consistency
-        const dirDiff = Math.abs(
+        // Check direction consistency with most common direction
+        const consistencyDiff = Math.abs(
           (((windDir - mostCommonDirection) % 360) + 540) % 360 - 180
         );
         
-        // Direction is considered favorable if within deviation threshold
-        const isDirectionFavorable = dirDiff <= criteria.directionDeviationThreshold;
+        // Check if direction is within preferred direction range
+        const preferredDiff = Math.abs(
+          (((windDir - criteria.preferredDirection) % 360) + 540) % 360 - 180
+        );
+        
+        // Direction is considered favorable if within deviation threshold of most common direction
+        // AND within the preferred direction range
+        const isDirectionConsistent = consistencyDiff <= criteria.directionDeviationThreshold;
+        const isInPreferredRange = preferredDiff <= criteria.preferredDirectionRange;
+        const isDirectionFavorable = isDirectionConsistent && isInPreferredRange;
         
         if (isDirectionFavorable) {
           favorableDirectionCount++;
@@ -229,6 +253,7 @@ export const useWindAnalyzer = () => {
         - Direction consistency: ${directionConsistency.toFixed(1)}% (min: ${criteria.directionConsistencyThreshold}%)
         - Max consecutive favorable points: ${maxConsecutivePoints} (min: ${criteria.minimumConsecutivePoints})
         - Most common wind direction: ${mostCommonDirection}°
+        - Preferred wind direction: ${criteria.preferredDirection}° (±${criteria.preferredDirectionRange}°)
         - Overall quality score: ${qualityScore}/100
       `;
       
@@ -286,7 +311,16 @@ export const useWindAnalyzer = () => {
       const isDirectionConsistent = conditions.directionConsistency >= criteriaSettings.directionConsistencyThreshold;
       const hasEnoughConsecutivePoints = conditions.favorablePoints >= criteriaSettings.minimumConsecutivePoints;
       
-      const isAlarmWorthy = isSpeedSufficient && isDirectionConsistent && hasEnoughConsecutivePoints;
+      // Check if wind direction is within the preferred range
+      let isInPreferredDirection = true;
+      if (conditions.windDirection !== undefined) {
+        const preferredDiff = Math.abs(
+          (((conditions.windDirection - criteriaSettings.preferredDirection) % 360) + 540) % 360 - 180
+        );
+        isInPreferredDirection = preferredDiff <= criteriaSettings.preferredDirectionRange;
+      }
+      
+      const isAlarmWorthy = isSpeedSufficient && isDirectionConsistent && hasEnoughConsecutivePoints && isInPreferredDirection;
       
       // Create analysis summary
       const details = `
@@ -297,6 +331,8 @@ export const useWindAnalyzer = () => {
         - Average speed: ${conditions.averageSpeed.toFixed(1)} mph (min: ${criteriaSettings.minimumAverageSpeed})
         - Direction consistency: ${conditions.directionConsistency.toFixed(1)}% (min: ${criteriaSettings.directionConsistencyThreshold}%)
         - Consecutive favorable points: ${conditions.favorablePoints} (min: ${criteriaSettings.minimumConsecutivePoints})
+        - Wind direction: ${conditions.windDirection !== undefined ? `${conditions.windDirection}°` : 'Not specified'}
+        - Preferred wind direction: ${criteriaSettings.preferredDirection}° (±${criteriaSettings.preferredDirectionRange}°)
         - Overall quality score: ${conditions.quality}/100
       `;
       

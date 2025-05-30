@@ -16,6 +16,8 @@ export interface WindAlarmState {
   directionConsistencyThreshold: number;
   minDirectionPercentage: number;
   maxDirectionDeviationDegrees: number;
+  preferredDirection: number;
+  preferredDirectionRange: number;
 
   // Analysis results
   isAlarmActive: boolean;
@@ -65,6 +67,8 @@ export const initialWindAlarmState: WindAlarmState = {
   directionConsistencyThreshold: 70,
   minDirectionPercentage: 70,
   maxDirectionDeviationDegrees: 45,
+  preferredDirection: 315, // Northwest (default)
+  preferredDirectionRange: 45, // +/- 45 degrees (default)
 
   // Analysis results
   isAlarmActive: false,

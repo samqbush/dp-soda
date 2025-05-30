@@ -207,12 +207,18 @@ export function WindAlarmTesterRefactored() {
       } else {
         // Use real data
         AlarmLogger.forceLog('Using real wind data');
-        result = analyzeWindData(windData, {
-          minWindSpeed: state.minWindSpeed,
+        
+        // Map UI property names to analyzer property names
+        const criteriaSettings = {
+          minimumAverageSpeed: state.minWindSpeed,
           directionConsistencyThreshold: state.directionConsistencyThreshold,
-          minConsecutiveDataPoints: state.minConsecutiveDataPoints,
-          maxDirectionDeviationDegrees: state.maxDirectionDeviationDegrees
-        });
+          minimumConsecutivePoints: state.minConsecutiveDataPoints,
+          directionDeviationThreshold: state.maxDirectionDeviationDegrees,
+          preferredDirection: state.preferredDirection,
+          preferredDirectionRange: state.preferredDirectionRange
+        };
+        
+        result = analyzeWindData(windData, criteriaSettings);
         AlarmLogger.forceLog(`Real data analysis result:`, result);
       }
       
@@ -272,7 +278,9 @@ export function WindAlarmTesterRefactored() {
             minimumAverageSpeed: state.minWindSpeed,
             directionConsistencyThreshold: state.directionConsistencyThreshold,
             minimumConsecutivePoints: state.minConsecutiveDataPoints,
-            directionDeviationThreshold: state.maxDirectionDeviationDegrees
+            directionDeviationThreshold: state.maxDirectionDeviationDegrees,
+            preferredDirection: state.preferredDirection,
+            preferredDirectionRange: state.preferredDirectionRange
           }
         }
       });
@@ -306,7 +314,9 @@ export function WindAlarmTesterRefactored() {
       'minWindSpeed': 'minimumAverageSpeed',
       'directionConsistencyThreshold': 'directionConsistencyThreshold', // no change
       'minConsecutiveDataPoints': 'minimumConsecutivePoints',
-      'maxDirectionDeviationDegrees': 'directionDeviationThreshold'
+      'maxDirectionDeviationDegrees': 'directionDeviationThreshold',
+      'preferredDirection': 'preferredDirection', // no change
+      'preferredDirectionRange': 'preferredDirectionRange' // no change
     };
     return mappings[uiPropName] || uiPropName;
   }, []);
@@ -323,7 +333,9 @@ export function WindAlarmTesterRefactored() {
       setting === 'minWindSpeed' || 
       setting === 'directionConsistencyThreshold' || 
       setting === 'minConsecutiveDataPoints' || 
-      setting === 'maxDirectionDeviationDegrees'
+      setting === 'maxDirectionDeviationDegrees' ||
+      setting === 'preferredDirection' ||
+      setting === 'preferredDirectionRange'
     ) {
       const mappedSetting = mapPropertyName(setting);
       AlarmLogger.forceLog(`Mapping UI setting "${setting}" to AlarmCriteria property "${mappedSetting}"`);
@@ -599,6 +611,44 @@ export function WindAlarmTesterRefactored() {
                 maxLength={3}
               />
               <ThemedText>°</ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.settingItem}>
+            <ThemedText>Preferred Direction</ThemedText>
+            <View style={styles.settingValueContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={state.preferredDirection.toString()}
+                onChangeText={(text) => {
+                  const value = parseInt(text, 10);
+                  if (!isNaN(value) && value >= 0 && value <= 360) {
+                    updateSetting('preferredDirection', value);
+                  }
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+              />
+              <ThemedText>° (0-360)</ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.settingItem}>
+            <ThemedText>Direction Range</ThemedText>
+            <View style={styles.settingValueContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={state.preferredDirectionRange.toString()}
+                onChangeText={(text) => {
+                  const value = parseInt(text, 10);
+                  if (!isNaN(value) && value >= 0 && value <= 180) {
+                    updateSetting('preferredDirectionRange', value);
+                  }
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+              />
+              <ThemedText>° (±)</ThemedText>
             </View>
           </View>
         </View>
