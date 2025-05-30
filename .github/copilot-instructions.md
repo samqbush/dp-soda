@@ -32,6 +32,7 @@
 
 ## Cleanup
 - When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later
+- When recreating files, delete the old files to avoid confusion
 
 ## Documentation
 - All documentation besides the [README.md](../README.md) should be stored in the `docs` directory
