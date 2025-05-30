@@ -79,36 +79,49 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
-      # Configure app/build.gradle for proper signing
+      # Configure app/build.gradle for proper signing - improved approach
       - name: 🔏 Configure signing in build.gradle
         run: |
           if [ -f "android/app/build.gradle" ]; then
-            # Check if signingConfigs section already exists
-            if ! grep -q "signingConfigs {" android/app/build.gradle; then
-              # Insert signingConfigs section before android { section
-              sed -i '/android {/i \
-              signingConfigs {\
-                  release {\
-                      storeFile file(project.storeFile)\
-                      storePassword project.storePassword\
-                      keyAlias project.keyAlias\
-                      keyPassword project.keyPassword\
-                      v1SigningEnabled true\
-                      v2SigningEnabled true\
-                  }\
-              }\
-              ' android/app/build.gradle
-            fi
+            # Create a backup of the original file
+            cp android/app/build.gradle android/app/build.gradle.bak
             
-            # Ensure release buildType uses our signing config
-            if ! grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
-              sed -i '/buildTypes {/,/}/s/release {/release {\
-                signingConfig signingConfigs.release/' android/app/build.gradle
-            fi
+            # Create a temporary file with our desired signing config
+            cat << 'EOF' > /tmp/signing_config.gradle
+signingConfigs {
+    release {
+        storeFile file(project.storeFile)
+        storePassword project.storePassword
+        keyAlias project.keyAlias
+        keyPassword project.keyPassword
+        v1SigningEnabled true
+        v2SigningEnabled true
+    }
+}
+EOF
             
-            echo "Signing configuration added to build.gradle"
+            # Insert signing config right after "android {" line
+            sed -i '/android\s*{/r /tmp/signing_config.gradle' android/app/build.gradle
+            
+            # Make sure release buildType uses our signing config
+            sed -i '/buildTypes\s*{/,/}/s/release\s*{/release {\n            signingConfig signingConfigs.release/' android/app/build.gradle
+            
+            # Verify changes were applied successfully
+            echo "✅ Verifying signing configuration..."
+            if grep -q "signingConfigs {" android/app/build.gradle && grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+              echo "✅ Signing configuration successfully added to build.gradle"
+              echo "===== Content after modification ====="
+              grep -A 15 "signingConfigs" android/app/build.gradle
+              grep -A 10 "buildTypes" android/app/build.gradle
+              echo "================================="
+            else
+              echo "❌ Failed to add signing configuration"
+              echo "Restoring backup..."
+              cp android/app/build.gradle.bak android/app/build.gradle
+              exit 1
+            fi
           else
-            echo "Error: android/app/build.gradle not found"
+            echo "❌ Error: android/app/build.gradle not found"
             exit 1
           fi
 
@@ -146,10 +159,56 @@ jobs:
           cd android
           ./gradlew bundleRelease
 
+      # Fallback manual signing of the AAB with jarsigner
+      - name: 🔏 Manual signing fallback
+        run: |
+          echo "Applying fallback manual signing to ensure proper release signing..."
+          # Sign the AAB with jarsigner
+          jarsigner -verbose \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.STORE_PASSWORD }}" \
+            -keypass "${{ secrets.STORE_PASSWORD }}" \
+            -signedjar android/app/build/outputs/bundle/release/app-release-signed.aab \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            upload-key
+          
+          # Use the manually signed AAB
+          mv android/app/build/outputs/bundle/release/app-release-signed.aab android/app/build/outputs/bundle/release/app-release.aab
+          
+          echo "Manual signing complete"
+
       # Rename AAB to include version
       - name: 🏷️ Rename AAB with version
         run: |
           mv android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
+
+      # Verify the AAB is properly signed
+      - name: 🔍 Verify AAB signing
+        run: |
+          echo "Verifying AAB signing status..."
+          # Install bundletool if not already installed
+          if [ ! -f "bundletool.jar" ]; then
+            curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
+          fi
+          
+          # Get signing info from the AAB
+          echo "Extracting signing information from AAB:"
+          java -jar bundletool.jar validate \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
+            --mode=universal_apk
+          
+          echo "Checking release mode vs debug mode signing:"
+          # Extract APK from AAB to check signatures
+          java -jar bundletool.jar build-apks \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
+            --output=/tmp/verify.apks \
+            --mode=universal
+          
+          mkdir -p /tmp/verify_apk
+          unzip -o /tmp/verify.apks -d /tmp/verify_apk
+          
+          echo "APK signing information:"
+          keytool -printcert -jarfile /tmp/verify_apk/universal.apk
 
       # Upload the AAB as an artifact
       - name: 📤 Upload AAB
