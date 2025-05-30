@@ -1,4 +1,4 @@
-name: Release Wind Trend Analyzer
+name: Release Dawn Patrol Alarm
 
 on:
   push:
@@ -51,7 +51,7 @@ jobs:
 #      - name: 🚀 Create GitHub Release
 #        uses: softprops/action-gh-release@v2
 #        with:
-#          name: "Wind Trend Analyzer v${{ github.run_number }}"
+#          name: "Dawn Patrol Alarm v${{ github.run_number }}"
 #          tag_name: "v${{ github.run_number }}"
 #          draft: false
 #          prerelease: false
@@ -60,9 +60,9 @@ jobs:
 #            artifacts/aab/app-release.aab
 #            artifacts/apk/app-release-universal.apk
 #          body: |
-#            ## Wind Trend Analyzer Release
+#            ## Dawn Patrol Alarm Release
 #
-#            This release contains the latest version of the Wind Trend Analyzer app for Android.
+#            This release contains the latest version of the Dawn Patrol Alarm app for Android.
 #
 #            ### Installation
 #            - Download the APK file directly from this release

@@ -1,17 +1,17 @@
 import { crashMonitor } from '@/services/crashMonitor';
 import { debugSettings } from '@/services/debugSettings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  AppState,
-  Platform,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    AppState,
+    Platform,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface CrashLog {
@@ -65,6 +65,91 @@ export function AndroidCrashLogger() {
   const [isComponentEnabled, setIsComponentEnabled] = useState(false);
   const [appState, setAppState] = useState<'loading' | 'ready' | 'crashed'>('loading');
 
+  const logCrash = useCallback(async (context: string, error: Error) => {
+    const crashLog: CrashLog = {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack,
+      context,
+      buildType: __DEV__ ? 'development' : 'production',
+      deviceInfo: {
+        platform: Platform.OS,
+        version: String(Platform.Version),
+      }
+    };
+
+    try {
+      // Always log to terminal in a formatted way first (won't be truncated)
+      logToTerminal(crashLog);
+      
+      const updatedLogs = [crashLog, ...crashLogs].slice(0, 20); // Keep last 20 crashes
+      setCrashLogs(updatedLogs);
+      await AsyncStorage.setItem('android_crash_logs', JSON.stringify(updatedLogs));
+      
+      // Also log to crash monitor
+      await crashMonitor.logCrash(context, error);
+      
+      setAppState('crashed');
+    } catch (saveError) {
+      console.error('Failed to save crash log:', saveError);
+    }
+  }, [crashLogs]);
+
+  const setupCrashDetection = useCallback(() => {
+    // Monitor console errors
+    const originalError = console.error;
+    console.error = (...args: any[]) => {
+      originalError.apply(console, args);
+      
+      const errorMessage = args.join(' ');
+      if (errorMessage.includes('ReferenceError') || 
+          errorMessage.includes('TypeError') || 
+          errorMessage.includes('SyntaxError') ||
+          errorMessage.includes('RangeError') ||
+          // Specific check for navigation findLast errors (now fixed with polyfill)
+          errorMessage.includes('findLast is not a function')) {
+        logCrash('console_error', new Error(errorMessage));
+      }
+    };
+
+    // Monitor unhandled promise rejections
+    if (global.addEventListener) {
+      global.addEventListener('unhandledrejection', (event) => {
+        logCrash('promise_rejection', new Error(`Unhandled Promise: ${event.reason}`));
+      });
+    }
+  }, [logCrash]);
+
+  const initializeCrashLogger = useCallback(async () => {
+    try {
+      console.log('🔍 Initializing Android Crash Logger');
+      // Load existing crash logs
+      const stored = await AsyncStorage.getItem('android_crash_logs');
+      if (stored) {
+        const parsedLogs = JSON.parse(stored);
+        setCrashLogs(parsedLogs);
+        
+        // Print any recent crashes to terminal on startup
+        if (parsedLogs.length > 0) {
+          console.log(`📱 Found ${parsedLogs.length} existing crash logs. Most recent:`);
+          logToTerminal(parsedLogs[0]);
+        }
+      }
+
+      // Set up crash detection
+      setupCrashDetection();
+      
+      // Mark app as ready after a short delay
+      setTimeout(() => {
+        setAppState('ready');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Failed to initialize crash logger:', error);
+      logCrash('initialization', error instanceof Error ? error : new Error(String(error)));
+    }
+  }, [setupCrashDetection, logCrash]);
+
   // Single unified useEffect for both visibility checking and initialization
   useEffect(() => {
     // Only relevant on Android
@@ -111,90 +196,7 @@ export function AndroidCrashLogger() {
       subscription.remove();
       unsubscribe();
     };
-  }, []);
-
-  const initializeCrashLogger = async () => {
-    try {
-      console.log('🔍 Initializing Android Crash Logger');
-      // Load existing crash logs
-      const stored = await AsyncStorage.getItem('android_crash_logs');
-      if (stored) {
-        const parsedLogs = JSON.parse(stored);
-        setCrashLogs(parsedLogs);
-        
-        // Print any recent crashes to terminal on startup
-        if (parsedLogs.length > 0) {
-          console.log(`📱 Found ${parsedLogs.length} existing crash logs. Most recent:`);
-          logToTerminal(parsedLogs[0]);
-        }
-      }
-
-      // Set up crash detection
-      setupCrashDetection();
-      
-      // Mark app as ready after a short delay
-      setTimeout(() => {
-        setAppState('ready');
-      }, 2000);
-
-    } catch (error) {
-      console.error('Failed to initialize crash logger:', error);
-      logCrash('initialization', error instanceof Error ? error : new Error(String(error)));
-    }
-  };
-
-  const setupCrashDetection = () => {
-    // Monitor console errors
-    const originalError = console.error;
-    console.error = (...args: any[]) => {
-      originalError.apply(console, args);
-      
-      const errorMessage = args.join(' ');
-      if (errorMessage.includes('ReferenceError') || 
-          errorMessage.includes('TypeError') || 
-          errorMessage.includes('SyntaxError') ||
-          errorMessage.includes('RangeError')) {
-        logCrash('console_error', new Error(errorMessage));
-      }
-    };
-
-    // Monitor unhandled promise rejections
-    if (global.addEventListener) {
-      global.addEventListener('unhandledrejection', (event) => {
-        logCrash('promise_rejection', new Error(`Unhandled Promise: ${event.reason}`));
-      });
-    }
-  };
-
-  const logCrash = async (context: string, error: Error) => {
-    const crashLog: CrashLog = {
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      stack: error.stack,
-      context,
-      buildType: __DEV__ ? 'development' : 'production',
-      deviceInfo: {
-        platform: Platform.OS,
-        version: String(Platform.Version),
-      }
-    };
-
-    try {
-      // Always log to terminal in a formatted way first (won't be truncated)
-      logToTerminal(crashLog);
-      
-      const updatedLogs = [crashLog, ...crashLogs].slice(0, 20); // Keep last 20 crashes
-      setCrashLogs(updatedLogs);
-      await AsyncStorage.setItem('android_crash_logs', JSON.stringify(updatedLogs));
-      
-      // Also log to crash monitor
-      await crashMonitor.logCrash(context, error);
-      
-      setAppState('crashed');
-    } catch (saveError) {
-      console.error('Failed to save crash log:', saveError);
-    }
-  };
+  }, [initializeCrashLogger]);
 
   const clearLogs = async () => {
     try {

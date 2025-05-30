@@ -2,16 +2,16 @@ import { logBuildIssue } from '@/config/buildConfig';
 import EMERGENCY_FALLBACK_DATA from '@/services/fallbackData';
 import { clearWindDataCache } from '@/services/storageService';
 import {
-    analyzeWindData,
-    fetchRealWindData,
-    fetchWindData,
-    getAlarmCriteria,
-    getCachedWindData,
-    setAlarmCriteria,
-    verifyWindConditions,
-    type AlarmCriteria,
-    type WindAnalysis,
-    type WindDataPoint
+  analyzeWindData,
+  fetchRealWindData,
+  fetchWindData,
+  getAlarmCriteria,
+  getCachedWindData,
+  setAlarmCriteria,
+  verifyWindConditions,
+  type AlarmCriteria,
+  type WindAnalysis,
+  type WindDataPoint
 } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
@@ -50,8 +50,9 @@ export const useWindData = (): UseWindDataReturn => {
     minimumAverageSpeed: 10,
     directionConsistencyThreshold: 70,
     minimumConsecutivePoints: 4,
-    speedDeviationThreshold: 3,
     directionDeviationThreshold: 45,
+    preferredDirection: 315, // Northwest
+    preferredDirectionRange: 45, // +/- 45 degrees from preferred direction
     alarmEnabled: false,
     alarmTime: "05:00" // Default to 5:00 AM
   });

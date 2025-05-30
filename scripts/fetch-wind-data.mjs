@@ -125,8 +125,9 @@ const analyzeWindData = (data, criteria = {}) => {
     minimumAverageSpeed: 10,
     directionConsistencyThreshold: 70,
     minimumConsecutivePoints: 4,
-    speedDeviationThreshold: 3,
-    directionDeviationThreshold: 45
+    directionDeviationThreshold: 45,
+    preferredDirection: 315, // Northwest
+    preferredDirectionRange: 45 // +/- 45 degrees from preferred direction
   };
   
   const config = { ...defaultCriteria, ...criteria };
@@ -178,13 +179,23 @@ const analyzeWindData = (data, criteria = {}) => {
 
   const directionConsistency = calculateDirectionConsistency(directions);
   const consecutiveGoodPoints = countConsecutiveGoodPoints(alarmWindowData, config);
+  
+  // Calculate average direction and check if it's in the preferred range
+  const avgDirection = calculateAverageDirection(directions);
+  const isPreferredDirection = isDirectionInPreferredRange(
+    avgDirection, 
+    config.preferredDirection, 
+    config.preferredDirectionRange
+  );
 
   const isAlarmWorthy = 
     averageSpeed >= config.minimumAverageSpeed &&
     directionConsistency >= config.directionConsistencyThreshold &&
-    consecutiveGoodPoints >= config.minimumConsecutivePoints;
+    consecutiveGoodPoints >= config.minimumConsecutivePoints &&
+    isPreferredDirection;
 
   const analysis = `Avg Speed: ${averageSpeed.toFixed(1)}mph, ` +
+    `Direction: ${avgDirection.toFixed(0)}° (${getDirectionName(avgDirection)}), ` +
     `Direction Consistency: ${directionConsistency.toFixed(1)}%, ` +
     `Consecutive Good Points: ${consecutiveGoodPoints}`;
 
@@ -217,6 +228,66 @@ const calculateDirectionConsistency = (directions) => {
   const resultantLength = Math.sqrt(meanSin * meanSin + meanCos * meanCos);
   
   return resultantLength * 100;
+};
+
+/**
+ * Calculate the average wind direction (circular mean)
+ */
+const calculateAverageDirection = (directions) => {
+  if (directions.length === 0) return 0;
+  
+  let sumSin = 0;
+  let sumCos = 0;
+  
+  directions.forEach(dir => {
+    const radians = (dir * Math.PI) / 180;
+    sumSin += Math.sin(radians);
+    sumCos += Math.cos(radians);
+  });
+  
+  // Calculate angle in radians and convert to degrees
+  const radians = Math.atan2(sumSin, sumCos);
+  let degrees = (radians * 180) / Math.PI;
+  
+  // Ensure result is in 0-360 range
+  if (degrees < 0) {
+    degrees += 360;
+  }
+  
+  return degrees;
+};
+
+/**
+ * Check if a direction is within the preferred range
+ */
+const isDirectionInPreferredRange = (direction, preferredDirection, range) => {
+  // No direction or no preferred direction means we don't check
+  if (isNaN(direction) || !preferredDirection) return true;
+  
+  // Calculate the minimum and maximum acceptable directions
+  let minDirection = (preferredDirection - range) % 360;
+  let maxDirection = (preferredDirection + range) % 360;
+  
+  // Handle cases where range crosses 0/360 boundary
+  if (minDirection < 0) minDirection += 360;
+  
+  // Special case for ranges that cross 0/360 boundary
+  if (minDirection > maxDirection) {
+    return direction >= minDirection || direction <= maxDirection;
+  }
+  
+  // Normal case
+  return direction >= minDirection && direction <= maxDirection;
+};
+
+/**
+ * Get cardinal direction name from degrees
+ */
+const getDirectionName = (degrees) => {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                     'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round((degrees % 360) / 22.5) % 16;
+  return directions[index];
 };
 
 /**
@@ -276,11 +347,19 @@ const main = async () => {
     fs.writeFileSync(csvFile, csvHeader + csvRows);
     
     // Console output
+    // Get average direction for display
+    const avgDir = calculateAverageDirection(windData
+      .map(point => parseFloat(point.windDirection))
+      .filter(dir => !isNaN(dir))
+    );
+    const dirName = getDirectionName(avgDir);
+    
     console.log('\n📊 Analysis Results:');
     console.log('==================');
     console.log(`🚨 Alarm Worthy: ${analysis.isAlarmWorthy ? 'YES! 🌊' : 'No 😴'}`);
     console.log(`💨 Average Speed: ${analysis.averageSpeed.toFixed(1)} mph`);
-    console.log(`🧭 Direction Consistency: ${analysis.directionConsistency.toFixed(1)}%`);
+    console.log(`🧭 Wind Direction: ${avgDir.toFixed(0)}° (${dirName})`);
+    console.log(`🧿 Direction Consistency: ${analysis.directionConsistency.toFixed(1)}%`);
     console.log(`📈 Consecutive Good Points: ${analysis.consecutiveGoodPoints}`);
     console.log(`📝 Analysis: ${analysis.analysis}`);
     

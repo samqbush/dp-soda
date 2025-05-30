@@ -18,6 +18,8 @@ class GlobalCrashHandler {
   private isInitialized = false;
   private crashCount = 0;
   private lastCrashTime: Date | null = null;
+  private lastError: { message: string; time: string } | null = null;
+  private memoryWarningCount = 0;
 
   /**
    * Initialize global crash detection
@@ -44,6 +46,24 @@ class GlobalCrashHandler {
 
       // Set up global error handlers
       this.setupErrorHandlers();
+      
+      // Set up memory warning listener if on a device
+      if (Platform.OS !== 'web') {
+        try {
+          const { LogBox } = require('react-native');
+          LogBox.ignoreLogs(['Warning: Possible Unhandled Promise Rejection']);
+          
+          const { NativeEventEmitter, NativeModules } = require('react-native');
+          if (NativeModules.MemoryWarningModule) {
+            const memoryWarningEmitter = new NativeEventEmitter(NativeModules.MemoryWarningModule);
+            memoryWarningEmitter.addListener('memoryWarning', () => this.handleMemoryWarning());
+            console.log('🧠 Memory warning listener initialized');
+          }
+        } catch (e) {
+          console.log('Memory warning listener setup failed:', e);
+        }
+      }
+      
       this.isInitialized = true;
       
       console.log(`🛡️ Global crash handler initialized. Previous crashes: ${this.crashCount}`);
@@ -120,8 +140,36 @@ class GlobalCrashHandler {
     return crashKeywords.some(keyword => lowerMessage.includes(keyword));
   }
 
+  /**
+   * Get the last error that was reported
+   */
+  getLastError() {
+    return this.lastError;
+  }
+
+  /**
+   * Get the count of memory warnings
+   */
+  getMemoryWarningCount() {
+    return this.memoryWarningCount;
+  }
+
+  /**
+   * Handle memory warning event
+   */
+  handleMemoryWarning() {
+    this.memoryWarningCount++;
+    console.warn(`📉 Memory warning received (total: ${this.memoryWarningCount})`);
+  }
+
   private async handleGlobalCrash(crashInfo: GlobalCrashInfo) {
     try {
+      // Update last error for debugging purposes
+      this.lastError = {
+        message: crashInfo.message,
+        time: crashInfo.timestamp
+      };
+
       // Format and log to terminal in a more visible way
       const formattedCrash = formatCrashLogForTerminal({
         ...crashInfo,

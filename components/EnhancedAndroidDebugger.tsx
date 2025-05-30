@@ -1,7 +1,7 @@
 import { debugSettings } from '@/services/debugSettings';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     AppState,
@@ -63,83 +63,7 @@ export function EnhancedAndroidDebugger() {
   const [appStartTime] = useState(Date.now());
   const [isComponentEnabled, setIsComponentEnabled] = useState(false);
 
-  // Check visibility and initialize if enabled
-  useEffect(() => {
-    // Only relevant on Android
-    if (Platform.OS !== 'android') return;
-
-    const checkVisibilityAndInit = async () => {
-      try {
-        // Check if this component should be shown
-        const shouldShow = await debugSettings.isComponentVisible('showEnhancedAndroidDebugger');
-        console.log('🔍 EnhancedAndroidDebugger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
-        setIsComponentEnabled(shouldShow);
-        
-        // Only initialize monitoring if component should be shown
-        if (shouldShow) {
-          startMonitoring();
-        } else {
-          stopMonitoring(); // Ensure monitoring is stopped if component becomes invisible
-        }
-      } catch (error) {
-        console.error('Failed to check EnhancedAndroidDebugger visibility:', error);
-      }
-    };
-    
-    checkVisibilityAndInit();
-    
-    // Subscribe to visibility changes
-    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showEnhancedAndroidDebugger', 
-      (isVisible) => {
-        console.log('🔄 EnhancedAndroidDebugger visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
-        setIsComponentEnabled(isVisible);
-        
-        if (isVisible) {
-          startMonitoring();
-        } else {
-          stopMonitoring();
-        }
-      }
-    );
-    
-    // Also check when app returns to foreground
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        checkVisibilityAndInit();
-      }
-    });
-    
-    return () => {
-      subscription.remove();
-      unsubscribe();
-      stopMonitoring(); // Clean up on unmount
-    };
-  }, []);
-
-  const startMonitoring = async () => {
-    setIsMonitoring(true);
-    
-    // Collect initial system info
-    await collectSystemInfo();
-    
-    // Start performance monitoring
-    const interval = setInterval(async () => {
-      await collectPerformanceMetric();
-    }, 5000); // Every 5 seconds
-
-    // Store interval reference for cleanup
-    (global as any).__debuggerInterval = interval;
-  };
-
-  const stopMonitoring = () => {
-    setIsMonitoring(false);
-    if ((global as any).__debuggerInterval) {
-      clearInterval((global as any).__debuggerInterval);
-      delete (global as any).__debuggerInterval;
-    }
-  };
-
-  const collectSystemInfo = async (): Promise<void> => {
+  const collectSystemInfo = useCallback(async (): Promise<void> => {
     try {
       console.log('🔍 Collecting system info...');
       const screen = Dimensions.get('screen');
@@ -194,9 +118,9 @@ export function EnhancedAndroidDebugger() {
     } catch (error) {
       console.error('Failed to collect system info:', error);
     }
-  };
+  }, [appStartTime]);
 
-  const collectPerformanceMetric = async (): Promise<void> => {
+  const collectPerformanceMetric = useCallback(async (): Promise<void> => {
     try {
       const metric: PerformanceMetric = {
         timestamp: Date.now(),
@@ -224,7 +148,83 @@ export function EnhancedAndroidDebugger() {
     } catch (error) {
       console.error('Failed to collect performance metric:', error);
     }
-  };
+  }, []);
+
+  const stopMonitoring = useCallback(() => {
+    setIsMonitoring(false);
+    if ((global as any).__debuggerInterval) {
+      clearInterval((global as any).__debuggerInterval);
+      delete (global as any).__debuggerInterval;
+    }
+  }, []);
+  
+  const startMonitoring = useCallback(async () => {
+    setIsMonitoring(true);
+    
+    // Collect initial system info
+    await collectSystemInfo();
+    
+    // Start performance monitoring
+    const interval = setInterval(async () => {
+      await collectPerformanceMetric();
+    }, 5000); // Every 5 seconds
+
+    // Store interval reference for cleanup
+    (global as any).__debuggerInterval = interval;
+  }, [collectSystemInfo, collectPerformanceMetric]);
+
+  // Check visibility and initialize if enabled
+  useEffect(() => {
+    // Only relevant on Android
+    if (Platform.OS !== 'android') return;
+
+    const checkVisibilityAndInit = async () => {
+      try {
+        // Check if this component should be shown
+        const shouldShow = await debugSettings.isComponentVisible('showEnhancedAndroidDebugger');
+        console.log('🔍 EnhancedAndroidDebugger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(shouldShow);
+        
+        // Only initialize monitoring if component should be shown
+        if (shouldShow) {
+          startMonitoring();
+        } else {
+          stopMonitoring(); // Ensure monitoring is stopped if component becomes invisible
+        }
+      } catch (error) {
+        console.error('Failed to check EnhancedAndroidDebugger visibility:', error);
+      }
+    };
+    
+    checkVisibilityAndInit();
+    
+    // Subscribe to visibility changes
+    const unsubscribe = debugSettings.subscribeToVisibilityChanges('showEnhancedAndroidDebugger', 
+      (isVisible) => {
+        console.log('🔄 EnhancedAndroidDebugger visibility changed:', isVisible ? 'VISIBLE' : 'HIDDEN');
+        setIsComponentEnabled(isVisible);
+        
+        if (isVisible) {
+          startMonitoring();
+        } else {
+          stopMonitoring();
+        }
+      }
+    );
+    
+    // Also check when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkVisibilityAndInit();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      unsubscribe();
+      stopMonitoring(); // Clean up on unmount
+    };
+  }, [startMonitoring, stopMonitoring]);
 
   const simulateCrash = () => {
     Alert.alert(

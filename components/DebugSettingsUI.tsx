@@ -26,6 +26,7 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
   const [showApkDiagnostics, setShowApkDiagnostics] = useState(false);
   const [showEnhancedAndroidDebugger, setShowEnhancedAndroidDebugger] = useState(false);
   const [showQuickExportButton, setShowQuickExportButton] = useState(false);
+  const [showWindAlarmTester, setShowWindAlarmTester] = useState(false);
   const [lastToggled, setLastToggled] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -41,6 +42,7 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
         setShowApkDiagnostics(settings.showApkDiagnostics);
         setShowEnhancedAndroidDebugger(settings.showEnhancedAndroidDebugger);
         setShowQuickExportButton(settings.showQuickExportButton);
+        setShowWindAlarmTester(settings.showWindAlarmTester);
         setLastToggled(settings.lastToggled);
         
       } catch (error) {
@@ -66,6 +68,7 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
         setShowApkDiagnostics(false);
         setShowEnhancedAndroidDebugger(false);
         setShowQuickExportButton(false);
+        setShowWindAlarmTester(false);
       }
       
       // Show confirmation
@@ -104,6 +107,10 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
         case 'showQuickExportButton':
           setShowQuickExportButton(value);
           await debugSettings.toggleComponent('showQuickExportButton', value);
+          break;
+        case 'showWindAlarmTester':
+          setShowWindAlarmTester(value);
+          await debugSettings.toggleComponent('showWindAlarmTester', value);
           break;
       }
     } catch (error) {
@@ -305,6 +312,22 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
                 onValueChange={(value) => handleComponentToggle('showQuickExportButton', value)}
                 trackColor={{ false: '#767577', true: '#2196F3' }}
                 thumbColor={showQuickExportButton ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+            
+            {/* Wind Alarm Tester Toggle */}
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextContainer}>
+                <Text style={styles.settingName}>Wind Alarm Tester</Text>
+                <Text style={styles.settingDescription}>
+                  Enable access to the Wind Alarm test screen
+                </Text>
+              </View>
+              <Switch
+                value={showWindAlarmTester}
+                onValueChange={(value) => handleComponentToggle('showWindAlarmTester', value)}
+                trackColor={{ false: '#767577', true: '#2196F3' }}
+                thumbColor={showWindAlarmTester ? '#fff' : '#f4f3f4'}
               />
             </View>
           </>

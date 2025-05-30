@@ -1,3 +1,6 @@
+// Import polyfills first to ensure they're available for all dependencies
+import '@/services/polyfills';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -5,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, LogBox, Platform, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { AndroidCrashLogger } from '@/components/AndroidCrashLogger';
@@ -192,7 +196,7 @@ export default function RootLayout() {
         backgroundColor: '#ffffff' 
       }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
-          Wind Trend Analyzer
+          Dawn Patrol Alarm
         </Text>
         <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center' }}>
           Loading took longer than expected. Continuing anyway...
@@ -212,7 +216,7 @@ export default function RootLayout() {
         backgroundColor: Platform.OS === 'android' ? '#ffffff' : undefined 
       }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
-          Wind Trend Analyzer
+          Dawn Patrol Alarm
         </Text>
         <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center' }}>
           Something went wrong during app initialization
@@ -235,23 +239,25 @@ export default function RootLayout() {
   }
 
   return (
-    <AndroidSafeWrapper>
-      <AndroidDebugger />
-      <AndroidCrashLogger />
-      <ApkCrashDiagnostics />
-      <EnhancedAndroidDebugger />
-      <QuickExportButton />
-      <ErrorBoundary>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </ErrorBoundary>
-      {/* Global crash recovery overlay */}
-      <GlobalCrashRecovery />
-    </AndroidSafeWrapper>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AndroidSafeWrapper>
+        <AndroidDebugger />
+        <AndroidCrashLogger />
+        <ApkCrashDiagnostics />
+        <EnhancedAndroidDebugger />
+        <QuickExportButton />
+        <ErrorBoundary>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </ErrorBoundary>
+        {/* Global crash recovery overlay */}
+        <GlobalCrashRecovery />
+      </AndroidSafeWrapper>
+    </GestureHandlerRootView>
   );
 }

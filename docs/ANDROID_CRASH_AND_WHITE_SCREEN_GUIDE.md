@@ -1,6 +1,6 @@
 # Android Crash & White Screen Guide
 
-This guide consolidates all documentation related to Android white screen issues, crash detection, debugging, and recovery for the Wind Trend Analyzer app. It replaces the following documents:
+This guide consolidates all documentation related to Android white screen issues, crash detection, debugging, and recovery for the Dawn Patrol Alarm app. It replaces the following documents:
 - WHITE_SCREEN_FIX.md
 - APK_DEBUGGING_IMPLEMENTATION.md
 - docs/ANDROID_WHITE_SCREEN.md

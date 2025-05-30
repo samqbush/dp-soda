@@ -37,6 +37,7 @@ export interface DebugSettings {
   showApkDiagnostics: boolean;
   showEnhancedAndroidDebugger: boolean;
   showQuickExportButton: boolean;
+  showWindAlarmTester: boolean;
   lastToggled: string; // ISO date string
 }
 
@@ -48,6 +49,7 @@ const DEFAULT_SETTINGS: DebugSettings = {
   showApkDiagnostics: false,
   showEnhancedAndroidDebugger: false,
   showQuickExportButton: false,
+  showWindAlarmTester: false,
   lastToggled: new Date().toISOString(),
 };
 

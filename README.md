@@ -1,38 +1,29 @@
-# Wind Trend Analyzer - Soda Lake
+# Dawn Patrol Alarm - Soda Lake
 
-An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for beach activities. Get reliable predictions based on early morning wind patterns!
-
-![Wind Trend Analyzer App](./assets/images/app-preview.png)
+An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for "dawn patrol". Get reliable predictions based on early morning wind patterns!
 
 ## Features
 
-- **Morning Wind Predictions**: Wake up or sleep in based on actual wind conditions
+- **Morning Wind Alarm**: Wake up or sleep in based on actual wind conditions
 - **Smart Analysis**: Uses 3am-5am window to analyze if conditions will be favorable
 - **Verification System**: Confirms predictions using 6am-8am window data
 - **Fully Configurable**: Customize all wind criteria to match your preferences
-- **Works Offline**: Access previous predictions even without internet connection
-- **Dark Mode**: Easy on the eyes for early morning checks
-- **Reliable Operation**: Enhanced stability with crash detection and recovery
 
 ## Getting Started
 
 ### Download Options
 
-- **Android**: Download the latest APK from the [Releases](https://github.com/yourusername/wind-trend-analyzer/releases) page
-- **iOS**: Coming soon to the App Store
-- **Expo Go**: Scan the QR code below to open in Expo Go app
-
-![Expo QR Code](./assets/images/expo-qr-code.png)
+- Private Link
 
 ## How It Works
 
-The Wind Trend Analyzer helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
+The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
 
 ### Smart Wake-Up Decisions
 
 1. **Morning Analysis**: The app checks wind conditions during the crucial 3am-5am window
 2. **Decision Making**: Based on speed, consistency, and direction, it determines if conditions are favorable
-3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation
+3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation with alarm
 4. **Verification**: The app also checks the 6am-8am window to validate its predictions
 
 ### Default Settings (All Customizable)
@@ -40,14 +31,11 @@ The Wind Trend Analyzer helps you decide when to head to the beach by analyzing 
 - **Minimum Wind Speed**: 10 mph (good for most water activities)
 - **Direction Consistency**: 70% (ensures reliable wind patterns)
 - **Required Consecutive Points**: 4 (confirms sustained conditions)
-- **Speed Variation Limit**: 3 mph (avoids gusty, unpredictable wind)
 - **Direction Variation Limit**: 45° (ensures consistent direction)
 
 ## Using the App
 
 ### Main Screen
-
-![Main Screen](./assets/images/main-screen.png)
 
 - **Current Status**: Large "Wake Up! 🌊" or "Sleep In 😴" indicator
 - **Wind Statistics**: View current speed, direction consistency, and quality metrics
@@ -55,15 +43,25 @@ The Wind Trend Analyzer helps you decide when to head to the beach by analyzing 
 - **Manual Refresh**: Pull down to update wind data
 - **Last Updated**: Time of most recent data fetch
 
+### Alarm Tester
+
+- **Test Different Scenarios**: Try different wind conditions to see how the alarm responds
+- **Customize Parameters**: Adjust minimum wind speed, direction consistency, and other criteria
+- **Real-time Feedback**: See immediate analysis results as you change settings
+- **Audio Testing**: Test alarm sounds with volume control
+- **Scenario Library**: Choose from pre-configured test scenarios:
+  - Good morning conditions (should trigger alarm)
+  - Weak morning winds (should not trigger alarm) 
+  - Inconsistent wind direction
+  - Wrong wind direction (opposite of preferred)
+  - Few good consecutive data points
+
 ### Settings Screen
 
-![Settings Screen](./assets/images/settings-screen.png)
-
-- Tap the "Explore" tab to access settings
+- Tap the "Settings" tab to access settings
 - Adjust all wind criteria to match your activity needs
 - Changes take effect immediately with real-time analysis update
 - Reset to defaults with a single tap
-
 
 ## Customizing Your Experience
 
@@ -80,37 +78,29 @@ Tailor the app to your specific needs through the Settings screen:
 ## Frequently Asked Questions
 
 ### Why isn't my app showing current data?
-The app may be in offline mode. Check your internet connection and pull down to refresh.
-
-### How accurate are the predictions?
-The app analyzes actual wind data from WindAlert's monitoring station at Soda Lake. Predictions are based on established wind patterns and verified using the 6am-8am window data.
+The app may be in offline mode. Check your internet connection and click the refresh button.
 
 ### Can I use this for other locations?
-Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado. Support for additional locations is planned for future updates.
+Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
-### What should I do if I see a white screen on Android?
-The app includes advanced recovery systems. If you encounter a white screen, wait a few moments for the recovery system to engage. If problems persist, see the troubleshooting guide in the app settings.
+## Technical Features
+
+### Modern Architecture
+
+- **Service-based Audio System**: Dedicated audio service with race condition prevention
+- **Custom React Hooks**: Separation of concerns for improved code maintainability
+  - `useAlarmAudio`: Handles all audio playback and state
+  - `useWindAnalyzer`: Manages wind data analysis and scenarios
+  - `useWindAlarmReducer`: Centralizes state management for clean component logic
+- **Error Resilience**: Comprehensive error handling and recovery mechanisms
+- **Multiple Test Scenarios**: Pre-configured tests for various wind conditions
 
 ## Coming Soon
 
 - Push notifications for ideal conditions
 - Historical accuracy tracking
-- Integration with weather forecasts
-- Multiple location support
-- Enhanced visualization options
-- Social sharing capabilities
 
 ## Contact & Support
 
-For questions, feature requests, or support:
-- Email: support@windtrendanalyzer.com
-- Twitter: @WindTrendApp
-- Visit our website: [windtrendanalyzer.com](https://windtrendanalyzer.com)
+For questions, feature requests, or support open a GitHub issue in this repository
 
-For Android-specific troubleshooting, tap the "Help" button in the app settings or visit our [Android Support Guide](https://windtrendanalyzer.com/android-support).
-
-## Privacy & Terms
-
-This app does not collect personal data. Location permissions are requested only to enhance wind analysis relevance. For our full privacy policy, visit [windtrendanalyzer.com/privacy](https://windtrendanalyzer.com/privacy).
-
-Wind Trend Analyzer © 2025. All rights reserved.

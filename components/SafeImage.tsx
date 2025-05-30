@@ -9,13 +9,14 @@ interface SafeImageProps {
   style?: any;
   fallbackText?: string;
   backgroundColor?: string;
+  contentFit?: "contain" | "cover" | "fill" | "none" | "scale-down";
 }
 
 /**
  * A wrapper around Image with fallback handling for Android
  * Prevents issues with image loading that can cause white screens
  */
-export function SafeImage({ source, style, fallbackText, backgroundColor }: SafeImageProps) {
+export function SafeImage({ source, style, fallbackText, backgroundColor, contentFit = "contain" }: SafeImageProps) {
   // On Android, we add extra error handling and timeouts
   if (Platform.OS === 'android') {
     return (
@@ -29,7 +30,7 @@ export function SafeImage({ source, style, fallbackText, backgroundColor }: Safe
         <Image
           source={source}
           style={styles.image}
-          contentFit="contain"
+          contentFit={contentFit}
           transition={300}
           onError={() => {
             console.warn('Image failed to load:', source);
@@ -49,7 +50,7 @@ export function SafeImage({ source, style, fallbackText, backgroundColor }: Safe
     <Image
       source={source}
       style={style}
-      contentFit="contain"
+      contentFit={contentFit}
       transition={300}
     />
   );

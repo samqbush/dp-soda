@@ -17,15 +17,26 @@
   - Theme management with dark/light mode support
   - Automatic data refresh and caching
   - Error handling with user-friendly messages
+  - Specialized hooks for audio and alarm functionality:
+    - `useAlarmAudio`: Audio playback state management
+    - `useWindAnalyzer`: Wind data analysis logic
+    - `useWindAlarmReducer`: Centralized state management
 
 ### User Interface
 - **Main Display Components**
   - Wind status indicator (Wake Up! 🌊 or Sleep In 😴)
   - Key metrics dashboard: speed, consistency, consecutive points
-  - Wind trend visualization chart showing 12-hour history
+  - Wind trend visualization chart showing 10-hour history
   - Manual refresh and data management
   - Configurable settings interface
   - Dark mode support throughout the application
+  
+- **Alarm Tester**
+  - Interactive testing interface for wind alarm functionality
+  - Pre-configured test scenarios (good conditions, weak winds, etc.)
+  - Real-time parameter adjustment with immediate feedback
+  - Audio testing with volume control and snooze functionality
+  - Educational interface explaining alarm criteria and decisions
 
 ### Android Crash & White Screen Prevention
 - **Enhanced Crash Detection & Recovery**
@@ -53,7 +64,7 @@
 
 ### ✅ Data Handling
 - Fetches data just before analysis (configurable timing)
-- Focuses on 2am-8am window with 3am-5am alarm analysis
+- Focuses on 2am-10am window with 3am-5am alarm analysis
 - Converts kph to mph as in original script
 - Outputs structured data for visualization
 - Robust error handling and fallback data
@@ -63,7 +74,7 @@
   - Minimum average wind speed (default: 10 mph)
   - Direction consistency (default: 70%)
   - Minimum consecutive good data points (default: 4)
-  - Speed/direction deviation thresholds
+  - Direction deviation thresholds
 - Verification logic for 6am-8am window
 - Real-time re-analysis when settings change
 
@@ -94,7 +105,7 @@ The modular architecture makes it easy to add:
 
 1. **Start the app**: `npm start` or `npx expo start --tunnel` for public wifi testing
 2. **View wind conditions**: Home screen shows current analysis
-3. **Adjust settings**: Explore tab for configuration
+3. **Adjust settings**: Settings tab for configuration
 4. **Test functionality**: WindDataTest component for debugging
 5. **Run standalone**: `npm run fetch-wind` for independent data fetching
 6. **Android build**: GitHub Actions workflow handles optimized Android builds

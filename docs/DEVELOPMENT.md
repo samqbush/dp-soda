@@ -1,10 +1,10 @@
-# Wind Trend Analyzer - Developer Documentation
+# Dawn Patrol Alarm - Developer Documentation
 
-This document contains information for developers working on the Wind Trend Analyzer project. For end-user documentation, see [README.md](./README.md).
+This document contains information for developers working on the Dawn Patrol Alarm project. For end-user documentation, see [README.md](./README.md).
 
 ## Project Overview
 
-The Wind Trend Analyzer is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
+The Dawn Patrol Alarm is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
 
 ## Development Environment
 
@@ -74,22 +74,14 @@ eas build --platform android --profile production
 
 ## Testing
 
-### Running Tests
+TODO: Develop unit tests
 
-```bash
-# Run all tests
-npm test
+### Lint
 
-# Run specific tests
-npm test -- -t "WindService"
+```shell
+npm run lint
+npx tsc --noEmit
 ```
-
-### Testing Components
-
-The `components/WindDataTest.tsx` component can be used for debugging and testing wind service functionality:
-- Tests API connectivity
-- Validates data parsing and analysis
-- Shows console-style output for debugging
 
 ### Standalone Script
 
@@ -110,6 +102,16 @@ Key Android development features:
 - White screen prevention mechanisms
 - Diagnostic tools and crash reporting
 - Production-specific optimizations
+- Compatibility polyfills for older devices
+
+### JavaScript Compatibility
+
+The app includes polyfills for modern JavaScript features to ensure compatibility with older Android devices. These polyfills are loaded early in the app initialization process.
+
+- `services/polyfills.ts` - Contains polyfills for modern JavaScript methods like `Array.prototype.findLast`
+- For details on specific compatibility fixes, see [REACT_NAVIGATION_V7_FIXES.md](../docs/REACT_NAVIGATION_V7_FIXES.md)
+
+When adding new features that use modern JavaScript methods, consider checking if they need polyfills for older Android versions (API level ≤ 29).
 
 ## Developer Mode
 

@@ -57,7 +57,7 @@ When you're ready to switch to local builds:
 ## Local Debug Instructions
 ```shell
 # install new apk
-adb install /Users/samquakenbush/Downloads/app-release-universal-with-fixes.apk 
+adb install ~/Downloads/app-release-universal.apk
 
 # clear the logs
 adb logcat -c

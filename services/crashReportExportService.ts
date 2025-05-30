@@ -201,7 +201,7 @@ class CrashReportExportService {
       }
 
       const shareOptions = {
-        message: `Wind Trend Analyzer Crash Report\n\nGenerated: ${new Date().toLocaleString()}\n\n${data.substring(0, 1000)}${data.length > 1000 ? '\n\n... (full report in console logs)' : ''}`,
+        message: `Dawn Patrol Alarm Crash Report\n\nGenerated: ${new Date().toLocaleString()}\n\n${data.substring(0, 1000)}${data.length > 1000 ? '\n\n... (full report in console logs)' : ''}`,
         title: 'Crash Report',
       };
 
@@ -239,7 +239,7 @@ class CrashReportExportService {
    * Format report as human-readable text
    */
   private formatAsText(report: CrashReport, options: ExportOptions): string {
-    let text = `WIND TREND ANALYZER - CRASH REPORT\n`;
+    let text = `DAWN PATROL ALARM - CRASH REPORT\n`;
     text += `===========================================\n\n`;
     text += `Report ID: ${report.reportId}\n`;
     text += `Generated: ${report.timestamp}\n\n`;

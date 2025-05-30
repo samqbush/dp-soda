@@ -2,7 +2,7 @@ import { getBuildConfig } from '@/config/buildConfig';
 import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface DebugInfo {
@@ -15,42 +15,81 @@ interface DebugInfo {
   lastError: string | null;
 }
 
-/**
- * Android-specific debugging component to help diagnose white screen issues
- * Only visible when enabled through Developer Mode settings
- */
-export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [renderCount, setRenderCount] = useState(0);
-  const [visible, setVisible] = useState(false);
-  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
+interface AndroidDebuggerProps {
+  enabled?: boolean;
+}
 
-  // Check visibility and initialize if enabled
+/**
+ * Android Debugger - Helps debug issues on Android devices
+ * This component provides insights into the device, platform, and runtime environment
+ */
+export function AndroidDebugger({ enabled = false }: AndroidDebuggerProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isComponentEnabled, setIsComponentEnabled] = useState(false);
+  const [renderCount, setRenderCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({
+    timestamp: new Date().toISOString(),
+    platform: Platform.OS,
+    buildInfo: getBuildConfig(),
+    storageTest: 'not run',
+    renderCount: 0,
+    memoryWarnings: 0,
+    lastError: null
+  });
+
+  const gatherDebugInfo = useCallback(async () => {
+    try {
+      // Update render count
+      const currentRenderCount = renderCount + 1;
+      setRenderCount(currentRenderCount);
+      
+      // Test AsyncStorage
+      let storageTest = 'failed';
+      try {
+        await AsyncStorage.setItem('debug_test', 'working');
+        storageTest = await AsyncStorage.getItem('debug_test') || 'not found';
+      } catch (e) {
+        storageTest = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      
+      // Get build info
+      const buildInfo = getBuildConfig();
+      
+      // Get last error from global handler
+      const lastError = globalCrashHandler.getLastError();
+      
+      setDebugInfo({
+        timestamp: new Date().toISOString(),
+        platform: Platform.OS,
+        buildInfo,
+        storageTest,
+        renderCount: currentRenderCount,
+        memoryWarnings: globalCrashHandler.getMemoryWarningCount(),
+        lastError: lastError ? `${lastError.message} (${lastError.time})` : null
+      });
+    } catch (error) {
+      console.error('Error gathering debug info:', error);
+    }
+  }, [renderCount]);
+
+  // Single unified useEffect for both visibility checking and initialization
   useEffect(() => {
     // Only relevant on Android
     if (Platform.OS !== 'android') return;
 
     const checkVisibilityAndInit = async () => {
       try {
-        // Check if this component should be shown - only use debug settings
-        const shouldShow = await debugSettings.isComponentVisible('showAndroidDebugger');
+        // Check if this component should be shown based on props or debug settings
+        const shouldShow = enabled || await debugSettings.isComponentVisible('showAndroidDebugger');
         console.log('🔍 AndroidDebugger visibility:', shouldShow ? 'VISIBLE' : 'HIDDEN');
         setIsComponentEnabled(shouldShow);
         
-        // Only initialize if component should be shown
         if (shouldShow) {
           await gatherDebugInfo();
         }
       } catch (error) {
         console.error('Failed to check AndroidDebugger visibility:', error);
       }
-    };
-    
-    // Function to check if app appears to be stuck or crashed
-    const isStuckOrCrashed = () => {
-      // App has been running for more than 15 seconds without initializing
-      const appStartTime = (global as any).__APP_START_TIME || Date.now();
-      return (Date.now() - appStartTime) > 15000;
     };
     
     checkVisibilityAndInit();
@@ -78,50 +117,7 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
       subscription.remove();
       unsubscribe();
     };
-  }, [enabled]);
-
-  const gatherDebugInfo = async () => {
-    try {
-      // Update render count
-      const currentRenderCount = renderCount + 1;
-      setRenderCount(currentRenderCount);
-      
-      // Test AsyncStorage
-      let storageTest = 'failed';
-      try {
-        await AsyncStorage.setItem('debugTest', 'working');
-        const result = await AsyncStorage.getItem('debugTest');
-        storageTest = result === 'working' ? 'working' : 'failed';
-        await AsyncStorage.removeItem('debugTest');
-      } catch (e) {
-        storageTest = `error: ${e}`;
-      }
-
-      // Get last error
-      let lastError = null;
-      try {
-        const errorData = await AsyncStorage.getItem('lastError');
-        if (errorData) {
-          lastError = errorData;
-        }
-      } catch (e) {
-        console.error('Error reading last error:', e);
-      }
-
-      // Set the debug info
-      setDebugInfo({
-        timestamp: new Date().toISOString(),
-        platform: `${Platform.OS} ${Platform.Version}`,
-        buildInfo: getBuildConfig(),
-        storageTest,
-        renderCount: currentRenderCount,
-        memoryWarnings: 0,
-        lastError
-      });
-    } catch (error) {
-      console.error('Failed to gather debug info:', error);
-    }
-  };
+  }, [enabled, gatherDebugInfo]);
 
   // Don't render if not enabled or not on Android
   if (Platform.OS !== 'android' || !isComponentEnabled) {
@@ -132,12 +128,12 @@ export function AndroidDebugger({ enabled = false }: { enabled?: boolean }) {
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.toggleButton}
-        onPress={() => setVisible(!visible)}
+        onPress={() => setIsVisible(!isVisible)}
       >
         <Text style={styles.toggleText}>🔧 Debug Info</Text>
       </TouchableOpacity>
       
-      {visible && debugInfo && (
+      {isVisible && debugInfo && (
         <ScrollView style={styles.infoPanel}>
           <View style={styles.section}>
             <Text style={styles.label}>Platform:</Text>

@@ -1,13 +1,12 @@
 {
   "expo": {
-    "name": "dp-react",
+    "name": "Dawn Patrol Alarm",
     "slug": "dp-soda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dpreact",
+    "scheme": "dpsoda",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.samqbush.dpsoda"
@@ -16,12 +15,15 @@
       "package": "com.samqbush.dpsoda",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#1E3D58"
       },
       "permissions": [
         "INTERNET",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "AUDIO_RECORDING",
+        "AUDIO_SETTINGS"
       ],
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": true,
@@ -45,11 +47,11 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#1E3D58",
           "dark": {
             "image": "./assets/images/splash-icon.png",
             "resizeMode": "contain",
-            "backgroundColor": "#121212"
+            "backgroundColor": "#0A1F33"
           }
         }
       ]
@@ -57,23 +59,22 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#1E3D58",
       "dark": {
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#121212"
+        "backgroundColor": "#0A1F33"
       }
     },
     "androidStatusBar": {
-      "backgroundColor": "#ffffff",
-      "translucent": false,
-      "barStyle": "dark-content",
+      "backgroundColor": "#1E3D58",
+      "translucent": true,
+      "barStyle": "light-content",
       "hidden": false
     },
     "experiments": {
       "typedRoutes": false,
-      "turboModules": false,
-      "newArchEnabled": false
+      "turboModules": false
     },
     "extra": {
       "router": {},
