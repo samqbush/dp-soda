@@ -271,11 +271,10 @@ jobs:
             curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
           fi
           
-          # Get signing info from the AAB
-          echo "Extracting signing information from AAB:"
+          # Basic validation of the AAB
+          echo "Validating AAB format:"
           java -jar bundletool.jar validate \
-            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
-            --mode=universal_apk
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
           
           echo "Checking release mode vs debug mode signing:"
           # Extract APK from AAB to check signatures
