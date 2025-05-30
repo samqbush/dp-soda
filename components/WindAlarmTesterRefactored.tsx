@@ -6,23 +6,23 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import React, { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
-    AccessibilityInfo,
-    Alert,
-    Animated,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    TextInput,
-    TouchableOpacity,
-    View
+  AccessibilityInfo,
+  Alert,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 // Import our new hooks
 import { useAlarmAudio } from '@/hooks/useAlarmAudio';
 import {
-    WindAlarmState,
-    initialWindAlarmState,
-    windAlarmReducer
+  WindAlarmState,
+  initialWindAlarmState,
+  windAlarmReducer
 } from '@/hooks/useWindAlarmReducer';
 import { useWindAnalyzer } from '@/hooks/useWindAnalyzer';
 
@@ -151,6 +151,8 @@ export function WindAlarmTesterRefactored() {
     }
   }, [state.isAlarmActive, isPlaying, isSoundEnabled, isSnoozing, playAlarm, stopAlarm, volume]);
   
+
+  
   // Handle snooze timer
   useEffect(() => {
     // Clear any existing timer
@@ -158,7 +160,7 @@ export function WindAlarmTesterRefactored() {
       clearTimeout(snoozeTimerRef.current);
       snoozeTimerRef.current = null;
     }
-    
+
     // If snooze is enabled, set up a new timer
     if (state.isSnoozeEnabled && state.snoozeEnd) {
       const timeUntilEnd = state.snoozeEnd.getTime() - Date.now();
@@ -192,21 +194,26 @@ export function WindAlarmTesterRefactored() {
   // Analyze selected scenario
   const analyzeScenario = useCallback(() => {
     AlarmLogger.lifecycle.start('analyzeScenario');
+    AlarmLogger.forceLog(`Starting analysis with state: isTestScenarioActive=${state.isTestScenarioActive}, selectedTestScenario=${state.selectedTestScenario}`);
     
     try {
       let result;
       
       if (state.isTestScenarioActive && state.selectedTestScenario) {
         // Use test scenario
+        AlarmLogger.forceLog(`Using test scenario: ${state.selectedTestScenario}`);
         result = analyzeTestScenario(state.selectedTestScenario);
+        AlarmLogger.forceLog(`Test scenario analysis result:`, result);
       } else {
         // Use real data
+        AlarmLogger.forceLog('Using real wind data');
         result = analyzeWindData(windData, {
           minWindSpeed: state.minWindSpeed,
           directionConsistencyThreshold: state.directionConsistencyThreshold,
           minConsecutiveDataPoints: state.minConsecutiveDataPoints,
           maxDirectionDeviationDegrees: state.maxDirectionDeviationDegrees
         });
+        AlarmLogger.forceLog(`Real data analysis result:`, result);
       }
       
       // Update state with analysis results
@@ -244,6 +251,35 @@ export function WindAlarmTesterRefactored() {
     windData
   ]);
 
+  // Run analysis when the test scenario or real data state changes
+  useEffect(() => {
+    if (state.isTestScenarioActive && state.selectedTestScenario) {
+      AlarmLogger.forceLog(`Running analysis for newly selected scenario: ${state.selectedTestScenario}`);
+      analyzeScenario();
+    } else if (!state.isTestScenarioActive) {
+      AlarmLogger.forceLog('Running analysis with real data after deactivating test scenario');
+      // Add detailed debug information
+      AlarmLogger.forceLog('Wind data analysis context:', {
+        dataLength: windData?.length || 0,
+        settings: {
+          uiSettings: {
+            minWindSpeed: state.minWindSpeed,
+            directionConsistencyThreshold: state.directionConsistencyThreshold,
+            minConsecutiveDataPoints: state.minConsecutiveDataPoints,
+            maxDirectionDeviationDegrees: state.maxDirectionDeviationDegrees
+          },
+          mappedSettings: {
+            minimumAverageSpeed: state.minWindSpeed,
+            directionConsistencyThreshold: state.directionConsistencyThreshold,
+            minimumConsecutivePoints: state.minConsecutiveDataPoints,
+            directionDeviationThreshold: state.maxDirectionDeviationDegrees
+          }
+        }
+      });
+      analyzeScenario();
+    }
+  }, [state.isTestScenarioActive, state.selectedTestScenario, analyzeScenario, windData]);
+
   // Apply a snooze (commented out as it's currently unused)
   // const handleSnooze = useCallback((minutes: number) => {
   //   dispatch({ 
@@ -259,13 +295,21 @@ export function WindAlarmTesterRefactored() {
 
   // Handle activation of a test scenario
   const activateTestScenario = useCallback((scenarioKey: string) => {
+    AlarmLogger.forceLog(`Activating test scenario: ${scenarioKey}`);
     dispatch({ type: 'ACTIVATE_TEST_SCENARIO', payload: scenarioKey });
-    
-    // Analyze immediately when scenario changes
-    setTimeout(() => {
-      analyzeScenario();
-    }, 0);
-  }, [analyzeScenario]);
+    // Analysis will be triggered by the useEffect that watches for scenario changes
+  }, []);
+
+  // Helper function to map UI property names to AlarmCriteria property names
+  const mapPropertyName = useCallback((uiPropName: string): string => {
+    const mappings: Record<string, string> = {
+      'minWindSpeed': 'minimumAverageSpeed',
+      'directionConsistencyThreshold': 'directionConsistencyThreshold', // no change
+      'minConsecutiveDataPoints': 'minimumConsecutivePoints',
+      'maxDirectionDeviationDegrees': 'directionDeviationThreshold'
+    };
+    return mappings[uiPropName] || uiPropName;
+  }, []);
 
   // Update a setting
   const updateSetting = useCallback((setting: keyof WindAlarmState, value: any) => {
@@ -281,11 +325,13 @@ export function WindAlarmTesterRefactored() {
       setting === 'minConsecutiveDataPoints' || 
       setting === 'maxDirectionDeviationDegrees'
     ) {
+      const mappedSetting = mapPropertyName(setting);
+      AlarmLogger.forceLog(`Mapping UI setting "${setting}" to AlarmCriteria property "${mappedSetting}"`);
       updateSettings({ 
-        [setting.replace('min', 'min')]: value 
+        [mappedSetting]: value 
       });
     }
-  }, [updateSettings]);
+  }, [updateSettings, mapPropertyName]);
 
   // Emergency cleanup
   const handleEmergencyStop = useCallback(async () => {

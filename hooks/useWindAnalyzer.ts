@@ -22,12 +22,14 @@ export const useWindAnalyzer = () => {
   // Get wind data from our main data hook
   const { windData, isLoading, error } = useWindData();
   
-  // State for manual analysis settings
+  // State for manual analysis settings - aligned with AlarmCriteria interface
   const [criteriaSettings, setCriteriaSettings] = useState({
-    minWindSpeed: 10,
+    minimumAverageSpeed: 10,
     directionConsistencyThreshold: 70,
-    minConsecutiveDataPoints: 4,
-    maxDirectionDeviationDegrees: 45
+    minimumConsecutivePoints: 4,
+    directionDeviationThreshold: 45,
+    preferredDirection: 315, // Northwest (default)
+    preferredDirectionRange: 45 // +/- 45 degrees (default)
   });
   
   // Predefined test scenarios
@@ -173,14 +175,14 @@ export const useWindAnalyzer = () => {
         );
         
         // Direction is considered favorable if within deviation threshold
-        const isDirectionFavorable = dirDiff <= criteria.maxDirectionDeviationDegrees;
+        const isDirectionFavorable = dirDiff <= criteria.directionDeviationThreshold;
         
         if (isDirectionFavorable) {
           favorableDirectionCount++;
         }
         
         // Track consecutive favorable points (considering both speed and direction)
-        const isSpeedFavorable = windSpeedMph >= criteria.minWindSpeed;
+        const isSpeedFavorable = windSpeedMph >= criteria.minimumAverageSpeed;
         const isPointFavorable = isDirectionFavorable && isSpeedFavorable;
         
         if (isPointFavorable) {
@@ -205,16 +207,16 @@ export const useWindAnalyzer = () => {
       const directionConsistency = (favorableDirectionCount / morningData.length) * 100;
       
       // Determine if conditions are alarm-worthy
-      const isSpeedSufficient = averageSpeed >= criteria.minWindSpeed;
+      const isSpeedSufficient = averageSpeed >= criteria.minimumAverageSpeed;
       const isDirectionConsistent = directionConsistency >= criteria.directionConsistencyThreshold;
-      const hasEnoughConsecutivePoints = maxConsecutivePoints >= criteria.minConsecutiveDataPoints;
+      const hasEnoughConsecutivePoints = maxConsecutivePoints >= criteria.minimumConsecutivePoints;
       
       const isAlarmWorthy = isSpeedSufficient && isDirectionConsistent && hasEnoughConsecutivePoints;
       
       // Calculate overall quality score (0-100)
-      const speedQuality = Math.min(100, (averageSpeed / criteria.minWindSpeed) * 70);
+      const speedQuality = Math.min(100, (averageSpeed / criteria.minimumAverageSpeed) * 70);
       const directionQuality = (directionConsistency / 100) * 100;
-      const consecutiveQuality = (maxConsecutivePoints / criteria.minConsecutiveDataPoints) * 100;
+      const consecutiveQuality = (maxConsecutivePoints / criteria.minimumConsecutivePoints) * 100;
       
       const qualityScore = Math.round(
         (speedQuality * 0.4) + (directionQuality * 0.3) + (consecutiveQuality * 0.3)
@@ -223,9 +225,9 @@ export const useWindAnalyzer = () => {
       // Create analysis summary
       const details = `
         Analysis of ${morningData.length} data points from 3am-5am:
-        - Average speed: ${averageSpeed.toFixed(1)} mph (min: ${criteria.minWindSpeed})
+        - Average speed: ${averageSpeed.toFixed(1)} mph (min: ${criteria.minimumAverageSpeed})
         - Direction consistency: ${directionConsistency.toFixed(1)}% (min: ${criteria.directionConsistencyThreshold}%)
-        - Max consecutive favorable points: ${maxConsecutivePoints} (min: ${criteria.minConsecutiveDataPoints})
+        - Max consecutive favorable points: ${maxConsecutivePoints} (min: ${criteria.minimumConsecutivePoints})
         - Most common wind direction: ${mostCommonDirection}°
         - Overall quality score: ${qualityScore}/100
       `;
@@ -280,9 +282,9 @@ export const useWindAnalyzer = () => {
       const { conditions } = scenario;
       
       // Determine if conditions meet criteria
-      const isSpeedSufficient = conditions.averageSpeed >= criteriaSettings.minWindSpeed;
+      const isSpeedSufficient = conditions.averageSpeed >= criteriaSettings.minimumAverageSpeed;
       const isDirectionConsistent = conditions.directionConsistency >= criteriaSettings.directionConsistencyThreshold;
-      const hasEnoughConsecutivePoints = conditions.favorablePoints >= criteriaSettings.minConsecutiveDataPoints;
+      const hasEnoughConsecutivePoints = conditions.favorablePoints >= criteriaSettings.minimumConsecutivePoints;
       
       const isAlarmWorthy = isSpeedSufficient && isDirectionConsistent && hasEnoughConsecutivePoints;
       
@@ -292,9 +294,9 @@ export const useWindAnalyzer = () => {
         ${scenario.description}
         
         Analysis results:
-        - Average speed: ${conditions.averageSpeed.toFixed(1)} mph (min: ${criteriaSettings.minWindSpeed})
+        - Average speed: ${conditions.averageSpeed.toFixed(1)} mph (min: ${criteriaSettings.minimumAverageSpeed})
         - Direction consistency: ${conditions.directionConsistency.toFixed(1)}% (min: ${criteriaSettings.directionConsistencyThreshold}%)
-        - Consecutive favorable points: ${conditions.favorablePoints} (min: ${criteriaSettings.minConsecutiveDataPoints})
+        - Consecutive favorable points: ${conditions.favorablePoints} (min: ${criteriaSettings.minimumConsecutivePoints})
         - Overall quality score: ${conditions.quality}/100
       `;
       
