@@ -123,23 +123,10 @@ jobs:
               echo "⚠️ signingConfigs section already exists, skipping this step"
             fi
             
-            # Add signingConfig to release buildType if it doesn't exist
-            if ! grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
-              awk '
-                /buildTypes\s*{/,/}/ {
-                  if (/release\s*{/) {
-                    print $0;
-                    print "            signingConfig signingConfigs.release";
-                    next;
-                  }
-                }
-                { print }
-              ' android/app/build.gradle > android/app/build.gradle.new
-              mv android/app/build.gradle.new android/app/build.gradle
-              echo "✅ Added signingConfig to release buildType"
-            else
-              echo "⚠️ signingConfig already exists in release buildType, skipping this step"
-            fi
+            # Replace the debug signing config with release signing config in release buildType
+            echo "🔧 Replacing debug signing config with release signing config..."
+            sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
+            echo "✅ Updated release build type to use release signing config"
             
             # Verify changes were applied successfully
             echo "🔍 Verifying signing configuration..."
