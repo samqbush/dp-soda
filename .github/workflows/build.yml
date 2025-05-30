@@ -79,45 +79,95 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
-      # Configure app/build.gradle for proper signing - improved approach
+      # Configure app/build.gradle for proper signing - with enhanced debugging
       - name: 🔏 Configure signing in build.gradle
-        run: >
+        run: |
           if [ -f "android/app/build.gradle" ]; then
+            echo "📄 Found build.gradle file"
+            # Show the initial structure of the file for debugging
+            echo "===== Original build.gradle structure ====="
+            grep -n "android {" android/app/build.gradle
+            grep -n "buildTypes {" android/app/build.gradle
+            grep -n "signingConfigs" android/app/build.gradle || echo "No existing signingConfigs found"
+            echo "======================================="
+            
             # Create a backup of the original file
-            cp android/app/build.gradle android/app/build.gradle.bak;
+            cp android/app/build.gradle android/app/build.gradle.bak
             
-            # Create a temporary file with our desired signing config
-            echo 'signingConfigs {
-              release {
-                storeFile file(project.storeFile)
-                storePassword project.storePassword
-                keyAlias project.keyAlias
-                keyPassword project.keyPassword
-                v1SigningEnabled true
-                v2SigningEnabled true
-              }
-            }' > /tmp/signing_config.gradle;
+            # Simpler approach - direct modification
+            echo "🔧 Adding signing configuration to build.gradle"
             
-            # Insert signing config right after "android {" line
-            sed -i '/android\s*{/r /tmp/signing_config.gradle' android/app/build.gradle
+            # Check if signingConfigs already exists to avoid duplicate
+            if ! grep -q "signingConfigs" android/app/build.gradle; then
+              # Add signingConfigs section directly after android {
+              awk '
+                /android\s*{/ {
+                  print $0;
+                  print "    signingConfigs {";
+                  print "        release {";
+                  print "            storeFile file(\"upload-keystore.jks\")";
+                  print "            storePassword project.storePassword";
+                  print "            keyAlias project.keyAlias";
+                  print "            keyPassword project.keyPassword";
+                  print "            v1SigningEnabled true";
+                  print "            v2SigningEnabled true";
+                  print "        }";
+                  print "    }";
+                  next;
+                }
+                { print }
+              ' android/app/build.gradle > android/app/build.gradle.new
+              mv android/app/build.gradle.new android/app/build.gradle
+              echo "✅ Added signingConfigs section"
+            else
+              echo "⚠️ signingConfigs section already exists, skipping this step"
+            fi
             
-            # Make sure release buildType uses our signing config
-            sed -i '/buildTypes\s*{/,/}/s/release\s*{/release {\n            signingConfig signingConfigs.release/' android/app/build.gradle
+            # Add signingConfig to release buildType if it doesn't exist
+            if ! grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+              awk '
+                /buildTypes\s*{/,/}/ {
+                  if (/release\s*{/) {
+                    print $0;
+                    print "            signingConfig signingConfigs.release";
+                    next;
+                  }
+                }
+                { print }
+              ' android/app/build.gradle > android/app/build.gradle.new
+              mv android/app/build.gradle.new android/app/build.gradle
+              echo "✅ Added signingConfig to release buildType"
+            else
+              echo "⚠️ signingConfig already exists in release buildType, skipping this step"
+            fi
             
             # Verify changes were applied successfully
-            echo "✅ Verifying signing configuration..."
-            if grep -q "signingConfigs {" android/app/build.gradle && grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
-              echo "✅ Signing configuration successfully added to build.gradle"
-              echo "===== Content after modification ====="
-              grep -A 15 "signingConfigs" android/app/build.gradle
-              grep -A 10 "buildTypes" android/app/build.gradle
-              echo "================================="
+            echo "🔍 Verifying signing configuration..."
+            if grep -q "signingConfigs {" android/app/build.gradle; then
+              echo "✅ signingConfigs section found"
             else
-              echo "❌ Failed to add signing configuration"
+              echo "❌ Could not find signingConfigs section"
+              cat android/app/build.gradle
               echo "Restoring backup..."
               cp android/app/build.gradle.bak android/app/build.gradle
               exit 1
             fi
+            
+            if grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+              echo "✅ signingConfig correctly set in release buildType"
+            else
+              echo "❌ Could not find signingConfig in release buildType"
+              grep -A 15 "buildTypes" android/app/build.gradle || echo "Could not find buildTypes section"
+              echo "Restoring backup..."
+              cp android/app/build.gradle.bak android/app/build.gradle
+              exit 1
+            fi
+            
+            # Show the modified structure for confirmation
+            echo "===== Modified build.gradle structure ====="
+            grep -A 10 "signingConfigs" android/app/build.gradle
+            grep -A 15 "buildTypes" android/app/build.gradle
+            echo "========================================"
           else
             echo "❌ Error: android/app/build.gradle not found"
             exit 1
