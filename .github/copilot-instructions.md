@@ -8,6 +8,7 @@
 - This app is not built locally, it is built using [build.yml](./workflows/build.yml) in the GitHub Actions workflow. 
 - The app can be tested locally using `npx expo start` or `npx expo start --tunnel`.
 - The app can be tested after a github action build by downloading the universal apk and installing on a usb tethered android device.
+- Do not install javascript libraries globally, as this can cause issues with the build process. Instead, use `npx` to run commands locally.
 
 ## Mobile App Guidance
 - The application should be self contained and not rely on a backend server

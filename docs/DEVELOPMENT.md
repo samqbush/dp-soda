@@ -81,6 +81,7 @@ TODO: Develop unit tests
 ```shell
 npm run lint
 npx tsc --noEmit
+npx yaml-lint .github/workflows/build.yml
 ```
 
 ### Standalone Script

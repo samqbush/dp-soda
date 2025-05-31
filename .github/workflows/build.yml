@@ -79,6 +79,132 @@ jobs:
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
 
+      # Configure app/build.gradle for proper signing - with improved structure
+      - name: 🔏 Configure signing in build.gradle
+        run: |
+          if [ -f "android/app/build.gradle" ]; then
+            echo "📄 Found build.gradle file"
+            
+            # Create a backup of the original file
+            cp android/app/build.gradle android/app/build.gradle.bak
+            
+            # First analyze the file structure
+            echo "🔍 Analyzing build.gradle structure..."
+            grep -n "android {" android/app/build.gradle
+            grep -n "buildTypes {" android/app/build.gradle
+            grep -n "signingConfigs" android/app/build.gradle || echo "No existing signingConfigs found"
+            
+            # Modified approach - TWO-PASS STRATEGY
+            # 1. First, find buildTypes section to determine placement of signingConfigs
+            # 2. Then, add signingConfigs before buildTypes and update buildTypes section
+            
+            echo "🔧 Implementing two-pass signing configuration strategy"
+            
+            # First, find the buildTypes section line number
+            BUILDTYPES_LINE=$(grep -n "buildTypes {" android/app/build.gradle | head -n1 | cut -d: -f1)
+            
+            if [ -n "$BUILDTYPES_LINE" ]; then
+              echo "✅ Found buildTypes section at line $BUILDTYPES_LINE"
+              
+              # Add debug config block to make sure debug signingConfig reference works
+              # Create a temp file with proper structure
+              TEMP_FILE=$(mktemp)
+              
+              # Write the first part of the file up to buildTypes
+              sed -n "1,$((BUILDTYPES_LINE-1))p" android/app/build.gradle > "$TEMP_FILE"
+              
+              # Insert signingConfigs BEFORE buildTypes using echo statements
+              echo '    signingConfigs {' >> "$TEMP_FILE"
+              echo '        debug {' >> "$TEMP_FILE"
+              echo '            storeFile file("debug.keystore")' >> "$TEMP_FILE"
+              echo '            storePassword "android"' >> "$TEMP_FILE"
+              echo '            keyAlias "androiddebugkey"' >> "$TEMP_FILE"
+              echo '            keyPassword "android"' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '        release {' >> "$TEMP_FILE"
+              echo '            storeFile file("upload-keystore.jks")' >> "$TEMP_FILE"
+              echo '            storePassword project.storePassword' >> "$TEMP_FILE"
+              echo '            keyAlias project.keyAlias' >> "$TEMP_FILE"
+              echo '            keyPassword project.keyPassword' >> "$TEMP_FILE"
+              echo '            v1SigningEnabled true' >> "$TEMP_FILE"
+              echo '            v2SigningEnabled true' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '    }' >> "$TEMP_FILE"
+              echo '' >> "$TEMP_FILE"
+              
+              # Append the rest of the file starting with buildTypes
+              sed -n "${BUILDTYPES_LINE},\$p" android/app/build.gradle >> "$TEMP_FILE"
+              
+              # Replace original with our new file
+              mv "$TEMP_FILE" android/app/build.gradle
+              
+              echo "✅ Added signingConfigs section before buildTypes section"
+            else
+              echo "⚠️ Could not find buildTypes section, using standard approach"
+              
+              # Standard approach - add after android {
+              awk '
+                /android\s*{/ {
+                  print $0;
+                  print "    signingConfigs {";
+                  print "        debug {";
+                  print "            storeFile file(\"debug.keystore\")";
+                  print "            storePassword \"android\"";
+                  print "            keyAlias \"androiddebugkey\"";
+                  print "            keyPassword \"android\"";
+                  print "        }";
+                  print "        release {";
+                  print "            storeFile file(\"upload-keystore.jks\")";
+                  print "            storePassword project.storePassword";
+                  print "            keyAlias project.keyAlias";
+                  print "            keyPassword project.keyPassword";
+                  print "            v1SigningEnabled true";
+                  print "            v2SigningEnabled true";
+                  print "        }";
+                  print "    }";
+                  next;
+                }
+                { print }
+              ' android/app/build.gradle > android/app/build.gradle.new
+              mv android/app/build.gradle.new android/app/build.gradle
+              echo "✅ Added signingConfigs section after android {"
+            fi
+            
+            # Step 2: Update the release buildType section to use release signing
+            if grep -q "signingConfig signingConfigs.debug" android/app/build.gradle; then
+              echo "🔧 Found debug signing config reference, replacing with release..."
+              sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
+              echo "✅ Updated signing config references in buildType"
+            else
+              echo "⚠️ No debug signing config reference found, attempting to add release config"
+              
+              # Check if there's already a release section in buildTypes
+              if grep -q "buildTypes {" android/app/build.gradle && grep -q "release {" android/app/build.gradle; then
+                # Add signingConfig to the release section if it doesn't have one
+                if ! grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+                  echo "🔧 Adding release signing config to release buildType"
+                  sed -i '/release {/,/}/s/}/            signingConfig signingConfigs.release\n        }/g' android/app/build.gradle
+                fi
+              fi
+            fi
+            
+            # Verify changes were applied successfully
+            echo "🔍 Verifying signing configuration..."
+            echo "===== Modified build.gradle structure ====="
+            grep -A 10 "signingConfigs" android/app/build.gradle || echo "No signingConfigs section found!"
+            grep -A 15 "buildTypes" android/app/build.gradle || echo "No buildTypes section found!"
+            
+            # Final validation
+            if grep -q "signingConfigs {" android/app/build.gradle && grep -q "signingConfig signingConfigs.release" android/app/build.gradle; then
+              echo "✅ Verification passed: Found both signingConfigs and release references"
+            else
+              echo "⚠️ Could not verify all changes. Will rely on manual signing fallback."
+            fi
+          else
+            echo "❌ Error: android/app/build.gradle not found"
+            exit 1
+          fi
+
       # Update gradle.properties for better build performance
       - name: ⚙️ Configure Gradle for production build
         run: |
@@ -99,18 +225,76 @@ jobs:
             sed -i '/<application/a\        <meta-data android:name="build_timestamp" android:value="'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" />' android/app/src/main/AndroidManifest.xml
           fi
 
+      # Extract app version from app.json
+      - name: 🏷️ Extract app version from app.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.expo.version' app.json)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       # Build the AAB
       - name: 🏗️ Build Android App Bundle
         run: |
           cd android
           ./gradlew bundleRelease
 
+      # Fallback manual signing of the AAB with jarsigner
+      - name: 🔏 Manual signing fallback
+        run: |
+          echo "Applying fallback manual signing to ensure proper release signing..."
+          # Sign the AAB with jarsigner
+          jarsigner -verbose \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.STORE_PASSWORD }}" \
+            -keypass "${{ secrets.STORE_PASSWORD }}" \
+            -signedjar android/app/build/outputs/bundle/release/app-release-signed.aab \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            upload-key
+          
+          # Use the manually signed AAB
+          mv android/app/build/outputs/bundle/release/app-release-signed.aab android/app/build/outputs/bundle/release/app-release.aab
+          
+          echo "Manual signing complete"
+
+      # Rename AAB to include version
+      - name: 🏷️ Rename AAB with version
+        run: |
+          mv android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
+
+      # Verify the AAB is properly signed
+      - name: 🔍 Verify AAB signing
+        run: |
+          echo "Verifying AAB signing status..."
+          # Install bundletool if not already installed
+          if [ ! -f "bundletool.jar" ]; then
+            curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
+          fi
+          
+          # Basic validation of the AAB
+          echo "Validating AAB format:"
+          java -jar bundletool.jar validate \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
+          
+          echo "Checking release mode vs debug mode signing:"
+          # Extract APK from AAB to check signatures
+          java -jar bundletool.jar build-apks \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
+            --output=/tmp/verify.apks \
+            --mode=universal
+          
+          mkdir -p /tmp/verify_apk
+          unzip -o /tmp/verify.apks -d /tmp/verify_apk
+          
+          echo "APK signing information:"
+          keytool -printcert -jarfile /tmp/verify_apk/universal.apk
+
       # Upload the AAB as an artifact
       - name: 📤 Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: dp-soda-aab
+          path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
 
       # Convert AAB to APKs for device testing
       - name: 📥 Download Bundletool
@@ -120,7 +304,7 @@ jobs:
       - name: 📱 Generate Universal APK from AAB
         run: |
           java -jar bundletool.jar build-apks \
-            --bundle=android/app/build/outputs/bundle/release/app-release.aab \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab \
             --output=android/app/build/outputs/bundle/release/app-release.apks \
             --ks=android/app/upload-keystore.jks \
             --ks-key-alias=upload-key \
@@ -132,13 +316,13 @@ jobs:
         run: |
           cd android/app/build/outputs/bundle/release
           unzip -j app-release.apks universal.apk
-          mv universal.apk app-release-universal.apk
+          mv universal.apk dp-soda${{ env.APP_VERSION }}.apk
 
       - name: 📤 Upload Universal APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: app-universal-apk
-          path: android/app/build/outputs/bundle/release/app-release-universal.apk
+          name: dp-soda-apk
+          path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
 
       # Add a brief build summary
       - name: 📋 Build Summary
@@ -149,8 +333,12 @@ jobs:
           echo "- **AAB**: For Google Play Store submission" >> $GITHUB_STEP_SUMMARY
           echo "- **Universal APK**: For direct device installation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔐 App Signing Information:" >> $GITHUB_STEP_SUMMARY
+          echo "- This build is signed with your upload key" >> $GITHUB_STEP_SUMMARY
+          echo "- Ready for Google Play App Signing enrollment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the \`app-universal-apk\` artifact" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the \`dp-soda-apk\` artifact" >> $GITHUB_STEP_SUMMARY
           echo "2. Install on your Android device" >> $GITHUB_STEP_SUMMARY
           echo "3. Run the app and verify functionality" >> $GITHUB_STEP_SUMMARY
 
