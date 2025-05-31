@@ -22,7 +22,6 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
         "VIBRATE",
-        "AUDIO_RECORDING",
         "AUDIO_SETTINGS"
       ],
       "softwareKeyboardLayoutMode": "pan",
