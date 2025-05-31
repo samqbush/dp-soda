@@ -24,6 +24,9 @@
         "VIBRATE",
         "AUDIO_SETTINGS"
       ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": true,
       "versionCode": 4,
