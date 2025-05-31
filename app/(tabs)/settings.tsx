@@ -245,18 +245,52 @@ export default function SettingsScreen() {
                 style={[styles.timePicker, { color: textColor, borderColor: tintColor, textAlign: 'center' }]}
                 value={localCriteria.alarmTime}
                 onChangeText={(time) => {
-                  // Only update if it's a valid time format or empty
-                  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
-                  if (timeRegex.test(time) || time === '') {
-                    updateCriteria('alarmTime', time);
-                  }
+                  // Allow any input during typing, validate only on completion
+                  updateCriteria('alarmTime', time);
                 }}
                 onBlur={() => {
-                  // Validate on blur and reset to default if invalid
-                  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
-                  if (!timeRegex.test(localCriteria.alarmTime)) {
+                  // Only validate and auto-correct if the field is not empty
+                  if (localCriteria.alarmTime.trim() === '') {
                     updateCriteria('alarmTime', '05:00');
-                    Alert.alert('Invalid Time', 'Time has been reset to 05:00');
+                    return;
+                  }
+                  
+                  // More flexible validation - handle various input formats
+                  const input = localCriteria.alarmTime.trim();
+                  let formattedTime = '';
+                  
+                  // Try to parse various time formats
+                  if (/^\d{1,2}:\d{2}$/.test(input)) {
+                    // Already in HH:MM format, validate ranges
+                    const [hours, minutes] = input.split(':').map(Number);
+                    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+                      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    }
+                  } else if (/^\d{3,4}$/.test(input)) {
+                    // Format like "500" or "0500" -> "05:00"
+                    const padded = input.padStart(4, '0');
+                    const hours = parseInt(padded.substring(0, 2));
+                    const minutes = parseInt(padded.substring(2, 4));
+                    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+                      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    }
+                  } else if (/^\d{1,2}$/.test(input)) {
+                    // Just hours like "5" -> "05:00"
+                    const hours = parseInt(input);
+                    if (hours >= 0 && hours <= 23) {
+                      formattedTime = `${hours.toString().padStart(2, '0')}:00`;
+                    }
+                  }
+                  
+                  // If we couldn't parse it, show an alert but don't auto-reset
+                  if (!formattedTime) {
+                    Alert.alert(
+                      'Invalid Time Format', 
+                      'Please enter time in 24-hour format (e.g., 05:00, 1730, or 5). Current value has been kept.',
+                      [{ text: 'OK' }]
+                    );
+                  } else {
+                    updateCriteria('alarmTime', formattedTime);
                   }
                 }}
                 placeholder="05:00"
@@ -265,7 +299,7 @@ export default function SettingsScreen() {
                 maxLength={5}
               />
               <ThemedText style={styles.timePickerHint}>
-                Format: 24-hour (e.g., 05:00)
+                Format: 24-hour (e.g., 05:00, 1730, or just 5 for 5:00)
               </ThemedText>
             </View>
           </View>
