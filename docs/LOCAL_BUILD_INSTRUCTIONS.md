@@ -11,7 +11,7 @@ This document outlines the steps to configure GitHub Actions for building Androi
 
 ## GitHub Actions Workflow
 
-Use [build.yml](../.github/workflows/build.yml) with this workflow when you're ready to implement local builds:
+The project uses the existing GitHub Actions workflow at [.github/workflows/android.yml](../.github/workflows/android.yml) for building Android APK files with crash prevention optimizations.
 
 
 ## Prerequisites

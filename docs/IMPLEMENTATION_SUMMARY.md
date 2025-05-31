@@ -127,9 +127,26 @@ The modular architecture makes it easy to add:
 4. **Diagnostics**: Runtime testing tools and crash reporting
 5. **Emergency**: Last-resort options for critical failures
 
+## ⚠️ Technical Debt & Known Issues
+
+### Audio System Migration Required
+- **Issue**: Currently using deprecated `expo-av` package for alarm audio (though `expo-audio` is installed)
+- **Impact**: Will break in Expo SDK 54+ (current project uses SDK 53)
+- **Solution**: Complete migration from `expo-av` to `expo-audio` package before upgrading to SDK 54
+- **Files Affected**: `services/alarmAudioService.ts`, `hooks/useAlarmAudio.ts`
+- **Status**: In progress - `expo-audio` dependency added, code migration needed
+- **Priority**: High (blocking future SDK upgrades)
+
+### Future Improvements
+- **Push Notifications**: Planned integration for background alarm notifications
+- **Historical Accuracy Tracking**: Track prediction accuracy over time
+- **Location Expansion**: Support for additional wind monitoring locations
+- **Offline Mode**: Enhanced offline capabilities with cached forecasts
+
 ## 📑 Documentation
 
 For more detailed information about the project:
-- **File Structure**: See [docs/FILE_STRUCTURE.md](./docs/FILE_STRUCTURE.md) for detailed file documentation
-- **Android Issues**: See [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) for Android-specific crash and white screen solutions
-- **Local Building**: See [docs/LOCAL_BUILD_INSTRUCTIONS.md](./docs/LOCAL_BUILD_INSTRUCTIONS.md) for building locally
+- **Architecture**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design and patterns
+- **File Structure**: See [FILE_STRUCTURE.md](./FILE_STRUCTURE.md) for project organization
+- **Android Issues**: See [ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) for Android-specific crash and white screen solutions
+- **Local Building**: See [LOCAL_BUILD_INSTRUCTIONS.md](./LOCAL_BUILD_INSTRUCTIONS.md) for building locally
