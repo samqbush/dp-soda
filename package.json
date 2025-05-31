@@ -7,8 +7,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint && npx tsc --noEmit",
-    "fetch-wind": "node ./scripts/fetch-wind-data.mjs"
+    "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
+    "fetch-wind": "node ./scripts/fetch-wind-data.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -53,6 +54,7 @@
     "@types/react": "~19.0.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "husky": "^9.1.7",
     "typescript": "~5.8.3",
     "yaml-lint": "^1.7.0"
   },
