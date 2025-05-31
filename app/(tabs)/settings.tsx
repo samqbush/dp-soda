@@ -7,7 +7,7 @@ import { debugSettings } from '@/services/debugSettings';
 import type { AlarmCriteria } from '@/services/windService';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useWindData();
@@ -54,6 +54,7 @@ export default function SettingsScreen() {
               directionDeviationThreshold: 45,
               preferredDirection: 315,
               preferredDirectionRange: 45,
+              useWindDirection: true,
               alarmEnabled: false,
               alarmTime: "05:00"
             };
@@ -102,89 +103,113 @@ export default function SettingsScreen() {
         <View style={styles.settingSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Wind Direction</ThemedText>
           
-          <View style={styles.directionInfoBox}>
-            <ThemedText style={styles.infoBoxTitle}>Wind Direction Guide</ThemedText>
-            <ThemedText style={styles.infoBoxText}>
-              Wind directions are measured in degrees (0-359°) where:{'\n'}
-              • 0° or 360° = wind from North{'\n'}
-              • 90° = wind from East{'\n'}
-              • 180° = wind from South{'\n'}
-              • 270° = wind from West
-            </ThemedText>
-            <ThemedText style={styles.infoBoxText}>
-              For optimal conditions at Soda Lake, winds coming from the northwest (around 315°) 
-              are typically best. This direction creates the cleanest wind across the water
-              with minimal obstruction and provides the most consistent conditions.
-            </ThemedText>
+          <View style={styles.settingItem}>
+            <View style={styles.switchContainer}>
+              <View style={styles.switchLabelContainer}>
+                <ThemedText style={styles.settingLabel}>
+                  Use Wind Direction in Alarm
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  When disabled, the alarm will only consider wind speed and consistency, ignoring direction. 
+                  Use this if the wind direction data is unreliable.
+                </ThemedText>
+              </View>
+              <Switch
+                value={localCriteria.useWindDirection}
+                onValueChange={(value) => updateCriteria('useWindDirection', value)}
+                trackColor={{ false: '#767577', true: tintColor }}
+                thumbColor={localCriteria.useWindDirection ? '#fff' : '#f4f3f4'}
+              />
+            </View>
           </View>
           
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Direction Consistency (%)
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              Minimum percentage of consistent wind direction
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.directionConsistencyThreshold.toString()}
-              onChangeText={(text) => updateCriteria('directionConsistencyThreshold', parseFloat(text) || 0)}
-              keyboardType="numeric"
-              placeholder="70"
-              placeholderTextColor={textColor + '80'}
-            />
-          </View>
+          {localCriteria.useWindDirection && (
+            <>
+              <View style={styles.directionInfoBox}>
+                <ThemedText style={styles.infoBoxTitle}>Wind Direction Guide</ThemedText>
+                <ThemedText style={styles.infoBoxText}>
+                  Wind directions are measured in degrees (0-359°) where:{'\n'}
+                  • 0° or 360° = wind from North{'\n'}
+                  • 90° = wind from East{'\n'}
+                  • 180° = wind from South{'\n'}
+                  • 270° = wind from West
+                </ThemedText>
+                <ThemedText style={styles.infoBoxText}>
+                  For optimal conditions at Soda Lake, winds coming from the northwest (around 315°) 
+                  are typically best. This direction creates the cleanest wind across the water
+                  with minimal obstruction and provides the most consistent conditions.
+                </ThemedText>
+              </View>
+              
+              <View style={styles.settingItem}>
+                <ThemedText style={styles.settingLabel}>
+                  Direction Consistency (%)
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  Minimum percentage of consistent wind direction
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
+                  value={localCriteria.directionConsistencyThreshold.toString()}
+                  onChangeText={(text) => updateCriteria('directionConsistencyThreshold', parseFloat(text) || 0)}
+                  keyboardType="numeric"
+                  placeholder="70"
+                  placeholderTextColor={textColor + '80'}
+                />
+              </View>
 
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Direction Deviation Threshold (degrees)
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              Maximum allowed variation in wind direction
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.directionDeviationThreshold.toString()}
-              onChangeText={(text) => updateCriteria('directionDeviationThreshold', parseFloat(text) || 0)}
-              keyboardType="numeric"
-              placeholder="45"
-              placeholderTextColor={textColor + '80'}
-            />
-          </View>
-          
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Preferred Wind Direction (degrees)
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              The optimal wind direction for Soda Lake (315° for Northwest)
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.preferredDirection.toString()}
-              onChangeText={(text) => updateCriteria('preferredDirection', parseFloat(text) || 0)}
-              keyboardType="numeric"
-              placeholder="315"
-              placeholderTextColor={textColor + '80'}
-            />
-          </View>
-          
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Preferred Direction Range (degrees)
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              The acceptable range around preferred direction (±degrees)
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.preferredDirectionRange.toString()}
-              onChangeText={(text) => updateCriteria('preferredDirectionRange', parseFloat(text) || 0)}
-              keyboardType="numeric"
-              placeholder="45"
-              placeholderTextColor={textColor + '80'}
-            />
-          </View>
+              <View style={styles.settingItem}>
+                <ThemedText style={styles.settingLabel}>
+                  Direction Deviation Threshold (degrees)
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  Maximum allowed variation in wind direction
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
+                  value={localCriteria.directionDeviationThreshold.toString()}
+                  onChangeText={(text) => updateCriteria('directionDeviationThreshold', parseFloat(text) || 0)}
+                  keyboardType="numeric"
+                  placeholder="45"
+                  placeholderTextColor={textColor + '80'}
+                />
+              </View>
+              
+              <View style={styles.settingItem}>
+                <ThemedText style={styles.settingLabel}>
+                  Preferred Wind Direction (degrees)
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  The optimal wind direction for Soda Lake (315° for Northwest)
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
+                  value={localCriteria.preferredDirection.toString()}
+                  onChangeText={(text) => updateCriteria('preferredDirection', parseFloat(text) || 0)}
+                  keyboardType="numeric"
+                  placeholder="315"
+                  placeholderTextColor={textColor + '80'}
+                />
+              </View>
+              
+              <View style={styles.settingItem}>
+                <ThemedText style={styles.settingLabel}>
+                  Preferred Direction Range (degrees)
+                </ThemedText>
+                <ThemedText style={styles.settingDescription}>
+                  The acceptable range around preferred direction (±degrees)
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
+                  value={localCriteria.preferredDirectionRange.toString()}
+                  onChangeText={(text) => updateCriteria('preferredDirectionRange', parseFloat(text) || 0)}
+                  keyboardType="numeric"
+                  placeholder="45"
+                  placeholderTextColor={textColor + '80'}
+                />
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.settingSection}>
@@ -586,6 +611,16 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     marginTop: 8,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 16,
   },
 });
 
