@@ -178,10 +178,7 @@ interface WindCriteria {
 #### Local Development
 ```bash
 # Start development server
-npx expo start
-
-# Start with tunnel for device testing
-npx expo start --tunnel
+npm start
 
 # Lint and type check
 npm run lint

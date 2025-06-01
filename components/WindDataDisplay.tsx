@@ -341,6 +341,66 @@ function WindDataDisplayContent() {
     return isAlarmWorthy ? 'WAKE UP! 🌊' : 'Sleep In 😴';
   };
 
+  // Calculate 6-9am validation results
+  const calculate6to9amValidation = () => {
+    console.log('🔍 Calculating 6-9am validation, total wind data points:', windData.length);
+    
+    if (!windData.length) {
+      console.log('❌ No wind data available for 6-9am validation');
+      return {
+        averageSpeed: 0,
+        pointCount: 0,
+        metThreshold: false,
+        hasData: false
+      };
+    }
+
+    // Filter data for 6-9am window
+    const filtered6to9amData = windData.filter(point => {
+      const hour = new Date(point.time).getHours();
+      return hour >= 6 && hour < 9;
+    });
+
+    console.log('🔍 6-9am filtered data points:', filtered6to9amData.length);
+    console.log('🔍 Sample 6-9am times:', filtered6to9amData.slice(0, 3).map(p => new Date(p.time).toLocaleTimeString()));
+
+    if (filtered6to9amData.length === 0) {
+      console.log('❌ No data points found in 6-9am window');
+      return {
+        averageSpeed: 0,
+        pointCount: 0,
+        metThreshold: false,
+        hasData: false
+      };
+    }
+
+    // Calculate average wind speed - convert to number if needed
+    const totalSpeed = filtered6to9amData.reduce((sum, point) => {
+      const speed = typeof point.windSpeed === 'string' ? parseFloat(point.windSpeed) : point.windSpeed;
+      return sum + (isNaN(speed) ? 0 : speed);
+    }, 0);
+    const averageSpeed = totalSpeed / filtered6to9amData.length;
+    
+    // Check if average meets 15 mph threshold
+    const metThreshold = averageSpeed >= 15;
+
+    console.log('✅ 6-9am validation result:', {
+      averageSpeed: averageSpeed.toFixed(1),
+      pointCount: filtered6to9amData.length,
+      metThreshold,
+      hasData: true
+    });
+
+    return {
+      averageSpeed,
+      pointCount: filtered6to9amData.length,
+      metThreshold,
+      hasData: true
+    };
+  };
+
+  const validation6to9am = calculate6to9amValidation();
+
   // Show loading screen when initially loading and no data
   if (isLoading && !windData.length && !error) {
     return <LoadingScreen message="Loading wind data..." />;
@@ -513,7 +573,76 @@ function WindDataDisplayContent() {
       )}
 
       {windData.length > 0 && (
-        <WindChart data={windData} title="10-Hour Wind Trend (2am-10am)" />
+        <WindChart 
+          data={windData} 
+          title="3am-5am Alarm Window (Dawn Patrol)" 
+          highlightGoodPoints={true}
+          criteria={criteria}
+          timeWindow={{ startHour: 3, endHour: 5 }}
+        />
+      )}
+
+      {windData.length > 0 && (
+        <WindChart 
+          data={windData} 
+          title="6am-9am Actual Conditions" 
+          highlightGoodPoints={false}
+          timeWindow={{ startHour: 6, endHour: 9 }}
+        />
+      )}
+
+      {windData.length > 0 && validation6to9am.hasData && (
+        <View style={styles.validation6to9amContainer}>
+          <ThemedText type="defaultSemiBold" style={styles.validation6to9amTitle}>
+            6-9am Wind Validation:
+          </ThemedText>
+          <ThemedText style={styles.validation6to9amText}>
+            Average: {validation6to9am.averageSpeed.toFixed(1)} mph ({validation6to9am.pointCount} data points)
+          </ThemedText>
+          <ThemedText style={[
+            styles.validation6to9amStatus,
+            { color: validation6to9am.metThreshold ? '#4CAF50' : '#FF9800' }
+          ]}>
+            {validation6to9am.metThreshold 
+              ? '✅ Met 15 mph threshold - conditions delivered!' 
+              : '⚠️ Below 15 mph average - conditions did not deliver'
+            }
+          </ThemedText>
+        </View>
+      )}
+
+      {windData.length > 0 && !validation6to9am.hasData && (
+        <View style={styles.validation6to9amContainer}>
+          <ThemedText style={styles.validation6to9amNoData}>
+            📊 No 6-9am data available for validation yet
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Debug info for 6-9am validation */}
+      {__DEV__ && windData.length > 0 && (
+        <View style={styles.devInfo}>
+          <ThemedText style={styles.devInfoText}>
+            Debug: 6-9am validation - hasData: {validation6to9am.hasData ? 'Yes' : 'No'}, 
+            pointCount: {validation6to9am.pointCount}, 
+            avg: {validation6to9am.averageSpeed.toFixed(1)}mph
+          </ThemedText>
+        </View>
+      )}
+
+      {windData.length > 0 && (
+        <View style={styles.chartExplanation}>
+          <ThemedText style={styles.chartExplanationTitle}>Chart Verification Guide:</ThemedText>
+          <ThemedText style={styles.chartExplanationText}>
+            • First chart: 3am-5am window used for alarm analysis{'\n'}
+            • Second chart: 6am-9am actual conditions for verification{'\n'}
+            • Validation above checks if 6-9am average met 15 mph threshold{'\n'}
+            • Green circles highlight "good points" (≥{criteria.minimumAverageSpeed}mph wind speed){'\n'}
+            • Need {criteria.minimumConsecutivePoints} consecutive good points for alarm{'\n'}
+            • Wind direction arrows show where wind is coming FROM{'\n'}
+            • Direction consistency must be ≥{criteria.directionConsistencyThreshold}%
+          </ThemedText>
+        </View>
       )}
 
       {windData.length > 0 && (
@@ -751,5 +880,48 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 16,
     marginTop: 4,
+  },
+  chartExplanation: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+  },
+  chartExplanationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#4CAF50',
+  },
+  chartExplanationText: {
+    fontSize: 12,
+    lineHeight: 16,
+    opacity: 0.8,
+  },
+  validation6to9amContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    borderRadius: 8,
+  },
+  validation6to9amTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#2196F3',
+  },
+  validation6to9amText: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  validation6to9amStatus: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  validation6to9amNoData: {
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

@@ -14,7 +14,7 @@ You are a specialized documentation assistant for the Dawn Patrol Alarm reposito
 - **Tech Stack**: Expo/React Native, TypeScript, React Navigation v7
 - **Purpose**: Scrapes WindAlert data, analyzes 3am-5am wind trends, determines favorable conditions for wind sports
 - **Build Process**: GitHub Actions workflow (no local builds)
-- **Testing**: Local testing with `npx expo start` or `npx expo start --tunnel`
+- **Testing**: Local testing with `npm start`
 
 ## Documentation Standards
 

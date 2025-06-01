@@ -2,7 +2,7 @@ import { DataCrashDetector } from '@/components/DataCrashDetector';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import type { WindDataPoint } from '@/services/windService';
+import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
 import React from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
@@ -11,9 +11,12 @@ import Svg, { Circle, G, Path } from 'react-native-svg';
 interface WindChartProps {
   data: WindDataPoint[];
   title?: string;
+  highlightGoodPoints?: boolean; // New prop to highlight consecutive good points
+  criteria?: AlarmCriteria; // Optional criteria for determining good points
+  timeWindow?: { startHour: number; endHour: number }; // Optional time window filter
 }
 
-export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) {
+export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoints = false, criteria, timeWindow }: WindChartProps) {
   const handleChartCrash = (error: Error, info: any) => {
     console.error('🚨 WindChart crashed:', error);
     console.error('🚨 Chart data that caused crash:', data);
@@ -21,7 +24,7 @@ export function WindChart({ data, title = 'Wind Speed Trend' }: WindChartProps) 
 
   return (
     <DataCrashDetector componentName="WindChart" onCrash={handleChartCrash}>
-      <WindChartContent data={data} title={title} />
+      <WindChartContent data={data} title={title} highlightGoodPoints={highlightGoodPoints} criteria={criteria} timeWindow={timeWindow} />
     </DataCrashDetector>
   );
 }
@@ -69,7 +72,7 @@ const DirectionArrow = ({ direction, x, y, size = 14, color = '#000' }: Directio
   );
 };
 
-function WindChartContent({ data, title }: WindChartProps) {
+function WindChartContent({ data, title, highlightGoodPoints = false, criteria, timeWindow }: WindChartProps) {
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
@@ -88,12 +91,15 @@ function WindChartContent({ data, title }: WindChartProps) {
     );
   }
 
-  // Filter data to show only the 2am-10am window
+  // Filter data based on provided time window or default to 3am-5am alarm window
+  const defaultWindow = { startHour: 3, endHour: 5 };
+  const activeWindow = timeWindow || defaultWindow;
+  
   const recentData = data
     .filter(point => {
       const date = new Date(point.time);
       const hours = date.getHours();
-      return hours >= 2 && hours < 10; // Only include data from 2am to 10am
+      return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
     })
     .slice(-20); // Limit to 20 points for better chart readability
 
@@ -103,7 +109,7 @@ function WindChartContent({ data, title }: WindChartProps) {
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
         <View style={styles.noDataContainer}>
           <ThemedText style={styles.noDataText}>
-            Not enough recent data to display chart
+            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour}am window to display chart
           </ThemedText>
         </View>
       </ThemedView>
@@ -264,6 +270,26 @@ function WindChartContent({ data, title }: WindChartProps) {
     })
     .filter((pos): pos is { x: number; y: number; direction: string } => pos !== null);
 
+  // Calculate positions for highlighting "good points" (points that meet alarm criteria)
+  const goodPointPositions = highlightGoodPoints ? recentData
+    .map((point, i) => {
+      // Use actual criteria if provided, otherwise fallback to default
+      const speedValue = typeof point.windSpeed === 'string' 
+        ? parseFloat(point.windSpeed) 
+        : point.windSpeed;
+      
+      const minSpeed = criteria?.minimumAverageSpeed || 10;
+      const isGoodPoint = speedValue >= minSpeed;
+      
+      if (!isGoodPoint) return null;
+      
+      const x = chartLeft + (i / (recentData.length - 1)) * chartInnerWidth;
+      const y = chartTop + (1 - (speedValue / maxSpeed)) * chartInnerHeight;
+      
+      return { x, y, speed: speedValue };
+    })
+    .filter((pos): pos is { x: number; y: number; speed: number } => pos !== null) : [];
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
@@ -288,9 +314,23 @@ function WindChartContent({ data, title }: WindChartProps) {
                     fromZero={true}
                   />
                   
-                  {/* Overlay for wind direction arrows */}
+                  {/* Overlay for wind direction arrows and good point highlights */}
                   <View style={styles.windDirectionOverlay}>
                     <Svg width={chartWidth} height={chartHeight}>
+                      {/* Render good point highlights */}
+                      {goodPointPositions.map((pos, i) => (
+                        <Circle 
+                          key={`good-${i}`}
+                          cx={pos.x}
+                          cy={pos.y}
+                          r={6}
+                          fill="rgba(76, 175, 80, 0.3)"
+                          stroke="#4CAF50"
+                          strokeWidth={2}
+                        />
+                      ))}
+                      
+                      {/* Render direction arrows */}
                       {arrowPositions.map((pos, i) => (
                         <DirectionArrow 
                           key={`dir-${i}`}
@@ -333,6 +373,12 @@ function WindChartContent({ data, title }: WindChartProps) {
           </View>
           <ThemedText style={styles.legendText}>Wind Direction</ThemedText>
         </View>
+        {highlightGoodPoints && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: 'rgba(76, 175, 80, 0.3)', borderWidth: 1, borderColor: '#4CAF50' }]} />
+            <ThemedText style={styles.legendText}>Good Points (≥{criteria?.minimumAverageSpeed || 10}mph)</ThemedText>
+          </View>
+        )}
       </View>
       <View style={styles.statsContainer}>
         <View style={styles.stat}>
