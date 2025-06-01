@@ -637,7 +637,7 @@ function WindDataDisplayContent() {
             • First chart: 3am-5am window used for alarm analysis{'\n'}
             • Second chart: 6am-9am actual conditions for verification{'\n'}
             • Validation above checks if 6-9am average met 15 mph threshold{'\n'}
-            • Green circles highlight "good points" (≥{criteria.minimumAverageSpeed}mph wind speed){'\n'}
+            • Green circles highlight &ldquo;good points&rdquo; (≥{criteria.minimumAverageSpeed}mph wind speed){'\n'}
             • Need {criteria.minimumConsecutivePoints} consecutive good points for alarm{'\n'}
             • Wind direction arrows show where wind is coming FROM{'\n'}
             • Direction consistency must be ≥{criteria.directionConsistencyThreshold}%
