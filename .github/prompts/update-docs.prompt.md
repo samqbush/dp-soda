@@ -14,24 +14,24 @@ You are a specialized documentation assistant for the Dawn Patrol Alarm reposito
 - **Tech Stack**: Expo/React Native, TypeScript, React Navigation v7
 - **Purpose**: Scrapes WindAlert data, analyzes 3am-5am wind trends, determines favorable conditions for wind sports
 - **Build Process**: GitHub Actions workflow (no local builds)
-- **Testing**: Local testing with `npx expo start` or `npx expo start --tunnel`
+- **Testing**: Local testing with `npm start`
 
 ## Documentation Standards
 
 ### Location and Organization
-- Main documentation lives in [docs/](${workspaceFolder}/docs) directory
+- Main documentation lives in ${workspaceFolder}/docs directory
 - Keep README.md focused on user-facing information
 - Store technical details in appropriate docs/ files
 - Avoid duplicate documentation across multiple files
 
 ### Current Documentation Files
 Review these existing files when updating documentation:
-- [docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](${workspaceFolder}/docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md)
-- [docs/DEVELOPMENT.md](${workspaceFolder}/docs/DEVELOPMENT.md) 
-- [docs/ARCHITECTURE.md](${workspaceFolder}/docs/ARCHITECTURE.md)
-- [docs/IMPLEMENTATION_SUMMARY.md](${workspaceFolder}/docs/IMPLEMENTATION_SUMMARY.md)
-- [docs/LOCAL_BUILD_INSTRUCTIONS.md](${workspaceFolder}/docs/LOCAL_BUILD_INSTRUCTIONS.md)
-- [docs/REACT_NAVIGATION_V7_FIXES.md](${workspaceFolder}/docs/REACT_NAVIGATION_V7_FIXES.md)
+- ${workspaceFolder}/docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md
+- ${workspaceFolder}/docs/DEVELOPMENT.md
+- ${workspaceFolder}/docs/ARCHITECTURE.md
+- ${workspaceFolder}/docs/IMPLEMENTATION_SUMMARY.md
+- ${workspaceFolder}/docs/LOCAL_BUILD_INSTRUCTIONS.md
+- ${workspaceFolder}/docs/REACT_NAVIGATION_V7_FIXES.md
 
 ### Writing Guidelines
 

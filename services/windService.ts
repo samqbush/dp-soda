@@ -30,6 +30,7 @@ export interface AlarmCriteria {
   directionDeviationThreshold: number; // degrees
   preferredDirection: number; // degrees - the preferred wind direction
   preferredDirectionRange: number; // degrees - the acceptable range around preferred direction
+  useWindDirection: boolean; // Whether to include wind direction in alarm calculations
   alarmEnabled: boolean; // Whether or not the alarm is enabled
   alarmTime: string; // Time in 24-hour format (e.g., "05:00")
 }
@@ -41,6 +42,7 @@ const DEFAULT_CRITERIA: AlarmCriteria = {
   directionDeviationThreshold: 45,
   preferredDirection: 315, // Northwest
   preferredDirectionRange: 45, // +/- 45 degrees from preferred direction
+  useWindDirection: true, // By default, use wind direction in calculations
   alarmEnabled: false,
   alarmTime: "05:00" // Default to 5:00 AM
 };

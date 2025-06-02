@@ -62,7 +62,7 @@ npm install
 3. Start development server
 ```bash
 # For local network 
-npx expo start
+npm start
 
 # For public network (tunnel)
 npx expo start --tunnel

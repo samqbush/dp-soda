@@ -6,7 +6,7 @@
 
 ## Build and Test Instructions
 - This app is not built locally, it is built using a GitHub Actions workflow. 
-- The app can be tested locally using `npx expo start` or `npx expo start --tunnel`.
+- The app can be tested locally using `npm start`.
 - Install javascript libraries locally instead of globally with `-g`.
 
 ## Documentation
