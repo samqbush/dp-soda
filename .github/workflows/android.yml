@@ -2,11 +2,11 @@ name: Build Dawn Patrol Alarm
 
 on:
   pull_request:
-    branches: [main]
+    branches: [android]
   workflow_dispatch:
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - name: 📦 Checkout repository

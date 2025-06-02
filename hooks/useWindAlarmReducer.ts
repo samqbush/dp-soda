@@ -18,6 +18,7 @@ export interface WindAlarmState {
   maxDirectionDeviationDegrees: number;
   preferredDirection: number;
   preferredDirectionRange: number;
+  useWindDirection: boolean;
 
   // Analysis results
   isAlarmActive: boolean;
@@ -69,6 +70,7 @@ export const initialWindAlarmState: WindAlarmState = {
   maxDirectionDeviationDegrees: 45,
   preferredDirection: 315, // Northwest (default)
   preferredDirectionRange: 45, // +/- 45 degrees (default)
+  useWindDirection: true, // By default, use wind direction in calculations
 
   // Analysis results
   isAlarmActive: false,

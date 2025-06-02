@@ -6,23 +6,23 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import React, { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
-  AccessibilityInfo,
-  Alert,
-  Animated,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  TextInput,
-  TouchableOpacity,
-  View
+    AccessibilityInfo,
+    Alert,
+    Animated,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 // Import our new hooks
 import { useAlarmAudio } from '@/hooks/useAlarmAudio';
 import {
-  WindAlarmState,
-  initialWindAlarmState,
-  windAlarmReducer
+    WindAlarmState,
+    initialWindAlarmState,
+    windAlarmReducer
 } from '@/hooks/useWindAlarmReducer';
 import { useWindAnalyzer } from '@/hooks/useWindAnalyzer';
 
@@ -215,7 +215,8 @@ export function WindAlarmTesterRefactored() {
           minimumConsecutivePoints: state.minConsecutiveDataPoints,
           directionDeviationThreshold: state.maxDirectionDeviationDegrees,
           preferredDirection: state.preferredDirection,
-          preferredDirectionRange: state.preferredDirectionRange
+          preferredDirectionRange: state.preferredDirectionRange,
+          useWindDirection: state.useWindDirection
         };
         
         result = analyzeWindData(windData, criteriaSettings);
@@ -252,6 +253,9 @@ export function WindAlarmTesterRefactored() {
     state.directionConsistencyThreshold,
     state.minConsecutiveDataPoints,
     state.maxDirectionDeviationDegrees,
+    state.preferredDirection,
+    state.preferredDirectionRange,
+    state.useWindDirection,
     analyzeTestScenario,
     analyzeWindData,
     windData
@@ -286,7 +290,19 @@ export function WindAlarmTesterRefactored() {
       });
       analyzeScenario();
     }
-  }, [state.isTestScenarioActive, state.selectedTestScenario, analyzeScenario, windData]);
+  }, [
+    state.isTestScenarioActive, 
+    state.selectedTestScenario, 
+    state.minWindSpeed,
+    state.directionConsistencyThreshold,
+    state.minConsecutiveDataPoints,
+    state.maxDirectionDeviationDegrees,
+    state.preferredDirection,
+    state.preferredDirectionRange,
+    state.useWindDirection,
+    analyzeScenario, 
+    windData
+  ]);
 
   // Apply a snooze (commented out as it's currently unused)
   // const handleSnooze = useCallback((minutes: number) => {

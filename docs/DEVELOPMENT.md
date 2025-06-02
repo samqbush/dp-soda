@@ -1,27 +1,57 @@
 # Dawn Patrol Alarm - Developer Documentation
 
-This document contains information for developers working on the Dawn Patrol Alarm project. For end-user documentation, see [README.md](./README.md).
+This document contains information for developers working on the Dawn Patrol Alarm project. For end-user documentation, see [README.md](../README.md).
 
 ## Project Overview
 
 The Dawn Patrol Alarm is a React Native app built with Expo that analyzes wind conditions at Soda Lake (Colorado) to determine if conditions are favorable for beach activities. It fetches data from WindAlert API, processes it, and presents results to users.
+
+
+## Design Principles
+
+### Mobile App Guidance
+- The application should be self contained and not rely on a backend server
+- Visualize wind trends and alarm analysis in a simple, mobile-friendly UI
+- Support dark mode, manual refresh, and offline access to last-fetched data
+- Plan for push notifications and alarm integration in future versions
+
+### Data Handling
+- The data should be fetched a minute or two before the alarm time to minimize scrapping
+- Data is processed to focus on the 2am–10am window, with special analysis for 3am–5am (alarm) and 6am–8am (verification)
+- Wind speeds are converted from kph to mph
+- Data is output as CSV and/or JSON for visualization and mobile consumption
+
+### Alarm Logic
+- Alarm-worthiness is determined by configurable criteria:
+  - Minimum average wind speed (default: 10 mph)
+  - Direction consistency (default: 70%)
+  - Minimum consecutive good data points (default: 4)
+  - Point speed and direction deviation thresholds
+- Verification logic checks actual conditions in the 6am–8am window
+- All thresholds and criteria should be user-configurable
+
+### User Experience
+- Ensure all features are discoverable and easy to use
+- Provide clear visual indicators for wind quality, alarm status, and prediction accuracy
+- Make all settings and thresholds easily adjustable by the user
 
 ## Development Environment
 
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Expo CLI (`npm install -g expo-cli`)
 - For iOS: macOS with Xcode 14+
 - For Android: Android Studio with SDK 33+
 - Git
+
+Note: Expo CLI is no longer required as Expo tools are now integrated into the Expo package.
 
 ### Setup
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/wind-trend-analyzer.git
-cd wind-trend-analyzer
+git clone [repository-url]
+cd dp-react
 ```
 
 2. Install dependencies
@@ -32,15 +62,16 @@ npm install
 3. Start development server
 ```bash
 # For local network 
-npx expo start
+npm start
 
-# For public network
-npx export start --tunnel
+# For public network (tunnel)
+npx expo start --tunnel
 ```
 
 ## Project Structure
 
-For a detailed breakdown of all files and their purposes, see [FILE_STRUCTURE.md](./docs/FILE_STRUCTURE.md).
+For a high-level overview of project organization, see [FILE_STRUCTURE.md](./FILE_STRUCTURE.md).
+For detailed architecture and design patterns, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 Key directories:
 - `/app` - Main application screens using Expo Router
@@ -61,7 +92,7 @@ The project includes a GitHub Actions workflow (`build.yml`) that builds the app
 
 ### Local Builds
 
-For instructions on building locally, see [LOCAL_BUILD_INSTRUCTIONS.md](./docs/LOCAL_BUILD_INSTRUCTIONS.md).
+For instructions on building locally, see [LOCAL_BUILD_INSTRUCTIONS.md](./LOCAL_BUILD_INSTRUCTIONS.md).
 
 ### Expo Application Services (EAS)
 
@@ -96,7 +127,7 @@ This creates JSON and CSV files with current wind data and analysis, mimicking t
 
 ## Android-Specific Development
 
-For detailed documentation on Android crash detection, white screen prevention, and debugging tools, see [ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).
+For detailed documentation on Android crash detection, white screen prevention, and debugging tools, see [ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md](./ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md).
 
 Key Android development features:
 - Multi-layer crash detection and recovery
@@ -110,7 +141,7 @@ Key Android development features:
 The app includes polyfills for modern JavaScript features to ensure compatibility with older Android devices. These polyfills are loaded early in the app initialization process.
 
 - `services/polyfills.ts` - Contains polyfills for modern JavaScript methods like `Array.prototype.findLast`
-- For details on specific compatibility fixes, see [REACT_NAVIGATION_V7_FIXES.md](../docs/REACT_NAVIGATION_V7_FIXES.md)
+- For details on specific compatibility fixes, see [REACT_NAVIGATION_V7_FIXES.md](./REACT_NAVIGATION_V7_FIXES.md)
 
 When adding new features that use modern JavaScript methods, consider checking if they need polyfills for older Android versions (API level ≤ 29).
 
