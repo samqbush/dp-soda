@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
     "fetch-wind": "node ./scripts/fetch-wind-data.mjs",
-    "prepare": "husky"
+    "test-version": "node scripts/test-version-increment.mjs",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
