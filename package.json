@@ -10,7 +10,7 @@
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
     "fetch-wind": "node ./scripts/fetch-wind-data.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
