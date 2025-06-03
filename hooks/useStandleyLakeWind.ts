@@ -1,11 +1,10 @@
 import {
     clearEcowittDataCache,
     convertToWindDataPoint,
+    debugDeviceListAPI,
     fetchEcowittWindData,
+    getAutoEcowittConfig,
     getCachedEcowittData,
-    getEcowittConfig,
-    setEcowittConfig,
-    type EcowittApiConfig,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
 import { analyzeWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
@@ -17,10 +16,6 @@ export interface UseStandleyLakeWindReturn {
   chartData: WindDataPoint[]; // Converted for chart compatibility
   analysis: WindAnalysis | null;
   
-  // Configuration state
-  config: EcowittApiConfig | null;
-  isConfigured: boolean;
-  
   // Loading and error states
   isLoading: boolean;
   error: string | null;
@@ -29,8 +24,8 @@ export interface UseStandleyLakeWindReturn {
   // Actions
   refreshData: () => Promise<void>;
   loadCachedData: () => Promise<boolean>;
-  setApiConfig: (config: EcowittApiConfig) => Promise<void>;
   clearCache: () => Promise<void>;
+  debugAPI: () => Promise<void>;
 }
 
 export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
@@ -38,16 +33,12 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   
   const [windData, setWindData] = useState<EcowittWindDataPoint[]>([]);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
-  const [config, setConfig] = useState<EcowittApiConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Convert data for chart compatibility
   const chartData = convertToWindDataPoint(windData);
-
-  // Check if API is configured
-  const isConfigured = !!(config?.applicationKey && config?.apiKey && config?.macAddress);
 
   /**
    * Load cached data from storage
@@ -97,16 +88,22 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
    * Refresh wind data from Ecowitt API
    */
   const refreshData = useCallback(async (): Promise<void> => {
-    if (!isConfigured) {
-      setError('API not configured. Please add your Ecowitt API credentials.');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
-    
+
     try {
       console.log('🔄 Refreshing Standley Lake wind data...');
+      
+      // First test the auto-configuration
+      try {
+        await getAutoEcowittConfig();
+        console.log('✅ Auto-configuration successful');
+      } catch (configError) {
+        console.error('❌ Auto-configuration failed:', configError);
+        setError(`Configuration failed: ${configError instanceof Error ? configError.message : 'Unknown error'}`);
+        return;
+      }
+
       const freshData = await fetchEcowittWindData();
       
       setWindData(freshData);
@@ -142,31 +139,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [isConfigured, loadCachedData]);
-
-  /**
-   * Set API configuration
-   */
-  const setApiConfig = useCallback(async (newConfig: EcowittApiConfig): Promise<void> => {
-    try {
-      await setEcowittConfig(newConfig);
-      setConfig(newConfig);
-      console.log('✅ Saved Ecowitt API configuration');
-      
-      // Clear any previous errors
-      setError(null);
-      
-      // Automatically fetch data after configuration
-      setTimeout(() => {
-        refreshData();
-      }, 100);
-      
-    } catch (error) {
-      console.error('❌ Error saving Ecowitt config:', error);
-      setError('Failed to save API configuration');
-      throw error;
-    }
-  }, [refreshData]);
+  }, [loadCachedData]);
 
   /**
    * Clear cached data
@@ -185,15 +158,22 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   }, []);
 
   /**
-   * Load initial configuration and cached data
+   * Debug API call
+   */
+  const debugAPI = useCallback(async (): Promise<void> => {
+    try {
+      await debugDeviceListAPI();
+    } catch (error) {
+      console.error('❌ Debug API failed:', error);
+    }
+  }, []);
+
+  /**
+   * Load initial cached data
    */
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Load API configuration
-        const savedConfig = await getEcowittConfig();
-        setConfig(savedConfig);
-        
         // Load cached data
         await loadCachedData();
         
@@ -213,10 +193,6 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     chartData,
     analysis,
     
-    // Configuration state
-    config,
-    isConfigured,
-    
     // Loading and error states
     isLoading,
     error,
@@ -225,8 +201,8 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     // Actions
     refreshData,
     loadCachedData,
-    setApiConfig,
-    clearCache
+    clearCache,
+    debugAPI
   };
 };
 

@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
+import {
+  DEVICE_MAC_STORAGE_KEY,
+  ECOWITT_CONFIG,
+  MAC_ADDRESS_CACHE_DURATION
+} from '../config/ecowittConfig';
 
 // Ecowitt API constants
 const BASE_URL = 'https://api.ecowitt.net/api/v3';
@@ -21,6 +26,25 @@ export interface EcowittApiConfig {
   applicationKey: string;
   apiKey: string;
   macAddress: string; // Device MAC address
+}
+
+export interface EcowittDevice {
+  name: string;
+  mac: string;
+  model: string;
+  online: boolean;
+}
+
+export interface EcowittDeviceListResponse {
+  code: number;
+  msg: string;
+  time: string;
+  data: {
+    list: EcowittDevice[];
+    pageNum: number;
+    total: number;
+    totalPage: number;
+  };
 }
 
 export interface EcowittHistoricResponse {
@@ -47,7 +71,7 @@ function msToMph(ms: number): number {
 }
 
 /**
- * Get stored Ecowitt API configuration
+ * Get stored Ecowitt API configuration (legacy function - kept for compatibility)
  */
 export async function getEcowittConfig(): Promise<EcowittApiConfig | null> {
   try {
@@ -57,6 +81,199 @@ export async function getEcowittConfig(): Promise<EcowittApiConfig | null> {
     console.error('Error loading Ecowitt config:', error);
     return null;
   }
+}
+
+/**
+ * Debug function to test device list API and log response structure
+ */
+export async function debugDeviceListAPI(): Promise<void> {
+  console.log('🔍 DEBUG: Testing device list API...');
+  
+  try {
+    const params = {
+      application_key: ECOWITT_CONFIG.applicationKey,
+      api_key: ECOWITT_CONFIG.apiKey,
+    };
+
+    console.log('📡 DEBUG: Making API request to device/list');
+    
+    const response = await axios.get(`${BASE_URL}/device/list`, {
+      params,
+      timeout: 10000,
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    console.log('📊 DEBUG: Raw API response:', JSON.stringify(response.data, null, 2));
+    console.log('📊 DEBUG: Response status:', response.status);
+    console.log('📊 DEBUG: Response headers:', response.headers);
+    
+    if (response.data.code !== 0) {
+      console.error('❌ DEBUG: API returned error code:', response.data.code, response.data.msg);
+    } else {
+      console.log('✅ DEBUG: API call successful');
+      console.log('📊 DEBUG: Response data structure:');
+      console.log('  - data exists:', !!response.data.data);
+      console.log('  - list exists:', !!response.data.data?.list);
+      console.log('  - list is array:', Array.isArray(response.data.data?.list));
+      console.log('  - list length:', response.data.data?.list?.length);
+      console.log('  - pageNum:', response.data.data?.pageNum);
+      console.log('  - total:', response.data.data?.total);
+      
+      if (response.data.data?.list) {
+        response.data.data.list.forEach((device: any, index: number) => {
+          console.log(`  - Device ${index}:`, JSON.stringify(device, null, 4));
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ DEBUG: Device list API failed:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('❌ DEBUG: Response data:', error.response?.data);
+      console.error('❌ DEBUG: Response status:', error.response?.status);
+    }
+  }
+}
+
+/**
+ * Fetch device list from Ecowitt API to get MAC address automatically
+ */
+export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
+  console.log('📱 Fetching Ecowitt device list...');
+  
+  try {
+    const params = {
+      application_key: ECOWITT_CONFIG.applicationKey,
+      api_key: ECOWITT_CONFIG.apiKey,
+    };
+
+    console.log('📡 Making Ecowitt device list API request');
+
+    const response = await axios.get<EcowittDeviceListResponse>(`${BASE_URL}/device/list`, {
+      params,
+      timeout: 10000,
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    if (response.data.code !== 0) {
+      throw new Error(`Ecowitt device list API error: ${response.data.msg}`);
+    }
+
+    // Validate response structure - the API returns 'list' not 'device_list'
+    if (!response.data.data || !Array.isArray(response.data.data.list)) {
+      console.error('❌ Invalid device list response structure:', response.data);
+      throw new Error('Invalid device list response from Ecowitt API');
+    }
+
+    const deviceList = response.data.data.list;
+    console.log('📊 Received Ecowitt devices:', deviceList.length);
+    return deviceList;
+
+  } catch (error) {
+    console.error('❌ Error fetching Ecowitt device list:', error);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        throw new Error('Network connection failed. Please check your internet connection.');
+      } else if (error.response?.status === 401) {
+        throw new Error('Invalid API credentials for device list.');
+      } else if (error.response?.status === 429) {
+        throw new Error('API rate limit exceeded. Please try again later.');
+      } else if (error.response && error.response.status >= 500) {
+        throw new Error('Ecowitt server error. Please try again later.');
+      }
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Get or fetch the device MAC address automatically
+ */
+export async function getDeviceMacAddress(): Promise<string> {
+  try {
+    // Check if we have a cached MAC address
+    const cachedMacData = await AsyncStorage.getItem(DEVICE_MAC_STORAGE_KEY);
+    
+    if (cachedMacData) {
+      const parsed = JSON.parse(cachedMacData);
+      const now = Date.now();
+      
+      // Use cached MAC if it's still valid (within cache duration)
+      if (parsed.timestamp && (now - parsed.timestamp) < MAC_ADDRESS_CACHE_DURATION && parsed.macAddress) {
+        console.log('📱 Using cached device MAC address');
+        return parsed.macAddress;
+      }
+    }
+
+    // Fetch fresh device list
+    console.log('🔍 Fetching fresh device MAC address...');
+    const devices = await fetchEcowittDeviceList();
+    
+    if (!devices || devices.length === 0) {
+      throw new Error('No devices found in your Ecowitt account. Please check your API credentials and ensure you have registered devices.');
+    }
+
+    // For now, use the first online device, or first device if none are online
+    let selectedDevice = devices.find(device => device && device.online);
+    if (!selectedDevice) {
+      selectedDevice = devices[0];
+      if (!selectedDevice) {
+        throw new Error('No valid devices found in your Ecowitt account.');
+      }
+      console.log('⚠️ No online devices found, using first device:', selectedDevice.name || 'Unknown');
+    } else {
+      console.log('✅ Using online device:', selectedDevice.name || 'Unknown');
+    }
+
+    // Validate device has required fields
+    if (!selectedDevice.mac) {
+      throw new Error('Selected device does not have a MAC address.');
+    }
+
+    // Cache the MAC address
+    const cacheData = {
+      macAddress: selectedDevice.mac,
+      timestamp: Date.now(),
+      deviceName: selectedDevice.name || 'Unknown Device',
+      deviceModel: selectedDevice.model || 'Unknown Model'
+    };
+    
+    await AsyncStorage.setItem(DEVICE_MAC_STORAGE_KEY, JSON.stringify(cacheData));
+    console.log('💾 Cached device MAC address for device:', selectedDevice.name || 'Unknown');
+    
+    return selectedDevice.mac;
+
+  } catch (error) {
+    console.error('❌ Error getting device MAC address:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the complete Ecowitt configuration with auto-fetched MAC address
+ */
+export async function getAutoEcowittConfig(): Promise<EcowittApiConfig> {
+  const macAddress = await getDeviceMacAddress();
+  
+  return {
+    applicationKey: ECOWITT_CONFIG.applicationKey,
+    apiKey: ECOWITT_CONFIG.apiKey,
+    macAddress
+  };
 }
 
 /**
@@ -77,10 +294,8 @@ export async function setEcowittConfig(config: EcowittApiConfig): Promise<void> 
 export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
   console.log('🌬️ Fetching Ecowitt wind data...');
   
-  const config = await getEcowittConfig();
-  if (!config) {
-    throw new Error('Ecowitt API configuration not found. Please configure your API keys in settings.');
-  }
+  // Use auto-configuration instead of manual config
+  const config = await getAutoEcowittConfig();
 
   try {
     // Get today's date range
@@ -88,13 +303,27 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
+    // Format dates as YYYY-MM-DD HH:MM:SS (Ecowitt API format)
+    const formatEcowittDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
     const params = {
       application_key: config.applicationKey,
       api_key: config.apiKey,
       mac: config.macAddress,
-      start_date: Math.floor(startOfDay.getTime() / 1000).toString(),
-      end_date: Math.floor(endOfDay.getTime() / 1000).toString(),
+      start_date: formatEcowittDate(startOfDay),
+      end_date: formatEcowittDate(endOfDay),
       cycle_type: '5min', // 5-minute intervals for detailed data
+      temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
+      pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
+      wind_unit: '6', // m/s (6 = m/s, 7 = mph)
     };
 
     console.log('📡 Making Ecowitt API request with params:', {
@@ -214,14 +443,15 @@ export async function getCachedEcowittData(): Promise<EcowittWindDataPoint[]> {
 }
 
 /**
- * Clear cached Ecowitt wind data
+ * Clear cached Ecowitt wind data and device MAC address
  */
 export async function clearEcowittDataCache(): Promise<void> {
   try {
     await AsyncStorage.removeItem(ECOWITT_CACHE_KEY);
-    console.log('🗑️ Cleared Ecowitt data cache');
+    await AsyncStorage.removeItem(DEVICE_MAC_STORAGE_KEY);
+    console.log('🗑️ Cleared Ecowitt data and device cache');
   } catch (error) {
-    console.error('Error clearing Ecowitt data cache:', error);
+    console.error('Error clearing Ecowitt cache:', error);
   }
 }
 
