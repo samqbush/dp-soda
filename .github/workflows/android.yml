@@ -236,7 +236,7 @@ jobs:
       - name: 🏷️ Extract app version from app.json
         id: get_version
         run: |
-          VERSION=$(jq -r '.expo.version' app.json)
+          VERSION=$(jq -r '.expo.version' app.config.js)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
