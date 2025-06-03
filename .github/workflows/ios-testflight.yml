@@ -305,6 +305,17 @@ jobs:
             echo "✅ iOS app archived successfully at build/${SCHEME_NAME}.xcarchive"
             ls -la "build/${SCHEME_NAME}.xcarchive"
             
+            # Verify the archive contains a valid app
+            APP_COUNT=$(find "build/${SCHEME_NAME}.xcarchive" -name "*.app" -type d | wc -l)
+            echo "Found $APP_COUNT .app bundles in archive"
+            
+            if [ "$APP_COUNT" -eq 0 ]; then
+              echo "❌ CRITICAL: Archive exists but contains no .app bundles"
+              echo "This indicates the build succeeded but produced an invalid archive"
+              find "build/${SCHEME_NAME}.xcarchive" -type f -name "*.plist" -exec echo "Plist: {}" \; -exec cat {} \; || true
+              exit 1
+            fi
+            
             # Debug: Check archive structure immediately after creation
             echo "=== ARCHIVE DEBUG INFO ==="
             echo "Archive structure:"
@@ -327,6 +338,7 @@ jobs:
             echo "❌ Archive not found at build/${SCHEME_NAME}.xcarchive"
             echo "Contents of build directory:"
             ls -la build
+            echo "❌ CRITICAL: Archive creation failed completely"
             exit 1
           fi
 
@@ -339,24 +351,18 @@ jobs:
             echo "❌ ERROR: Archive does not exist at $ARCHIVE_PATH"
             echo "Contents of build directory:"
             ls -la build || echo "No build directory found"
-            
-            # Create placeholder IPA file
-            mkdir -p build Payload
-            touch Payload/.placeholder
-            zip -r "build/${{ env.SCHEME_NAME }}.ipa" Payload
-            rm -rf Payload
-            
-            # Create final output IPA
-            OUTPUT_IPA="${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
-            cp "build/${{ env.SCHEME_NAME }}.ipa" "./$OUTPUT_IPA"
-            echo "Created placeholder IPA: $OUTPUT_IPA"
-            exit 0 # Don't fail the workflow, we've created a placeholder IPA
+            echo "❌ CRITICAL: No valid archive found - iOS build failed!"
+            exit 1 # Fail the workflow - we need a real archive
           fi
           
           echo "✅ Archive found at $ARCHIVE_PATH"
           
-          # Hardcode the bundle identifier based on the app name
-          BUNDLE_ID="com.dawnpatrol.soda"
+          # Get bundle identifier from app.config.js to ensure consistency
+          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
+          if [ -z "$BUNDLE_ID" ]; then
+            echo "❌ Could not extract bundle identifier from app.config.js"
+            exit 1
+          fi
           
           # Save current directory for reference
           CURRENT_DIR=$(pwd)
@@ -603,10 +609,9 @@ jobs:
                       ls -la "$ABSOLUTE_ARCHIVE_PATH/Products"
                     fi
                     
-                    # Create empty IPA as last resort
-                    touch Payload/.placeholder
-                    zip -r "build/${{ env.SCHEME_NAME }}.ipa" Payload
-                    echo "Created empty placeholder IPA for workflow continuity"
+                    echo "❌ CRITICAL ERROR: No .app file found in archive - build process failed"
+                    rm -rf Payload
+                    exit 1
                   fi
                   
                   # Clean up Payload directory
@@ -648,23 +653,35 @@ jobs:
               echo "Found IPA at $FOUND_IPA"
               cp "$FOUND_IPA" "./$OUTPUT_IPA"
             else
-              # Last resort: Create an empty placeholder IPA to prevent workflow failure
-              echo "Creating empty placeholder IPA for workflow continuity"
-              # Create a minimal structure for an IPA (zip with empty Payload directory)
-              mkdir -p Payload
-              touch Payload/.placeholder
-              zip -r "./$OUTPUT_IPA" Payload
-              rm -rf Payload
+              echo "❌ CRITICAL ERROR: No IPA file was created by any export method"
+              echo "This indicates the iOS build or export process completely failed"
+              echo "Build directory contents:"
+              ls -la build || echo "No build directory"
+              echo "Archive directory contents:"
+              ls -la "build/${{ env.SCHEME_NAME }}.xcarchive" || echo "No archive directory"
+              exit 1 # Fail the workflow - we need a real IPA
             fi
           fi
           
-          # Verify IPA exists
+          # Verify IPA exists and has reasonable size
           if [ -f "./$OUTPUT_IPA" ]; then
+            IPA_SIZE=$(stat -f%z "./$OUTPUT_IPA" 2>/dev/null || stat -c%s "./$OUTPUT_IPA" 2>/dev/null || echo "0")
             echo "IPA file ready: $OUTPUT_IPA"
             ls -la "./$OUTPUT_IPA"
-            echo "IPA file size: $(du -h "./$OUTPUT_IPA" | cut -f1)"
+            echo "IPA file size: $(du -h "./$OUTPUT_IPA" | cut -f1) ($IPA_SIZE bytes)"
+            
+            # Validate IPA size - should be at least 1MB for a real app
+            if [ "$IPA_SIZE" -lt 1048576 ]; then
+              echo "❌ CRITICAL ERROR: IPA file is too small ($IPA_SIZE bytes)"
+              echo "This indicates the IPA contains no real app content"
+              echo "Expected size: >1MB for a real Expo/React Native app"
+              unzip -l "./$OUTPUT_IPA" | head -20 || echo "Could not list IPA contents"
+              exit 1
+            fi
+            
+            echo "✅ IPA file appears to be valid (size: $IPA_SIZE bytes)"
           else
-            echo "ERROR: Failed to create IPA file"
+            echo "❌ CRITICAL ERROR: Failed to create IPA file"
             exit 1
           fi
 
