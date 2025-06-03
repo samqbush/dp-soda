@@ -63,8 +63,8 @@ async function getBaseVersionFromGit() {
     console.log(`📡 Fetching ${baseBranch} branch...`);
     execSync(`git fetch origin ${baseBranch}`, { stdio: 'pipe' });
     
-    console.log(`📄 Getting app.json from ${baseBranch} branch...`);
-    const baseAppJson = execSync(`git show origin/${baseBranch}:app.json`, { encoding: 'utf8' });
+    console.log(`📄 Getting app.config.js from ${baseBranch} branch...`);
+    const baseAppJson = execSync(`git show origin/${baseBranch}:app.config.js`, { encoding: 'utf8' });
     
     const baseData = JSON.parse(baseAppJson);
     return {
@@ -81,13 +81,13 @@ async function getBaseVersionFromGit() {
 async function main() {
   const [,, baseVersionArg, baseVersionCodeArg] = process.argv;
   
-  // Get current version from app.json
-  if (!fs.existsSync('app.json')) {
-    console.log('❌ Error: app.json not found. Run this script from the project root.');
+  // Get current version from app.config.js
+  if (!fs.existsSync('app.config.js')) {
+    console.log('❌ Error: app.config.js not found. Run this script from the project root.');
     process.exit(1);
   }
   
-  const currentAppData = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+  const currentAppData = JSON.parse(fs.readFileSync('app.config.js', 'utf8'));
   const currentVersion = currentAppData.expo.version;
   const currentVersionCode = currentAppData.expo.android.versionCode;
   

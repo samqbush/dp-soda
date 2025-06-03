@@ -1,24 +1,16 @@
 # GitHub Copilot Custom Instructions
-
-## Project Context
-- This repository is for Dawn Patrol Alarm focused on Soda Lake (Soda Lake Dam 1), Colorado. 
-- It is an Expo/React Native application that scrapes wind data from WindAlert, analyzes and visualizes early morning wind trends (especially 3am–5am), and determines if conditions are favorable for wind sports.
-
+## Development Guidelines
+- Edit files in place, do not create backups or copies of files unless necessary.
 ## Build and Test Instructions
 - This app is not built locally, it is built using a GitHub Actions workflow. 
-- The app can be tested locally using `npm start`.
+- Ask me to run `npm start` or to refresh the server and wait.  Do not run this command yourself.
+- Use `npm run lint` to check for code style issues.
 - Install javascript libraries locally instead of globally with `-g`.
 
 ## Documentation
 - All documentation besides the README.md should be stored in the `docs` directory
 - Keep documentation up to date and clear
-- Avoid creating multiple versions of the same documentation
-
-## What to Avoid
-- Do not hardcode values that should be user-configurable
-- Do not use deprecated libraries or patterns
-- Do not add unnecessary complexity or dependencies
-- Do not break existing automation or visualization workflows
+- Update existing documentation insead of creating new files when possible, ask me if you are unsure
 
 ## Cleanup
 - When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later

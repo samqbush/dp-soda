@@ -42,6 +42,13 @@ jobs:
         run: |
           npm run lint
           npx tsc --noEmit --skipLibCheck
+          
+      # Create .env file from GitHub secrets
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+          echo "✅ Created .env file with API credentials"
         
       # Android build setup
       - name: ☕ Set up JDK
@@ -226,10 +233,10 @@ jobs:
           fi
 
       # Extract app version from app.json
-      - name: 🏷️ Extract app version from app.json
+      - name: 🏷️ Extract app version from app.config.js
         id: get_version
         run: |
-          VERSION=$(jq -r '.expo.version' app.json)
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 

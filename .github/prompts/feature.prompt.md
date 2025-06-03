@@ -193,7 +193,7 @@ npm run lint
 ### Documentation Requirements
 
 #### Feature Documentation
-- Update `docs/ARCHITECTURE.md` for architectural changes
+- Update `docs/ARCHITECTURE_AND_IMPLEMENTATION.md` for architectural changes
 - Add feature-specific documentation to `docs/` directory
 - Update README.md for user-facing features
 - Document any new configuration options
