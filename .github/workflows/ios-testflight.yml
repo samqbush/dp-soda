@@ -143,9 +143,34 @@ jobs:
             echo "Available schemes in workspace:"
             xcodebuild -workspace "$WORKSPACE_FILE" -list
             
-            # Extract the first scheme from the list
-            SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 10 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | head -n 1 | xargs)
+            # Extract the app scheme name (prioritize non-library schemes)
+            # First try to find a scheme that matches common app naming patterns
+            SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -E "(DawnPatrol|Alarm|dp-|soda)" | head -n 1 | xargs)
+            
+            # If no app-like scheme found, fallback to first non-Pod scheme
+            if [ -z "$SCHEME_NAME" ]; then
+              SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v -E "(boost|Pod|EX|React|Double)" | head -n 1 | xargs)
+            fi
+            
+            # Final fallback to any scheme except boost
+            if [ -z "$SCHEME_NAME" ]; then
+              SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v "boost" | head -n 1 | xargs)
+            fi
             echo "Using scheme: $SCHEME_NAME"
+            
+            # Validate that we have a proper app scheme, not a library
+            if [ -z "$SCHEME_NAME" ]; then
+              echo "❌ ERROR: No valid scheme found"
+              exit 1
+            fi
+            
+            if echo "$SCHEME_NAME" | grep -q "boost\|Pod\|EX\|React\|Double"; then
+              echo "❌ WARNING: Selected scheme '$SCHEME_NAME' appears to be a library, not the main app"
+              echo "Available schemes:"
+              xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:"
+              echo "❌ Please check scheme selection logic"
+            fi
+            
             # Save scheme name to environment for later steps
             echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
             
@@ -222,9 +247,34 @@ jobs:
             echo "Available schemes in project:"
             xcodebuild -project "$PROJECT_FILE" -list
             
-            # Extract the first scheme from the list
-            SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 10 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | head -n 1 | xargs)
+            # Extract the app scheme name (prioritize non-library schemes)
+            # First try to find a scheme that matches common app naming patterns
+            SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -E "(DawnPatrol|Alarm|dp-|soda)" | head -n 1 | xargs)
+            
+            # If no app-like scheme found, fallback to first non-Pod scheme
+            if [ -z "$SCHEME_NAME" ]; then
+              SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v -E "(boost|Pod|EX|React|Double)" | head -n 1 | xargs)
+            fi
+            
+            # Final fallback to any scheme except boost
+            if [ -z "$SCHEME_NAME" ]; then
+              SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v "boost" | head -n 1 | xargs)
+            fi
             echo "Using scheme: $SCHEME_NAME"
+            
+            # Validate that we have a proper app scheme, not a library
+            if [ -z "$SCHEME_NAME" ]; then
+              echo "❌ ERROR: No valid scheme found"
+              exit 1
+            fi
+            
+            if echo "$SCHEME_NAME" | grep -q "boost\|Pod\|EX\|React\|Double"; then
+              echo "❌ WARNING: Selected scheme '$SCHEME_NAME' appears to be a library, not the main app"
+              echo "Available schemes:"
+              xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:"
+              echo "❌ Please check scheme selection logic"
+            fi
+            
             # Save scheme name to environment for later steps
             echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
             
