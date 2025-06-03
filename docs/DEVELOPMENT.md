@@ -71,7 +71,7 @@ npx expo start --tunnel
 ## Project Structure
 
 For a high-level overview of project organization, see [FILE_STRUCTURE.md](./FILE_STRUCTURE.md).
-For detailed architecture and design patterns, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+For detailed architecture and design patterns, see [ARCHITECTURE_AND_IMPLEMENTATION.md](./ARCHITECTURE_AND_IMPLEMENTATION.md).
 
 Key directories:
 - `/app` - Main application screens using Expo Router
@@ -90,9 +90,16 @@ For a detailed overview of implemented features, see [IMPLEMENTATION_SUMMARY.md]
 
 The project includes a GitHub Actions workflow (`build.yml`) that builds the app with specialized Android optimizations and white screen fixes. See the workflow file for details.
 
-### Local Builds
+### Local Debug Instructions
+```shell
+# install new apk
+VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
+adb install ~/Downloads/dp-soda$VERSION.apk
 
-For instructions on building locally, see [LOCAL_BUILD_INSTRUCTIONS.md](./LOCAL_BUILD_INSTRUCTIONS.md).
+# clear the logs
+adb logcat -c
+# Launch the app and let it crash
+adb logcat -s "ReactNative:*" "ReactNativeJS:*" "AndroidRuntime:*" "System.err:*" "com.samqbush.dpsoda:*" "*:F" "*:E" | tee crash-logs-filtered.log
 
 ### Expo Application Services (EAS)
 
@@ -100,7 +107,7 @@ This project uses EAS for managed builds. Configuration is in `eas.json`.
 
 ```bash
 # Build for production
-eas build --platform android --profile production
+npx expo prebuild --platform android --clean
 ```
 
 ## Testing

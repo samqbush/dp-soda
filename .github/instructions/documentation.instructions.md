@@ -53,4 +53,4 @@ This is the Dawn Patrol Alarm repository for Soda Lake, Colorado - an Expo/React
 - When changing file structure, update FILE_STRUCTURE.md
 
 Always check the current state of files before updating and ensure consistency across all documentation.
-The complete architecture is described in [ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
+The complete architecture is described in [ARCHITECTURE_AND_IMPLEMENTATION.md](../../docs/ARCHITECTURE_AND_IMPLEMENTATION.md).

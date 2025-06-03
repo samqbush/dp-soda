@@ -181,16 +181,40 @@ The app uses Expo Router v2 with the following structure:
 - **Reducer Pattern**: Complex state management
 - **Provider Pattern**: Context-based state sharing
 
+### Security & Privacy
+
+#### Data Handling
+- **Local Storage Only**: No user data sent to external services
+- **API Minimal**: Only fetches public wind data from WindAlert
+- **Crash Reports**: Debug data stored locally, manual export only
+
+#### Build Security
+- **Keystore Management**: Secure Android signing in CI/CD
+- **Dependency Management**: Regular security updates via npm audit
+- **Code Signing**: Proper certificate management for distribution
+
 ### Performance Considerations
 
-- **Data Caching**: Minimizing network requests
-- **Memoization**: Preventing unnecessary re-renders
-- **Lazy Loading**: Loading components on demand
-- **Virtualization**: Efficient list rendering
+#### Data Efficiency
+- **Smart Caching**: Minimize API calls while maintaining data freshness
+- **Lazy Loading**: Components and services loaded on-demand
+- **Memory Management**: Proper cleanup of audio and data resources
 
-### Security
+#### React Native Optimizations
+- **Navigation**: Expo Router for efficient screen management
+- **Animations**: React Native Reanimated for smooth 60fps animations
+- **Platform-Specific**: Conditional rendering for iOS/Android differences
 
-- **Environment Variables**: Secure API keys handling
-- **Input Validation**: Preventing injection attacks
-- **Error Handling**: Graceful failure management
-- **Secure Storage**: Protecting sensitive user data
+## Future Architecture Goals
+
+### Scalability Improvements
+- **Modular Services**: Extract services to separate packages
+- **Plugin Architecture**: Enable feature toggles and A/B testing
+- **Performance Monitoring**: Add metrics collection for optimization
+
+### Feature Expansion
+- **Multi-Location Support**: Extend architecture for multiple wind stations
+- **Background Processing**: Add background fetch capabilities
+- **Offline Maps**: Local storage of wind station locations
+
+This architecture supports the core goal of providing reliable dawn patrol decisions while maintaining code quality and developer productivity.

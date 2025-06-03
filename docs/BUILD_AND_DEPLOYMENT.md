@@ -55,12 +55,6 @@ This starts the Expo development server. You can then:
 - Press `i` to open on iOS simulator/device
 - Scan the QR code with Expo Go app on your physical device
 
-### Testing Environment Variables
-
-```bash
-npm run validate-env
-```
-
 ---
 
 ## CI/CD Workflow
@@ -164,7 +158,6 @@ The GitHub Actions workflow handles environment variables as follows:
 
 1. **Missing environment variables**
    - Check that all required environment variables are set in `.env` or GitHub secrets
-   - Use `npm run validate-env` to verify local environment setup
 
 2. **Gradle build failures**
    - Check for syntax errors in native Android files
