@@ -121,25 +121,44 @@ jobs:
           WORKSPACE_FILE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1)
           PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
           
+          # Get the correct scheme name
           if [ -n "$WORKSPACE_FILE" ]; then
             echo "Found workspace: $WORKSPACE_FILE"
+            echo "Available schemes in workspace:"
+            xcodebuild -workspace "$WORKSPACE_FILE" -list
+            
+            # Extract the first scheme from the list
+            SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 10 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | head -n 1 | xargs)
+            echo "Using scheme: $SCHEME_NAME"
+            # Save scheme name to environment for later steps
+            echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
+            
             xcodebuild archive \
               -workspace "$WORKSPACE_FILE" \
-              -scheme dpsoda \
+              -scheme "$SCHEME_NAME" \
               -configuration Release \
               -destination 'generic/platform=iOS' \
-              -archivePath ../build/dpsoda.xcarchive \
+              -archivePath "../build/${SCHEME_NAME}.xcarchive" \
               CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
               PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
           else
             echo "Found project: $PROJECT_FILE"
+            echo "Available schemes in project:"
+            xcodebuild -project "$PROJECT_FILE" -list
+            
+            # Extract the first scheme from the list
+            SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 10 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | head -n 1 | xargs)
+            echo "Using scheme: $SCHEME_NAME"
+            # Save scheme name to environment for later steps
+            echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
+            
             xcodebuild archive \
               -project "$PROJECT_FILE" \
-              -scheme dpsoda \
+              -scheme "$SCHEME_NAME" \
               -configuration Release \
               -destination 'generic/platform=iOS' \
-              -archivePath ../build/dpsoda.xcarchive \
+              -archivePath "../build/${SCHEME_NAME}.xcarchive" \
               CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
               PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
@@ -168,14 +187,15 @@ jobs:
           </plist>
           EOF
           
-          # Export IPA
+          # Export IPA using the detected scheme name
+          echo "Using scheme: ${{ env.SCHEME_NAME }}"
           xcodebuild -exportArchive \
-            -archivePath build/dpsoda.xcarchive \
+            -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
             -exportPath build \
             -exportOptionsPlist ExportOptions.plist
           
-          # Rename IPA to include version
-          mv build/dpsoda.ipa ./dp-soda-${{ env.APP_VERSION }}.ipa
+          # Rename IPA to include scheme name and version
+          mv "build/${{ env.SCHEME_NAME }}.ipa" "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
           
           echo "IPA exported successfully"
 
@@ -189,7 +209,7 @@ jobs:
       #     # Upload to TestFlight using altool
       #     xcrun altool --upload-app \
       #       --type ios \
-      #       --file "./dp-soda-${{ env.APP_VERSION }}.ipa" \
+      #       --file "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa" \
       #       --apiKey "${{ secrets.ASC_KEY_ID }}" \
       #       --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
       #       --verbose
@@ -200,8 +220,8 @@ jobs:
       - name: 📤 Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dp-soda-ios-${{ env.APP_VERSION }}
-          path: ./dp-soda-${{ env.APP_VERSION }}.ipa
+          name: ${{ env.SCHEME_NAME }}-ios-${{ env.APP_VERSION }}
+          path: ./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa
 
       # Add build summary
       - name: 📋 Build Summary
@@ -210,12 +230,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📱 Build Information:" >> $GITHUB_STEP_SUMMARY
           echo "- **App Version**: ${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scheme Name**: ${{ env.SCHEME_NAME }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
           echo "- **Distribution**: Manual upload to TestFlight" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
-          echo "- **App Store IPA**: \`dp-soda-ios-${{ env.APP_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **App Store IPA**: \`${{ env.SCHEME_NAME }}-ios-${{ env.APP_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Ready for TestFlight**: Download IPA and upload manually to App Store Connect" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
