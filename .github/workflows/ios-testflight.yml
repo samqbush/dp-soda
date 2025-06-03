@@ -118,22 +118,32 @@ jobs:
           cd ios
           
           # Find the .xcworkspace or .xcodeproj file
-          if [ -f *.xcworkspace ]; then
-            WORKSPACE_FILE=$(ls *.xcworkspace)
-            BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme dpsoda"
-          else
-            PROJECT_FILE=$(ls *.xcodeproj)
-            BUILD_COMMAND="xcodebuild archive -project $PROJECT_FILE -scheme dpsoda"
-          fi
+          WORKSPACE_FILE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1)
+          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
           
-          # Build and archive
-          $BUILD_COMMAND \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath ../build/dpsoda.xcarchive \
-            CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+          if [ -n "$WORKSPACE_FILE" ]; then
+            echo "Found workspace: $WORKSPACE_FILE"
+            xcodebuild archive \
+              -workspace "$WORKSPACE_FILE" \
+              -scheme dpsoda \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath ../build/dpsoda.xcarchive \
+              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
+              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+          else
+            echo "Found project: $PROJECT_FILE"
+            xcodebuild archive \
+              -project "$PROJECT_FILE" \
+              -scheme dpsoda \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath ../build/dpsoda.xcarchive \
+              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
+              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+          fi
           
           echo "iOS app archived successfully"
 
