@@ -169,33 +169,106 @@ jobs:
       # Export IPA
       - name: 📦 Export IPA
         run: |
-          # Create export options plist
+          # Extract the bundle identifier from the archive
+          BUNDLE_ID=$(xcrun xcodebuild -showBuildSettings -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" | grep PRODUCT_BUNDLE_IDENTIFIER | sed 's/.*= //')
+          echo "Bundle identifier: $BUNDLE_ID"
+          
+          # Extract provisioning profile name from the archive
+          PROFILE_NAME=$(grep -A1 -a 'Name' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Provisioning profile name: $PROFILE_NAME"
+          
+          # Create export options plist using proper format for Xcode 16.2
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+            <key>destination</key>
+            <string>export</string>
             <key>method</key>
             <string>app-store</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>uploadSymbols</key>
             <true/>
-            <key>uploadBitcode</key>
-            <false/>
           </dict>
           </plist>
           EOF
           
+          # Display generated plist for debugging
+          echo "Generated ExportOptions.plist:"
+          cat ExportOptions.plist
+          
           # Export IPA using the detected scheme name
           echo "Using scheme: ${{ env.SCHEME_NAME }}"
-          xcodebuild -exportArchive \
+          
+          # Try export with the detailed options
+          if xcodebuild -exportArchive \
             -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
             -exportPath build \
-            -exportOptionsPlist ExportOptions.plist
+            -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -verbose; then
+            echo "Export succeeded with detailed options"
+          else
+            echo "Export with detailed options failed, trying simplified options..."
+            
+            # Create a simplified export options plist as fallback
+            cat > SimpleExportOptions.plist << EOF
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>teamID</key>
+              <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            </dict>
+            </plist>
+            EOF
+            
+            # Try with simplified options
+            xcodebuild -exportArchive \
+              -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
+              -exportPath build \
+              -exportOptionsPlist SimpleExportOptions.plist \
+              -allowProvisioningUpdates \
+              -verbose
+          fi
           
-          # Rename IPA to include scheme name and version
-          mv "build/${{ env.SCHEME_NAME }}.ipa" "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+          # Find and rename the IPA file
+          echo "Looking for IPA files in the build directory:"
+          find build -name "*.ipa" -type f
+          
+          # Try different possible IPA filenames
+          if [ -f "build/${{ env.SCHEME_NAME }}.ipa" ]; then
+            mv "build/${{ env.SCHEME_NAME }}.ipa" "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+            echo "Renamed ${{ env.SCHEME_NAME }}.ipa to ${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+          elif [ -f "build/App.ipa" ]; then
+            mv "build/App.ipa" "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+            echo "Renamed App.ipa to ${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+          else
+            # Find any IPA file and rename it
+            FOUND_IPA=$(find build -name "*.ipa" -type f | head -n 1)
+            if [ -n "$FOUND_IPA" ]; then
+              mv "$FOUND_IPA" "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+              echo "Renamed $(basename "$FOUND_IPA") to ${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
+            else
+              echo "ERROR: No IPA file found in the build directory!"
+              exit 1
+            fi
+          fi
           
           echo "IPA exported successfully"
 
