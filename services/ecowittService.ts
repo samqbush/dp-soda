@@ -52,10 +52,20 @@ export interface EcowittHistoricResponse {
   msg: string;
   time: string;
   data: {
-    list: Array<{
-      datetime: string;
-      [key: string]: any; // Wind speed, direction, etc. fields vary by device
-    }>;
+    wind: {
+      wind_speed: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+      wind_gust: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+      wind_direction: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+    };
   };
 }
 
@@ -93,6 +103,7 @@ export async function debugDeviceListAPI(): Promise<void> {
     const params = {
       application_key: ECOWITT_CONFIG.applicationKey,
       api_key: ECOWITT_CONFIG.apiKey,
+      call_back: 'device', // Request device information
     };
 
     console.log('📡 DEBUG: Making API request to device/list');
@@ -151,6 +162,7 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
     const params = {
       application_key: ECOWITT_CONFIG.applicationKey,
       api_key: ECOWITT_CONFIG.apiKey,
+      call_back: 'device', // Request device information
     };
 
     console.log('📡 Making Ecowitt device list API request');
@@ -324,6 +336,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
       pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
       wind_unit: '6', // m/s (6 = m/s, 7 = mph)
+      call_back: 'wind', // Request wind data
     };
 
     console.log('📡 Making Ecowitt API request with params:', {
@@ -343,44 +356,66 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       }
     });
 
+    console.log('📊 Ecowitt API response received. Status:', response.status);
+    console.log('📊 Response data structure:', JSON.stringify(response.data, null, 2));
+
     if (response.data.code !== 0) {
       throw new Error(`Ecowitt API error: ${response.data.msg}`);
     }
 
-    console.log('📊 Received Ecowitt data points:', response.data.data.list.length);
+    // Validate response structure before accessing data
+    if (!response.data.data || !response.data.data.wind) {
+      console.error('❌ Invalid Ecowitt API response structure:', JSON.stringify(response.data, null, 2));
+      throw new Error('Invalid response structure from Ecowitt API - missing wind data');
+    }
+
+    const windData = response.data.data.wind;
+    if (!windData.wind_speed?.list || !windData.wind_direction?.list) {
+      console.error('❌ Missing wind speed or direction data in response');
+      throw new Error('Invalid response structure from Ecowitt API - missing wind measurements');
+    }
+
+    // Get timestamps from wind speed data (they should be consistent across all measurements)
+    const timestamps = Object.keys(windData.wind_speed.list);
+    console.log('📊 Received Ecowitt data points:', timestamps.length);
 
     // Transform API response to our format
-    const windData: EcowittWindDataPoint[] = response.data.data.list
-      .map(item => {
-        // Parse datetime from API (format: "2025-06-02 14:30:00")
-        const timestamp = new Date(item.datetime).getTime();
+    const windDataPoints: EcowittWindDataPoint[] = timestamps
+      .map(timestamp => {
+        // Convert timestamp to Date object and ISO string
+        const timestampMs = parseInt(timestamp) * 1000;
+        const date = new Date(timestampMs);
+        const timeString = date.toISOString();
         
-        // Extract wind data - field names may vary by device
-        // Common field names: windspeed, winddir, windgust
-        const windSpeedMs = parseFloat(item.windspeed || item.wind_speed || '0');
-        const windGustMs = parseFloat(item.windgust || item.wind_gust || windSpeedMs);
-        const windDirection = parseFloat(item.winddir || item.wind_dir || '0');
+        // Extract wind data from the response structure
+        const windSpeedMph = parseFloat(windData.wind_speed.list[timestamp] || '0');
+        const windGustMph = parseFloat(windData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
+        const windDirection = parseFloat(windData.wind_direction.list[timestamp] || '0');
+        
+        // Convert to m/s for internal consistency (API already provides mph)
+        const windSpeedMs = windSpeedMph / 2.237;
+        const windGustMs = windGustMph / 2.237;
         
         return {
-          time: item.datetime,
-          timestamp,
+          time: timeString,
+          timestamp: timestampMs,
           windSpeed: windSpeedMs,
-          windSpeedMph: msToMph(windSpeedMs),
+          windSpeedMph,
           windGust: windGustMs,
-          windGustMph: msToMph(windGustMs),
+          windGustMph,
           windDirection,
-          temperature: item.temp || item.temperature,
-          humidity: item.humidity
+          temperature: undefined, // Not available in wind-only response
+          humidity: undefined // Not available in wind-only response
         };
       })
       .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
       .sort((a, b) => a.timestamp - b.timestamp);
 
     // Cache the data
-    await cacheEcowittData(windData);
+    await cacheEcowittData(windDataPoints);
     
-    console.log('✅ Processed Ecowitt wind data points:', windData.length);
-    return windData;
+    console.log('✅ Processed Ecowitt wind data points:', windDataPoints.length);
+    return windDataPoints;
 
   } catch (error) {
     console.error('❌ Error fetching Ecowitt wind data:', error);
