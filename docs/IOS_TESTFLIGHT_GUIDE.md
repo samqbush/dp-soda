@@ -30,66 +30,109 @@ The iOS build workflow (`ios-testflight.yml`) automates:
 
 #### 2. App Store Connect Setup
 1. Sign in to [App Store Connect](https://appstoreconnect.apple.com)
-2. Create your app listing (if not already created)
-3. Note your App ID for configuration
+2. Go to "Apps" > "+" button to create a new app:
+   - Select platforms (iOS)
+   - Enter app name (e.g., "Dawn Patrol Alarm")
+   - Select your primary language
+   - Enter bundle ID (must match the App ID you'll create in step 4)
+   - Enter SKU (unique identifier for your records, e.g., "dawnpatrol-001")
+   - Select access (Full Access)
+3. Click "Create" and your app listing will be created in App Store Connect
 
 #### 3. Required GitHub Secrets
 
-Set up these secrets in your GitHub repository (Settings > Secrets and variables > Actions):
+You will need to set up several GitHub secrets for the workflow. See the reference table at the end of this guide for details on each required secret.
 
-| Secret Name | Description | How to Get |
-|-------------|-------------|------------|
-| `EXPO_TOKEN` | Expo authentication token | Run `npx expo login` then `npx expo whoami --auth` |
-| `APPLE_TEAM_ID` | Apple Developer Team ID | Found in Apple Developer Account > Membership |
-| `KEYCHAIN_PASSWORD` | Password for temporary keychain | Any secure password (e.g., `build123`) |
-| `IOS_DIST_CERTIFICATE_P12_BASE64` | Base64 encoded distribution .p12 certificate | Export from Keychain Access |
-| `IOS_DIST_CERTIFICATE_PASSWORD` | Password for .p12 certificate | Password used when exporting certificate |
-| `IOS_DIST_PROVISIONING_PROFILE_BASE64` | Base64 encoded App Store provisioning profile | Download from Apple Developer |
-| `IOS_DIST_CODE_SIGN_IDENTITY` | Code signing identity name | Usually "iPhone Distribution: Your Name" |
-| `APPLE_ID` | Your Apple ID email | Apple ID used for App Store Connect |
-| `APPLE_APP_PASSWORD` | App-specific password | Generate in Apple ID settings |
-| `ASC_KEY_ID` | App Store Connect API key ID | Create in App Store Connect > Users and Access > Keys |
-| `ASC_ISSUER_ID` | App Store Connect API issuer ID | Found in App Store Connect > Users and Access > Keys |
-| `ASC_PRIVATE_KEY` | App Store Connect API private key | Download when creating API key (base64 encoded) |
+> **Note**: For the `KEYCHAIN_PASSWORD` secret, you can create any secure password. This isn't an existing password - it's just used by the GitHub Actions workflow to create a temporary keychain for code signing during the build process.
 
-#### 4. Setting Up Distribution Certificate
+#### 4. Creating an App ID with Capabilities
+1. Go to [Apple Developer Portal](https://developer.apple.com/account/)
+2. Navigate to Certificates, Identifiers & Profiles > Identifiers
+3. Click the "+" button to register a new identifier
+4. Select "App IDs" and click "Continue"
+5. Select "App" as the type and click "Continue"
+6. Enter a description (e.g., "Dawn Patrol Alarm App")
+7. Enter a Bundle ID, typically in reverse-domain format (e.g., `com.samqbush.dpsoda`)
+   - Note: This Bundle ID must match the one in your Expo app.json/app.config.js
+8. Under Capabilities, select the ones your app needs:
+   - **Push Notifications**: Required for alarm notifications
+   - **Background Modes**: Required for alarms and background processing
+   - **Data Protection**: Recommended for user data security
+   - **App Groups**: If needed for sharing data between extensions
+   - Add other capabilities based on your app's specific features
+9. Click "Continue" and then "Register" to create your App ID
+
+> **Important:** Make sure your bundle identifier matches between:
+> - This App ID in Apple Developer Portal
+> - Your app.json or app.config.js file in your Expo project
+> - The App Store Connect listing you will create later
+
+#### 5. Setting Up Distribution Certificate
 1. Open Keychain Access on your Mac
-2. Go to Certificate Assistant > Request a Certificate From a Certificate Authority
-3. Enter your email and name, save to disk
-4. Go to Apple Developer > Certificates > Create new **iOS Distribution** certificate
-5. Upload the certificate request file
-6. Download the certificate and double-click to install in Keychain
-7. In Keychain Access, find your certificate, right-click > Export
-8. Export as .p12 format with a password
-9. Convert to base64: `base64 -i dist-certificate.p12 | pbcopy`
-10. Paste the result as `IOS_DIST_CERTIFICATE_P12_BASE64`
+   - Make sure "login" is selected in the left sidebar under "Keychains"
+2. From the menu, select Keychain Access > Certificate Assistant > Request a Certificate From a Certificate Authority
+3. Enter your email and name
+4. Select "Save to disk" (not "Request is:" option)
+5. Click Continue and save the .certSigningRequest file to your desktop
+6. Go to [Apple Developer Portal](https://developer.apple.com/account/) > Certificates > Create new **iOS Distribution** certificate
+7. Select "App Store and Ad Hoc" option and click Continue
+8. Upload the .certSigningRequest file you saved in step 5
+9. Click Continue and then Download the certificate (.cer file)
+10. Double-click the downloaded .cer file to install it
+    - **IMPORTANT**: Make sure it installs to your "login" keychain, not "System Roots"
+    - If prompted for a destination, explicitly select "login" keychain
+11. In Keychain Access:
+    - Select "login" keychain on the left
+    - Select "Certificates" category
+    - Find your certificate (should be named "iPhone Distribution: Your Name")
+    - **Important**: Note the EXACT name of the certificate (e.g., "iPhone Distribution: John Doe (ABC123XYZ)") - you'll need this for the `IOS_DIST_CODE_SIGN_IDENTITY` GitHub secret
+    - Right-click > Export
+12. Export as .p12 format:
+    - Set a strong password when prompted (you'll need this password later)
+    - Save the file as "dist-certificate.p12"
+13. Convert to base64 using Terminal:
+    ```bash
+    base64 -i dist-certificate.p12 | pbcopy
+    ```
+14. Paste the result as `IOS_DIST_CERTIFICATE_P12_BASE64` in your GitHub secrets
+15. Add the certificate password you created as `IOS_DIST_CERTIFICATE_PASSWORD` in GitHub secrets
 
-#### 5. Setting Up App Store Provisioning Profile
-1. Go to Apple Developer > Identifiers > Create App ID (if not exists)
-2. Go to Apple Developer > Profiles > Create new **App Store** provisioning profile
-3. Select your app ID and distribution certificate
-4. Download the .mobileprovision file
-5. Convert to base64: `base64 -i appstore-profile.mobileprovision | pbcopy`
-6. Paste the result as `IOS_DIST_PROVISIONING_PROFILE_BASE64`
+#### 6. Setting Up App Store Provisioning Profile
+1. Go to Apple Developer > Profiles > Distribution
+2. Click the "+" button to create a new profile
+3. Select "App Store" as the distribution method and click "Continue"
+4. Select your App ID from the dropdown menu and click "Continue"
+5. Select the distribution certificate you created earlier and click "Continue"
+6. Enter a profile name (e.g., "Dawn Patrol App Store Profile")
+7. Click "Generate" to create the provisioning profile
+8. Download the .mobileprovision file
+9. Convert to base64: `base64 -i appstore-profile.mobileprovision | pbcopy`
+10. Paste the result as `IOS_DIST_PROVISIONING_PROFILE_BASE64`
 
-#### 6. Setting Up App Store Connect API Key
+#### 7. Setting Up App Store Connect API Key
 1. Sign in to [App Store Connect](https://appstoreconnect.apple.com)
-2. Go to Users and Access > Keys
-3. Click "+" to create a new key
+2. Go to Users and Access > Integrations > API Keys
+3. Click the "+" button to create a new key
 4. Give it a name (e.g., "GitHub Actions")
-5. Select "Developer" role
-6. Click "Generate"
-7. Note the Key ID (`ASC_KEY_ID`) and Issuer ID (`ASC_ISSUER_ID`)
-8. Download the .p8 key file
-9. Convert to base64: `base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy`
-10. Paste the result as `ASC_PRIVATE_KEY`
+5. Under Access, select the appropriate role (Admin for full access, or App Manager)
+6. Click "Generate" 
+7. **Important**: Note the Key ID (`ASC_KEY_ID`) - you won't be able to see it again
+8. Note the Issuer ID (`ASC_ISSUER_ID`) from the top of the API Keys page
+9. Download the .p8 key file (you only get one chance to download it)
+10. Convert the .p8 file to base64 using Terminal:
+    ```bash
+    base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy
+    ```
+11. Paste the base64 result as `ASC_PRIVATE_KEY` in your GitHub secrets
 
-#### 7. App-Specific Password
+#### 8. App-Specific Password
 1. Go to [appleid.apple.com](https://appleid.apple.com)
 2. Sign in with your Apple ID
-3. Go to Security > App-Specific Passwords
-4. Click "+" to generate a new password
-5. Use this as `APPLE_APP_PASSWORD`
+3. Go to Sign-In and Security > App-Specific Passwords
+4. Click "+" or "Generate Password"
+5. Give your password a name (e.g., "GitHub TestFlight Upload")
+6. Note the generated password (it will only be shown once)
+7. Use this password as `APPLE_APP_PASSWORD` in your GitHub secrets
 ### Local Development Setup
 For local development, you'll still need Expo CLI:
 ```bash
@@ -144,7 +187,15 @@ After a successful build, you'll find:
 4. Add external testers (up to 10,000 public beta testers)
 5. Manage build distribution and feedback
 
-### Method 1: Using Xcode (Recommended)
+### Method 1: Using TestFlight (Recommended)
+When using the paid Apple Developer Program with TestFlight:
+1. Wait for the GitHub Action workflow to finish uploading to TestFlight
+2. Sign in to App Store Connect > TestFlight to verify build is processing
+3. Once processed, add testers or create public links
+4. Testers install TestFlight app from App Store and accept invitations
+
+### Method 2: Using Xcode (For Development Builds)
+For manual installation of development builds:
 1. Download the IPA artifact from the GitHub Actions run
 2. Connect your iPhone/iPad to your Mac
 3. Open Xcode
@@ -153,15 +204,15 @@ After a successful build, you'll find:
 6. Drag the IPA file to the "Installed Apps" section
 7. The app will install directly to your device
 
-### Method 2: Using AltStore (Auto-renewal)
-AltStore automatically refreshes your apps every 7 days when on the same WiFi network:
+### Method 3: Using AltStore (Auto-renewal for Development)
+AltStore automatically refreshes development apps every 7 days when on the same WiFi network:
 
 1. Install AltStore on your computer from [altstore.io](https://altstore.io)
 2. Install AltStore app on your iPhone via the desktop app
 3. Add the IPA file to AltStore
 4. AltStore will automatically refresh the app before it expires
 
-### Method 3: Manual Reinstallation
+### Method 4: Manual Reinstallation
 - Download and install the IPA every 7 days when it expires
 - Set a calendar reminder to reinstall weekly
 
@@ -219,6 +270,8 @@ AltStore automatically refreshes your apps every 7 days when on the same WiFi ne
 - All Apple credentials and certificates are stored as encrypted GitHub secrets
 - Certificates and provisioning profiles are automatically cleaned up after each build
 - Temporary keychains are created and destroyed for each build
+  - `KEYCHAIN_PASSWORD` is used to secure this temporary keychain during the build process
+  - This is not an existing password - just create a secure string for GitHub Actions to use
 - App Store Connect API keys are used securely for TestFlight uploads
 - Never commit certificates, provisioning profiles, or passwords to your repository
 
@@ -247,3 +300,24 @@ To use the free approach, you would need to:
 3. Invite beta testers through App Store Connect
 4. Set up your development workflow with automated TestFlight distribution
 5. Monitor feedback and crash reports through App Store Connect
+
+---
+
+## Reference: Required GitHub Secrets
+
+Set up these secrets in your GitHub repository (Settings > Secrets and variables > Actions):
+
+| Secret Name | Description | How to Get |
+|-------------|-------------|------------|
+| `EXPO_TOKEN` | Expo authentication token | Run `npx expo login` then `npx expo whoami --auth` |
+| `APPLE_TEAM_ID` | Apple Developer Team ID | Found in Apple Developer Account > Membership |
+| `KEYCHAIN_PASSWORD` | Password for temporary keychain | Create any secure password (e.g., `build123`) - this is only used during the build process |
+| `IOS_DIST_CERTIFICATE_P12_BASE64` | Base64 encoded distribution .p12 certificate | Export from Keychain Access |
+| `IOS_DIST_CERTIFICATE_PASSWORD` | Password for .p12 certificate | Password used when exporting certificate |
+| `IOS_DIST_PROVISIONING_PROFILE_BASE64` | Base64 encoded App Store provisioning profile | Download from Apple Developer |
+| `IOS_DIST_CODE_SIGN_IDENTITY` | Code signing identity name | Should be exactly "iPhone Distribution: Your Name (TEAM_ID)" - find the exact name in Keychain Access under your certificate |
+| `APPLE_ID` | Your Apple ID email | Apple ID used for App Store Connect |
+| `APPLE_APP_PASSWORD` | App-specific password | Generate in Apple ID settings |
+| `ASC_KEY_ID` | App Store Connect API key ID | Create in App Store Connect > Users and Access > Integrations > API Keys |
+| `ASC_ISSUER_ID` | App Store Connect API issuer ID | Found in App Store Connect > Users and Access > Integrations > API Keys |
+| `ASC_PRIVATE_KEY` | App Store Connect API private key | Download when creating API key (base64 encoded) |
