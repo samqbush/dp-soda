@@ -22,10 +22,11 @@ export default function StandleyLakeScreen() {
     error,
     lastUpdated,
     refreshData,
-    clearCache,
-    debugAPI
+    clearCache
   } = useStandleyLakeWind();
 
+  const textColor = useThemeColor({}, 'text');
+  const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 
@@ -174,14 +175,6 @@ export default function StandleyLakeScreen() {
             >
               <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
                 Clear Cache
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.debugButton, { borderColor: tintColor, marginTop: 8 }]}
-              onPress={debugAPI}
-            >
-              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
-                Debug API
               </ThemedText>
             </TouchableOpacity>
           </View>

@@ -1,10 +1,9 @@
 # GitHub Copilot Custom Instructions
-
 ## Development Guidelines
 - Edit files in place, do not create backups or copies of files unless necessary.
 ## Build and Test Instructions
 - This app is not built locally, it is built using a GitHub Actions workflow. 
-- The app can be tested locally using `npm start`.
+- Ask me to run `npm start` or to refresh the server and wait.  Do not run this command yourself.
 - Use `npm run lint` to check for code style issues.
 - Install javascript libraries locally instead of globally with `-g`.
 
