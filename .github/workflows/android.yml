@@ -42,6 +42,13 @@ jobs:
         run: |
           npm run lint
           npx tsc --noEmit --skipLibCheck
+          
+      # Create .env file from GitHub secrets
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+          echo "✅ Created .env file with API credentials"
         
       # Android build setup
       - name: ☕ Set up JDK

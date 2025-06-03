@@ -268,3 +268,50 @@ printCrashSummary(); // Prints statistics
 ```
 
 The terminal logger formats crash information with clear dividers, color coding (when supported), and special formatting to make issues easier to spot in cluttered logs.
+
+## Navigation and Routing
+
+The app uses Expo Router v7 (based on React Navigation v7) with file-based routing. The navigation structure is:
+
+- `app/_layout.tsx` - Main app layout with initialization
+- `app/(tabs)/_layout.tsx` - Tab navigation layout
+- `app/(tabs)/index.tsx` - Home screen (main wind analysis)
+- `app/(tabs)/settings.tsx` - Settings screen
+- `app/(tabs)/standley-lake.tsx` - Standley Lake wind monitor
+- `app/test-alarm.tsx` - Test screen for alarm functionality
+
+### React Navigation v7 Compatibility Fixes
+
+#### `findLast` Polyfill Fix
+
+After upgrading to React Navigation v7, the app began crashing on some Android devices with the following error:
+
+```
+TypeError: n.routes.findLast is not a function. (In 'n.routes.findLast((function(n){return n.name===s.payload.name&&k===(null==b?void 0:b({params:n.params}))}))', 'n.routes.findLast' is undefined)
+```
+
+This occurred because React Navigation v7 uses the `Array.prototype.findLast()` method, which was introduced in ES2023 and is not available in older JavaScript engines used by some Android devices.
+
+##### Solution
+
+We implemented a polyfill for `Array.prototype.findLast` (and `findLastIndex`) to ensure compatibility with all Android devices:
+
+1. Created a new file `services/polyfills.ts` with implementations for:
+   - `Array.prototype.findLast`
+   - `Array.prototype.findLastIndex`
+
+2. Imported the polyfills at the top of our app entry point (`app/_layout.tsx`) to ensure they're available throughout the app:
+   
+   ```typescript
+   import '../services/polyfills';
+   ```
+
+3. Updated the Android crash logger to specifically detect this type of error for better monitoring
+
+##### Testing Compatibility Fixes
+
+To verify the fix works:
+
+1. Build the app for an older Android device (API level ≤ 29)
+2. Test navigation between screens, especially when using navigation state
+3. Check the crash logs to ensure no `findLast is not a function` errors are occurring

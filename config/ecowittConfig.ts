@@ -28,12 +28,12 @@ function getRequiredEnvVar(name: string): string {
 
 /**
  * Secure Ecowitt API credentials loaded from environment variables
- * Make sure to set EXPO_PUBLIC_ECOWITT_APPLICATION_KEY and EXPO_PUBLIC_ECOWITT_API_KEY
+ * Make sure to set ECOWITT_APPLICATION_KEY and ECOWITT_API_KEY
  * in your .env file (see .env.example for template)
  */
 export const ECOWITT_CONFIG: SecureEcowittConfig = {
-  applicationKey: getRequiredEnvVar('EXPO_PUBLIC_ECOWITT_APPLICATION_KEY'),
-  apiKey: getRequiredEnvVar('EXPO_PUBLIC_ECOWITT_API_KEY')
+  applicationKey: getRequiredEnvVar('ECOWITT_APPLICATION_KEY'),
+  apiKey: getRequiredEnvVar('ECOWITT_API_KEY')
 } as const;
 
 /**

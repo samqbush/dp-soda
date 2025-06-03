@@ -8,6 +8,7 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 - **Smart Analysis**: Uses 3am-5am window to analyze if conditions will be favorable
 - **Verification System**: Confirms predictions using 6am-8am window data
 - **Fully Configurable**: Customize all wind criteria to match your preferences
+- **Standley Lake Monitor**: Monitor real-time wind conditions at Standley Lake (via Ecowitt weather stations)
 
 ## Getting Started
 
@@ -95,10 +96,37 @@ Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 - **Error Resilience**: Comprehensive error handling and recovery mechanisms
 - **Multiple Test Scenarios**: Pre-configured tests for various wind conditions
 
+## Documentation
+
+Comprehensive documentation for this application can be found in the `docs/` directory:
+
+- [Documentation Index](docs/DOCUMENTATION_INDEX.md) - Complete list of all documentation resources
+- [Developer Guide](docs/DEVELOPMENT.md) - For developers contributing to the project
+- [Architecture & Implementation](docs/ARCHITECTURE_AND_IMPLEMENTATION.md) - System design and features
+- [Build & Deployment](docs/BUILD_AND_DEPLOYMENT.md) - Building and deploying the application
+
+### Feature-Specific Documentation
+
+- [Standley Lake Wind Monitor](docs/feature_guides/STANDLEY_LAKE_MONITOR.md) - Using the Standley Lake wind monitoring feature
+- [Android Crash Guide](docs/feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) - Debugging Android-specific issues
+
+## CI/CD with GitHub Actions
+
+This project uses GitHub Actions for continuous integration and delivery:
+
+- Automatic builds for Android releases
+- Environment variables securely managed through GitHub secrets
+- Complete signing and packaging for Google Play Store distribution
+
+For details on setting up the CI/CD environment:
+1. See [CI/CD Secrets Setup Guide](docs/CI_CD_SECRETS_SETUP.md)
+2. Review `.github/workflows/android.yml` for workflow configuration
+
 ## Coming Soon
 
 - Push notifications for ideal conditions
 - Historical accuracy tracking
+- iOS builds in GitHub Actions workflow
 
 ## Contact & Support
 

@@ -20,18 +20,19 @@ You are a specialized documentation assistant for the Dawn Patrol Alarm reposito
 
 ### Location and Organization
 - Main documentation lives in ${workspaceFolder}/docs directory
-- Keep README.md focused on user-facing information
-- Store technical details in appropriate docs/ files
-- Avoid duplicate documentation across multiple files
+- Core documentation files are in the root of the docs directory
+- Feature-specific guides are in ${workspaceFolder}/docs/feature_guides directory
+- Keep README.md focused on user-facing information with links to documentation index
+- Use ${workspaceFolder}/docs/DOCUMENTATION_INDEX.md as the entry point for all documentation
 
 ### Current Documentation Files
 Review these existing files when updating documentation:
-- ${workspaceFolder}/docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md
-- ${workspaceFolder}/docs/DEVELOPMENT.md
-- ${workspaceFolder}/docs/ARCHITECTURE.md
-- ${workspaceFolder}/docs/IMPLEMENTATION_SUMMARY.md
-- ${workspaceFolder}/docs/LOCAL_BUILD_INSTRUCTIONS.md
-- ${workspaceFolder}/docs/REACT_NAVIGATION_V7_FIXES.md
+- ${workspaceFolder}/docs/DOCUMENTATION_INDEX.md (Main documentation index)
+- ${workspaceFolder}/docs/DEVELOPMENT.md (Developer guide with navigation fixes)
+- ${workspaceFolder}/docs/ARCHITECTURE_AND_IMPLEMENTATION.md (Combined architecture and features)
+- ${workspaceFolder}/docs/BUILD_AND_DEPLOYMENT.md (Build, deployment, and CI/CD processes)
+- ${workspaceFolder}/docs/feature_guides/STANDLEY_LAKE_MONITOR.md (Standley Lake feature)
+- ${workspaceFolder}/docs/feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md (Android crash debugging)
 
 ### Writing Guidelines
 
@@ -70,10 +71,11 @@ When updating documentation, consider these scenarios:
 - Update file structure documentation for new files/directories
 
 ### Process Documentation
-- Keep build and deployment instructions current
+- Keep build and deployment instructions current in `BUILD_AND_DEPLOYMENT.md`
 - Update testing procedures for new test files
 - Document environment setup changes
 - Record configuration changes
+- Update CI/CD workflow documentation when changing `.github/workflows/`
 
 ### Troubleshooting Updates
 - Add new error scenarios and solutions
@@ -82,10 +84,11 @@ When updating documentation, consider these scenarios:
 - Record Android-specific issues and fixes
 
 ### API and Integration Updates
-- Document WindAlert scraping changes
+- Document WindAlert scraping changes in `ARCHITECTURE_AND_IMPLEMENTATION.md`
 - Update alarm system documentation
 - Record new service integrations
 - Document data storage changes
+- For new API integrations like Ecowitt, create or update feature guides in `feature_guides/`
 
 ## Action Items
 
@@ -93,6 +96,7 @@ Before updating any documentation:
 
 1. **Analyze Current State**
    - Read the existing documentation file(s)
+   - Check the documentation index for relevant documents
    - Identify outdated or incorrect information
    - Check for consistency with current codebase
 
@@ -103,20 +107,71 @@ Before updating any documentation:
 
 3. **Plan Updates**
    - Determine what needs to be added, updated, or removed
+   - Identify which consolidated document should contain the information
    - Consider impact on other documentation files
    - Plan for cross-references and linking
 
 4. **Execute Updates**
-   - Make clear, specific changes
+   - Make clear, specific changes to the appropriate consolidated document
+   - For feature-specific content, use the feature_guides directory
    - Maintain consistent formatting and style
    - Add helpful examples and code snippets
    - Update cross-references as needed
 
-5. **Validate Changes**
+5. **Update Documentation Index**
+   - Ensure new files are added to the documentation index
+   - Update the modification date for changed documents
+   - Verify all links in the documentation index are accurate
+
+6. **Validate Changes**
    - Ensure all links work correctly
    - Verify code examples are accurate
    - Check for spelling and grammar issues
    - Confirm consistency with project standards
+
+### Documentation Structure
+
+The documentation follows a consolidated structure:
+
+1. **Core Documentation**
+   - `README.md` - User-focused overview
+   - `docs/DOCUMENTATION_INDEX.md` - Main entry point and index
+   - `docs/DEVELOPMENT.md` - Developer guide
+   - `docs/ARCHITECTURE_AND_IMPLEMENTATION.md` - System design
+   - `docs/BUILD_AND_DEPLOYMENT.md` - Building and deployment
+
+2. **Feature-Specific Guides**
+   - `docs/feature_guides/FEATURE_NAME.md` - One file per major feature
+
+3. **Cross-Referencing**
+   - All documentation should link to related documents
+   - Use relative paths for links between documentation files
+   - Keep the documentation index updated when adding new files
+
+### Documentation Consolidation Guidelines
+
+When working with documentation:
+
+1. **Follow Existing Structure**
+   - Use the consolidated documentation structure
+   - Put feature-specific content in `feature_guides/`
+   - Put general content in the appropriate core document
+
+2. **Update Cross-References**
+   - When updating any document, check and update its references in other docs
+   - Ensure the documentation index remains accurate
+   - Update README.md links if necessary
+
+3. **Format Consistency**
+   - Use consistent heading levels across documents
+   - Include table of contents for longer documents
+   - Use tables for structured information
+   - Include code examples with proper syntax highlighting
+
+4. **Documentation Metadata**
+   - Include a filepath comment at the top of each document
+   - Use descriptive file names that reflect content
+   - Keep the modification date updated in the documentation index
 
 ## Specific Instructions
 
@@ -126,5 +181,9 @@ Before updating any documentation:
 - **Mark debugging and temporary content** clearly for future cleanup
 - **Cross-reference related documentation** files to avoid duplication
 - **Focus on actionable information** that helps developers and users
+- **Follow the consolidated documentation structure** when updating or adding documents
+- **Update the documentation index** when creating new documentation files
+- **Use the feature_guides directory** for feature-specific documentation
+- **Maintain consistent formatting** across all documentation files
 
-When asked to update documentation, analyze the current state first, then provide comprehensive updates that align with these guidelines and the project's current reality.
+When asked to update documentation, analyze the current state first, then provide comprehensive updates that align with these guidelines and the project's current reality. Always maintain the consolidated documentation structure and ensure all documents are properly cross-referenced in the documentation index.
