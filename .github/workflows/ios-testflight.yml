@@ -614,6 +614,7 @@ jobs:
                 fi
               fi
             fi
+          fi
           
           # Show directory contents to debug
           echo "Contents of build directory:"
