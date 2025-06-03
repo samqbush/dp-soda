@@ -224,8 +224,16 @@ jobs:
           # Hardcode the bundle identifier based on the app name
           BUNDLE_ID="com.dawnpatrol.soda"
           
+          # Save current directory for reference
+          CURRENT_DIR=$(pwd)
+          echo "Current directory: $CURRENT_DIR"
+          
+          # Make sure we use absolute paths
+          ABSOLUTE_ARCHIVE_PATH=$(realpath "$ARCHIVE_PATH")
+          echo "Absolute archive path: $ABSOLUTE_ARCHIVE_PATH"
+          
           # Check archive Info.plist for bundle identifier with better error handling
-          ARCHIVE_INFO_PLIST="$ARCHIVE_PATH/Info.plist"
+          ARCHIVE_INFO_PLIST="$ABSOLUTE_ARCHIVE_PATH/Info.plist"
           if [ -f "$ARCHIVE_INFO_PLIST" ]; then
             echo "Archive Info.plist found at $ARCHIVE_INFO_PLIST"
             echo "Reading bundle ID from archive Info.plist..."
@@ -259,8 +267,8 @@ jobs:
           fi
           
           echo "Bundle identifier: $BUNDLE_ID"
-          cd ..
           
+          # Do NOT use cd anymore - we'll use absolute paths
           # Extract provisioning profile name from the archive
           PROFILE_NAME=$(grep -A1 -a 'Name' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           if [ -z "$PROFILE_NAME" ]; then
@@ -289,14 +297,34 @@ jobs:
           # Export IPA using the detected scheme name
           echo "Using scheme: ${{ env.SCHEME_NAME }}"
           
+          # Verify absolute path to archive again
+          if [ ! -d "$ABSOLUTE_ARCHIVE_PATH" ]; then
+            echo "❌ ERROR: Archive no longer at $ABSOLUTE_ARCHIVE_PATH"
+            echo "Checking if build directory still exists:"
+            ls -la $(dirname "$ABSOLUTE_ARCHIVE_PATH")
+            
+            # Check if we need to go back to the right directory
+            cd "$CURRENT_DIR" || echo "Failed to cd to $CURRENT_DIR"
+            echo "Now in directory: $(pwd)"
+            
+            if [ -d "build/${{ env.SCHEME_NAME }}.xcarchive" ]; then
+              echo "Found archive in relative path build/${{ env.SCHEME_NAME }}.xcarchive"
+              ABSOLUTE_ARCHIVE_PATH=$(realpath "build/${{ env.SCHEME_NAME }}.xcarchive")
+              echo "Updated absolute path: $ABSOLUTE_ARCHIVE_PATH"
+            else
+              echo "Archive not found in relative path either"
+            fi
+          fi
+          
           # List archive contents to debug
           echo "Archive contents:"
-          ls -la "build/${{ env.SCHEME_NAME }}.xcarchive"
+          ls -la "$ABSOLUTE_ARCHIVE_PATH" || echo "Failed to list archive contents"
           
-          echo "Checking Products directory:"
-          if [ -d "build/${{ env.SCHEME_NAME }}.xcarchive/Products/Applications" ]; then
-            ls -la "build/${{ env.SCHEME_NAME }}.xcarchive/Products/Applications"
-            APP_DIR=$(find "build/${{ env.SCHEME_NAME }}.xcarchive/Products/Applications" -type d -name "*.app" | head -n 1)
+          # Check Products directory with absolute path
+          if [ -d "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" ]; then
+            echo "Checking Products directory:"
+            ls -la "$ABSOLUTE_ARCHIVE_PATH/Products/Applications"
+            APP_DIR=$(find "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" -type d -name "*.app" | head -n 1)
             echo "Found app directory: $APP_DIR"
           else
             echo "No Applications directory found in archive"
@@ -306,9 +334,9 @@ jobs:
           
           echo "Trying export method 1: enterprise..."
           if xcodebuild -exportArchive \
-            -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
-            -exportPath build \
-            -exportOptionsPlist ExportOptions.plist \
+            -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
+            -exportPath "$(pwd)/build" \
+            -exportOptionsPlist "$(pwd)/ExportOptions.plist" \
             -allowProvisioningUpdates; then
             echo "✅ Export succeeded with enterprise options"
           else
@@ -329,9 +357,9 @@ jobs:
               '</plist>' > DevOptions.plist
             
             if xcodebuild -exportArchive \
-              -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
-              -exportPath build \
-              -exportOptionsPlist DevOptions.plist \
+              -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
+              -exportPath "$(pwd)/build" \
+              -exportOptionsPlist "$(pwd)/DevOptions.plist" \
               -allowProvisioningUpdates; then
               echo "✅ Export succeeded with development options"
             else
@@ -352,9 +380,9 @@ jobs:
                 '</plist>' > AdHocOptions.plist
               
               if xcodebuild -exportArchive \
-                -archivePath "build/${{ env.SCHEME_NAME }}.xcarchive" \
-                -exportPath build \
-                -exportOptionsPlist AdHocOptions.plist \
+                -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
+                -exportPath "$(pwd)/build" \
+                -exportOptionsPlist "$(pwd)/AdHocOptions.plist" \
                 -allowProvisioningUpdates; then
                 echo "✅ Export succeeded with ad-hoc options"
               else
@@ -366,8 +394,8 @@ jobs:
                 # Create the Payload directory structure
                 mkdir -p Payload
                 
-                # Try to find the .app file in the archive
-                APP_PATH=$(find "build/${{ env.SCHEME_NAME }}.xcarchive/Products/Applications" -name "*.app" -type d 2>/dev/null)
+                # Try to find the .app file in the archive using absolute path
+                APP_PATH=$(find "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" -name "*.app" -type d 2>/dev/null)
                 
                 if [ -n "$APP_PATH" ]; then
                   echo "Found app at $APP_PATH"
