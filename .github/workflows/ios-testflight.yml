@@ -152,7 +152,21 @@ jobs:
               CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
               PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              -verbose || { echo "Archive failed"; exit 1; }
+              CODE_SIGN_STYLE=Manual \
+              -allowProvisioningUpdates \
+              -verbose || { 
+                echo "Archive failed with explicit signing - trying with automatic signing..." 
+                xcodebuild archive \
+                  -workspace "$WORKSPACE_FILE" \
+                  -scheme "$SCHEME_NAME" \
+                  -configuration Release \
+                  -destination 'generic/platform=iOS' \
+                  -archivePath "$ARCHIVE_PATH" \
+                  DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                  CODE_SIGN_STYLE=Automatic \
+                  -allowProvisioningUpdates \
+                  -verbose || { echo "Both archive attempts failed"; exit 1; }
+              }
           else
             echo "Found project: $PROJECT_FILE"
             echo "Available schemes in project:"
@@ -180,7 +194,21 @@ jobs:
               CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
               PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              -verbose || { echo "Archive failed"; exit 1; }
+              CODE_SIGN_STYLE=Manual \
+              -allowProvisioningUpdates \
+              -verbose || { 
+                echo "Archive failed with explicit signing - trying with automatic signing..." 
+                xcodebuild archive \
+                  -project "$PROJECT_FILE" \
+                  -scheme "$SCHEME_NAME" \
+                  -configuration Release \
+                  -destination 'generic/platform=iOS' \
+                  -archivePath "$ARCHIVE_PATH" \
+                  DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                  CODE_SIGN_STYLE=Automatic \
+                  -allowProvisioningUpdates \
+                  -verbose || { echo "Both archive attempts failed"; exit 1; }
+              }
           fi
           
           cd ..
@@ -189,6 +217,25 @@ jobs:
           if [ -d "build/${SCHEME_NAME}.xcarchive" ]; then
             echo "✅ iOS app archived successfully at build/${SCHEME_NAME}.xcarchive"
             ls -la "build/${SCHEME_NAME}.xcarchive"
+            
+            # Debug: Check archive structure immediately after creation
+            echo "=== ARCHIVE DEBUG INFO ==="
+            echo "Archive structure:"
+            find "build/${SCHEME_NAME}.xcarchive" -type f -name "*.app" || echo "No .app bundles found"
+            find "build/${SCHEME_NAME}.xcarchive" -type d -name "*.app" || echo "No .app directories found"
+            
+            if [ -d "build/${SCHEME_NAME}.xcarchive/Products" ]; then
+              echo "Products directory contents:"
+              ls -la "build/${SCHEME_NAME}.xcarchive/Products"
+              if [ -d "build/${SCHEME_NAME}.xcarchive/Products/Applications" ]; then
+                echo "Applications directory contents:"
+                ls -la "build/${SCHEME_NAME}.xcarchive/Products/Applications"
+              fi
+            fi
+            
+            echo "Archive Info.plist:"
+            cat "build/${SCHEME_NAME}.xcarchive/Info.plist" || echo "Could not read Info.plist"
+            echo "=== END ARCHIVE DEBUG ==="
           else
             echo "❌ Archive not found at build/${SCHEME_NAME}.xcarchive"
             echo "Contents of build directory:"
@@ -277,6 +324,10 @@ jobs:
           echo "Provisioning profile name: $PROFILE_NAME"
           
           # Create export options plist for Xcode 16.2
+          # First, let's check what export methods are available for this archive
+          echo "Checking available export methods for this archive..."
+          xcodebuild -exportArchive -archivePath "$ABSOLUTE_ARCHIVE_PATH" -exportPath /tmp/dummy -verbose 2>&1 | head -20 || true
+          
           # Use printf to avoid YAML heredoc issues
           printf '%s\n' \
             '<?xml version="1.0" encoding="UTF-8"?>' \
@@ -284,9 +335,15 @@ jobs:
             '<plist version="1.0">' \
             '<dict>' \
             '  <key>method</key>' \
-            '  <string>app-store</string>' \
+            '  <string>app-store-connect</string>' \
             '  <key>teamID</key>' \
             "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
+            '  <key>uploadBitcode</key>' \
+            '  <false/>' \
+            '  <key>compileBitcode</key>' \
+            '  <false/>' \
+            '  <key>uploadSymbols</key>' \
+            '  <true/>' \
             '</dict>' \
             '</plist>' > ExportOptions.plist
           
@@ -332,13 +389,40 @@ jobs:
           
           # Try multiple export methods in sequence until one works
           
-          echo "Trying export method 1: enterprise..."
+          echo "Trying export method 1: app-store-connect..."
           if xcodebuild -exportArchive \
             -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
             -exportPath "$(pwd)/build" \
             -exportOptionsPlist "$(pwd)/ExportOptions.plist" \
             -allowProvisioningUpdates; then
-            echo "✅ Export succeeded with enterprise options"
+            echo "✅ Export succeeded with app-store-connect options"
+          else
+            echo "❌ App-store-connect export failed - trying app-store method..."
+            
+            # Try app-store method (legacy)
+            echo "Trying export method 2: app-store..."
+            printf '%s\n' \
+              '<?xml version="1.0" encoding="UTF-8"?>' \
+              '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+              '<plist version="1.0">' \
+              '<dict>' \
+              '  <key>method</key>' \
+              '  <string>app-store</string>' \
+              '  <key>teamID</key>' \
+              "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
+              '  <key>uploadBitcode</key>' \
+              '  <false/>' \
+              '  <key>compileBitcode</key>' \
+              '  <false/>' \
+              '</dict>' \
+              '</plist>' > AppStoreOptions.plist
+            
+            if xcodebuild -exportArchive \
+              -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
+              -exportPath "$(pwd)/build" \
+              -exportOptionsPlist "$(pwd)/AppStoreOptions.plist" \
+              -allowProvisioningUpdates; then
+              echo "✅ Export succeeded with app-store options"
           else
             echo "❌ Enterprise export failed - trying development method..."
             
@@ -437,10 +521,9 @@ jobs:
                   zip -r "build/${{ env.SCHEME_NAME }}.ipa" Payload
                   echo "Created empty placeholder IPA for workflow continuity"
                 fi
-                  zip -r "build/${{ env.SCHEME_NAME }}.ipa" Payload
-                  rm -rf Payload
-                  echo "Created empty placeholder IPA for workflow continuity"
-                fi
+                
+                # Clean up Payload directory
+                rm -rf Payload
               fi
             fi
           fi
