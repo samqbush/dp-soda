@@ -108,11 +108,18 @@ jobs:
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           echo "Found workspace: $WORKSPACE_FILE"
           BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          
           # Extract provisioning profile UUID and name
           PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           PROFILE_NAME=$(grep -A1 -a '<key>Name</key>' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           echo "Provisioning Profile UUID: $PROFILE_UUID"
           echo "Provisioning Profile Name: $PROFILE_NAME"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
+          
+          # Extract bundle identifier from project's Info.plist
+          BUNDLE_ID=$(grep -A1 "PRODUCT_BUNDLE_IDENTIFIER" DawnPatrolAlarm.xcodeproj/project.pbxproj | grep -v PRODUCT_BUNDLE_IDENTIFIER | head -1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
+          echo "Bundle Identifier: $BUNDLE_ID"
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           
           # Build and archive
           $BUILD_COMMAND \
@@ -129,9 +136,8 @@ jobs:
       # Export IPA
       - name: 📦 Export IPA
         run: |
-          # Extract bundle identifier from the archived Info.plist
-          BUNDLE_ID=$(defaults read build/dpsoda.xcarchive/Info.plist CFBundleIdentifier)
-          echo "Bundle Identifier: $BUNDLE_ID"
+          # Use bundle identifier from previous step
+          echo "Using Bundle Identifier: ${{ env.BUNDLE_ID }}"
           
           # Create export options plist with provisioning profile
           cat > ExportOptions.plist << EOF
@@ -151,8 +157,8 @@ jobs:
             <string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>$BUNDLE_ID</key>
-              <string>$PROFILE_NAME</string>
+              <key>${{ env.BUNDLE_ID }}</key>
+              <string>${{ env.PROFILE_NAME }}</string>
             </dict>
           </dict>
           </plist>
