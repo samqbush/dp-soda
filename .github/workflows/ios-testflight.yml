@@ -175,8 +175,23 @@ jobs:
           
           if [ -z "$PROFILE_UUID" ]; then
             echo "❌ Could not extract provisioning profile UUID"
-            exit 1
+            echo "Attempting alternative extraction methods..."
+            
+            # Try alternative extraction method
+            PROFILE_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | plutil -extract UUID raw -)
+            
+            if [ -z "$PROFILE_UUID" ]; then
+              echo "❌ All UUID extraction methods failed"
+              echo "Provisioning profile contents (first 30 lines):"
+              security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | head -30
+              exit 1
+            else
+              echo "✅ UUID extracted using alternative method: $PROFILE_UUID"
+            fi
           fi
+          
+          # Save the UUID for use in the build process
+          echo "IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED=$PROFILE_UUID" >> $GITHUB_ENV
           
           # Find the Xcode project file
           PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
@@ -316,7 +331,7 @@ jobs:
           fi
           
           # Save bundle ID for later use
-          echo "EXPECTED_BUNDLE_ID=$EXPECTED_BUNDLE_ID" >> $GITHUB_ENV
+          echo "EXPECTED_BUNDLE_ID=\"$EXPECTED_BUNDLE_ID\"" >> $GITHUB_ENV
           
           echo "=== END APP CONFIGURATION VALIDATION ==="
           echo ""
@@ -414,41 +429,30 @@ jobs:
             echo "Attempting to build the project to check for errors..."
             
             # Add comprehensive build settings for iOS CI environment
-            BUILD_SETTINGS="
-              CODE_SIGN_IDENTITY='${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}'
-              PROVISIONING_PROFILE='${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}'
-              DEVELOPMENT_TEAM='${{ secrets.APPLE_TEAM_ID }}'
-              CODE_SIGN_STYLE=Manual
-              IPHONEOS_DEPLOYMENT_TARGET=12.0
-              ONLY_ACTIVE_ARCH=NO
-              ARCHS='arm64'
-              VALID_ARCHS='arm64'
-              EXCLUDED_ARCHS=''
-              ENABLE_BITCODE=NO
-              COMPILER_INDEX_STORE_ENABLE=NO
-            "
-            
-            AUTO_BUILD_SETTINGS="
-              DEVELOPMENT_TEAM='${{ secrets.APPLE_TEAM_ID }}'
-              CODE_SIGN_STYLE=Automatic
-              IPHONEOS_DEPLOYMENT_TARGET=12.0
-              ONLY_ACTIVE_ARCH=NO
-              ARCHS='arm64'
-              VALID_ARCHS='arm64'
-              EXCLUDED_ARCHS=''
-              ENABLE_BITCODE=NO
-              COMPILER_INDEX_STORE_ENABLE=NO
-            "
-            
             echo "Build settings for manual signing:"
-            echo "$BUILD_SETTINGS"
+            echo "CODE_SIGN_IDENTITY: ${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}"
+            echo "PROVISIONING_PROFILE: ${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}"
+            echo "DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}"
+            
+            echo "Build settings for automatic signing:"
+            echo "DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}"
             
             if xcodebuild build \
               -workspace "$WORKSPACE_FILE" \
               -scheme "$SCHEME_NAME" \
               -configuration Release \
               -destination 'generic/platform=iOS' \
-              $BUILD_SETTINGS \
+              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+              PROVISIONING_PROFILE="${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}" \
+              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+              CODE_SIGN_STYLE=Manual \
+              IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+              ONLY_ACTIVE_ARCH=NO \
+              ARCHS=arm64 \
+              VALID_ARCHS=arm64 \
+              EXCLUDED_ARCHS="" \
+              ENABLE_BITCODE=NO \
+              COMPILER_INDEX_STORE_ENABLE=NO \
               -allowProvisioningUpdates \
               -verbose 2>&1 | tee build_test_manual.log; then
               echo "✅ Build test with manual signing succeeded, proceeding with archive..."
@@ -456,15 +460,20 @@ jobs:
             else
               echo "❌ Build failed with manual signing, trying with automatic signing..."
               
-              echo "Build settings for automatic signing:"
-              echo "$AUTO_BUILD_SETTINGS"
-              
               if xcodebuild build \
                 -workspace "$WORKSPACE_FILE" \
                 -scheme "$SCHEME_NAME" \
                 -configuration Release \
                 -destination 'generic/platform=iOS' \
-                $AUTO_BUILD_SETTINGS \
+                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                CODE_SIGN_STYLE=Automatic \
+                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+                ONLY_ACTIVE_ARCH=NO \
+                ARCHS=arm64 \
+                VALID_ARCHS=arm64 \
+                EXCLUDED_ARCHS="" \
+                ENABLE_BITCODE=NO \
+                COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
                 -verbose 2>&1 | tee build_test_auto.log; then
                 echo "✅ Build test with automatic signing succeeded"
@@ -495,7 +504,17 @@ jobs:
                 -configuration Release \
                 -destination 'generic/platform=iOS' \
                 -archivePath "$ARCHIVE_PATH" \
-                $BUILD_SETTINGS \
+                CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+                PROVISIONING_PROFILE="${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}" \
+                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                CODE_SIGN_STYLE=Manual \
+                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+                ONLY_ACTIVE_ARCH=NO \
+                ARCHS=arm64 \
+                VALID_ARCHS=arm64 \
+                EXCLUDED_ARCHS="" \
+                ENABLE_BITCODE=NO \
+                COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
                 -verbose 2>&1 | tee archive_log.txt; then
                 echo "✅ Archive with manual signing completed"
@@ -512,7 +531,15 @@ jobs:
                 -configuration Release \
                 -destination 'generic/platform=iOS' \
                 -archivePath "$ARCHIVE_PATH" \
-                $AUTO_BUILD_SETTINGS \
+                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                CODE_SIGN_STYLE=Automatic \
+                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+                ONLY_ACTIVE_ARCH=NO \
+                ARCHS=arm64 \
+                VALID_ARCHS=arm64 \
+                EXCLUDED_ARCHS="" \
+                ENABLE_BITCODE=NO \
+                COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
                 -verbose 2>&1 | tee archive_log.txt; then
                 echo "✅ Archive with automatic signing completed"
