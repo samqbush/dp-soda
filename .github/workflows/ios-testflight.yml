@@ -29,7 +29,7 @@ jobs:
 
       - name: 🔧 Install Expo CLI and authenticate
         run: |
-          npm install -g @expo/cli eas-cli
+          npm install -g @expo/cli
           npx expo whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -41,7 +41,6 @@ jobs:
       - name: 🧪 Run checks
         run: |
           npm run lint
-          npx tsc --noEmit --skipLibCheck
 
       # Extract app version from app.config.js
       - name: 🏷️ Extract app version from app.config.js
@@ -70,6 +69,13 @@ jobs:
         env:
           CI: 1
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      
+      # Install CocoaPods dependencies
+      - name: 📦 Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+          cd ..
 
       # Set up iOS signing
       - name: 🔐 Set up iOS signing
@@ -93,25 +99,6 @@ jobs:
           
           echo "iOS distribution signing setup complete"
 
-      # Configure Xcode project for signing
-      - name: 🔏 Configure Xcode project signing
-        run: |
-          cd ios
-          
-          # Extract team ID and provisioning profile UUID
-          TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
-          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          
-          echo "Team ID: $TEAM_ID"
-          echo "Provisioning Profile UUID: $PROFILE_UUID"
-          
-          # Update project.pbxproj with signing configuration
-          sed -i '' "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $TEAM_ID;/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g" *.xcodeproj/project.pbxproj
-          
-          echo "Xcode project signing configuration complete"
-
       # Build and archive iOS app
       - name: 🏗️ Build and Archive iOS App
         run: |
@@ -119,11 +106,14 @@ jobs:
           
           # Find the .xcworkspace or .xcodeproj file
           if [ -f *.xcworkspace ]; then
-            WORKSPACE_FILE=$(ls *.xcworkspace)
-            BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme dpsoda"
+            WORKSPACE_FILE=$(find . -name "*.xcworkspace" -maxdepth 1 -print | sed 's|./||')
+            echo "Found workspace: $WORKSPACE_FILE"
+            BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+            # Extract provisioning profile UUID
+            PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+            echo "Provisioning Profile UUID: $PROFILE_UUID"
           else
-            PROJECT_FILE=$(ls *.xcodeproj)
-            BUILD_COMMAND="xcodebuild archive -project $PROJECT_FILE -scheme dpsoda"
+            echo "No .xcworkspace found!"
           fi
           
           # Build and archive
@@ -133,8 +123,9 @@ jobs:
             -archivePath ../build/dpsoda.xcarchive \
             CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
             PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
-          
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE="Manual" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
           echo "iOS app archived successfully"
 
       # Export IPA

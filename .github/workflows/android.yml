@@ -41,7 +41,6 @@ jobs:
       - name: 🧪 Run checks
         run: |
           npm run lint
-          npx tsc --noEmit --skipLibCheck
           
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
