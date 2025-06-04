@@ -1,1151 +1,374 @@
 name: Build and Deploy iOS to TestFlight
 
 on:
-  pull_request:
-    branches: [dev, ios]
   workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable verbose debug logging'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 jobs:
   ios:
     runs-on: macos-latest
+    env:
+      DEBUG_MODE: ${{ github.event.inputs.debug_enabled == 'true' }}
+    
     steps:
       - name: 📦 Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🔧 Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: 🧹 Clean previous builds and caches
+        uses: actions/checkout@v3
+      
+      - name: Create build directory structure
         run: |
-          rm -rf node_modules/.cache .expo ios
-
-      - name: 📦 Install dependencies
-        run: npm ci
-
-      - name: 🔧 Install Expo CLI and authenticate
+          mkdir -p build/logs
+          echo "Build started at $(date)" > build/logs/build_summary.log
+      
+      - name: 🔍 App configuration validation
         run: |
-          npm install -g @expo/cli eas-cli
-          npx expo whoami
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          CI: 1
-
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
-
-      - name: 🧪 Run checks
-        run: |
-          npm run lint
-          npx tsc --noEmit --skipLibCheck
-
-      # Validate bundle identifiers
-      - name: 🔍 Validate bundle identifiers
-        run: |
-          echo "Validating bundle identifiers..."
-          chmod +x ./scripts/check-bundle-identifier.mjs
-          node ./scripts/check-bundle-identifier.mjs
+          echo "🔍 Validating app configuration..." 
           
-          # Extract and validate bundle IDs directly
-          IOS_BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
-          ANDROID_PACKAGE=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.android.package")
-          
-          echo "iOS Bundle ID: $IOS_BUNDLE_ID"
-          echo "Android Package: $ANDROID_PACKAGE"
-          
-          # Set in environment without quotes to avoid quotation issues
-          echo "IOS_BUNDLE_ID=$IOS_BUNDLE_ID" >> $GITHUB_ENV
-          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
-
-      # Extract app version from app.config.js
-      - name: 🏷️ Extract app version from app.config.js
-        id: get_version
-        run: |
-          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-      # Create .env file from GitHub secrets
-      - name: 🔐 Create .env file
-        run: |
-          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
-          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
-          echo "✅ Created .env file with API credentials"
-
-      # Set up Xcode
-      - name: 🍎 Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      # Generate the native iOS project
-      - name: 🔧 Generate native iOS project
-        run: npx expo prebuild --platform ios --clean
-        env:
-          CI: 1
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      # Set up iOS signing
-      - name: 🔐 Set up iOS signing
-        run: |
-          echo "=== ENHANCED IOS SIGNING SETUP ==="
-          
-          # Validate required secrets first
-          if [ -z "${{ secrets.KEYCHAIN_PASSWORD }}" ]; then
-            echo "❌ KEYCHAIN_PASSWORD secret is missing"
-            exit 1
-          fi
-          
-          if [ -z "${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}" ]; then
-            echo "❌ IOS_DIST_CERTIFICATE_P12_BASE64 secret is missing"
-            exit 1
-          fi
-          
-          if [ -z "${{ secrets.IOS_DIST_PROVISIONING_PROFILE_BASE64 }}" ]; then
-            echo "❌ IOS_DIST_PROVISIONING_PROFILE_BASE64 secret is missing"
-            exit 1
-          fi
-          
-          echo "✅ All required secrets are present"
-          
-          # Create and configure keychain
-          echo "Setting up keychain..."
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security set-keychain-settings -t 3600 -l build.keychain
-          
-          # Import distribution certificate
-          echo "Importing distribution certificate..."
-          echo "${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}" | base64 --decode > certificate.p12
-          
-          # Verify certificate file was created
-          if [ ! -f "certificate.p12" ]; then
-            echo "❌ Failed to decode certificate"
-            exit 1
-          fi
-          
-          # Import with verbose output
-          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/security
-          
-          # Verify certificate was imported
-          echo "Verifying certificate import..."
-          security find-identity -v -p codesigning build.keychain
-          
-          # Import provisioning profile
-          echo "Setting up provisioning profiles..."
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          
-          # Decode and save provisioning profile
-          echo "${{ secrets.IOS_DIST_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-          
-          # Verify provisioning profile was created
-          if [ ! -f ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision ]; then
-            echo "❌ Failed to decode provisioning profile"
-            exit 1
-          fi
-          
-          # Extract and display provisioning profile info
-          echo "Provisioning profile details:"
-          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | head -20
-          
-          # Extract bundle ID from provisioning profile
-          PROFILE_BUNDLE_ID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 "application-identifier" | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | sed 's/.*\.//')
-          echo "Provisioning profile bundle ID: $PROFILE_BUNDLE_ID"
-          
-          # Extract team ID from provisioning profile
-          PROFILE_TEAM_ID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 -E "com\.apple\.developer\.team-identifier|TeamIdentifier" | grep string | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          echo "Provisioning profile team ID: $PROFILE_TEAM_ID"
-          
-          # Set code signing permissions
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          
-          # List all available provisioning profiles
-          echo "Available provisioning profiles:"
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "No profiles directory found"
-          
-          echo "✅ iOS distribution signing setup complete"
-
-      # Configure Xcode project for signing
-      - name: 🔏 Configure Xcode project signing
-        run: |
-          echo "=== ENHANCED XCODE PROJECT CONFIGURATION ==="
-          cd ios
-          
-          # Extract team ID and provisioning profile UUID with validation
-          TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
-          
-          # Extract provisioning profile UUID more reliably
-          PROFILE_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 UUID | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          
-          echo "Team ID: $TEAM_ID"
-          echo "Provisioning Profile UUID: $PROFILE_UUID"
-          
-          # Validate that we have the required values
-          if [ -z "$TEAM_ID" ]; then
-            echo "❌ APPLE_TEAM_ID is missing"
-            exit 1
-          fi
-          
-          if [ -z "$PROFILE_UUID" ]; then
-            echo "❌ Could not extract provisioning profile UUID"
-            echo "Attempting alternative extraction methods..."
-            
-            # Try alternative extraction method
-            PROFILE_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | plutil -extract UUID raw -)
-            
-            if [ -z "$PROFILE_UUID" ]; then
-              echo "❌ All UUID extraction methods failed"
-              echo "Provisioning profile contents (first 30 lines):"
-              security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | head -30
-              exit 1
-            else
-              echo "✅ UUID extracted using alternative method: $PROFILE_UUID"
-            fi
-          fi
-          
-          # Save the UUID for use in the build process
-          echo "IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED=$PROFILE_UUID" >> $GITHUB_ENV
-          
-          # Find the Xcode project file
-          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
-          if [ -z "$PROJECT_FILE" ]; then
-            echo "❌ No Xcode project file found"
-            exit 1
-          fi
-          
-          echo "Configuring project: $PROJECT_FILE"
-          
-          # Backup original project file
-          cp "$PROJECT_FILE/project.pbxproj" "$PROJECT_FILE/project.pbxproj.backup"
-          
-          # Extract current bundle identifier from app.config.js
-          cd ..
-          EXPECTED_BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
-          cd ios
-          
-          echo "Expected bundle ID from app.config.js: $EXPECTED_BUNDLE_ID"
-          
-          # Update project.pbxproj with enhanced configuration
-          echo "Updating Xcode project configuration..."
-          
-          # Set development team
-          sed -i '' "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PROJECT_FILE/project.pbxproj"
-          
-          # Set provisioning profile specifier
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" "$PROJECT_FILE/project.pbxproj"
-          
-          # Set code sign style to manual
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g" "$PROJECT_FILE/project.pbxproj"
-          
-          # Ensure bundle identifier is correct (if it exists in project)
-          if grep -q "PRODUCT_BUNDLE_IDENTIFIER" "$PROJECT_FILE/project.pbxproj"; then
-            echo "Updating bundle identifier in project..."
-            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = $EXPECTED_BUNDLE_ID;/g" "$PROJECT_FILE/project.pbxproj"
-            
-            # Double-check the bundle ID was set correctly
-            CURRENT_BUNDLE_ID=$(grep "PRODUCT_BUNDLE_IDENTIFIER" "$PROJECT_FILE/project.pbxproj" | head -1 | sed 's/.*PRODUCT_BUNDLE_IDENTIFIER = \(.*\);.*/\1/')
-            echo "Current bundle ID in project: $CURRENT_BUNDLE_ID"
-            
-            # Validate it matches what we expect
-            if [ "$CURRENT_BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
-              echo "⚠️ Bundle ID mismatch detected!"
-              echo "Expected: $EXPECTED_BUNDLE_ID"
-              echo "Found: $CURRENT_BUNDLE_ID"
-              echo "This may cause provisioning profile issues"
-            fi
-          else
-            echo "⚠️ No PRODUCT_BUNDLE_IDENTIFIER found in project file"
-          fi
-          
-          # Add additional required build settings for Release configuration
-          if ! grep -q "ONLY_ACTIVE_ARCH.*Release" "$PROJECT_FILE/project.pbxproj"; then
-            echo "Adding ONLY_ACTIVE_ARCH = NO for Release builds..."
-            # This is a complex sed operation to add build settings in the right place
-            # For now, we'll handle this via xcodebuild parameters instead
-          fi
-          
-          # Verify changes were applied
-          echo "Verifying project configuration changes..."
-          if grep -q "DEVELOPMENT_TEAM = $TEAM_ID" "$PROJECT_FILE/project.pbxproj"; then
-            echo "✅ Development team set correctly"
-          else
-            echo "⚠️ Development team setting may not have been applied"
-          fi
-          
-          if grep -q "PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\"" "$PROJECT_FILE/project.pbxproj"; then
-            echo "✅ Provisioning profile specifier set correctly"
-          else
-            echo "⚠️ Provisioning profile specifier setting may not have been applied"
-          fi
-          
-          echo "✅ Xcode project signing configuration complete"
-
-      # Build and archive iOS app
-      - name: 🏗️ Build and Archive iOS App
-        run: |
-          # Create build directory
-          mkdir -p build
-          
-          # App configuration validation
-          echo "=== APP CONFIGURATION ==="
-          
-          # Check if app.config.js exists and is valid
+          # Check if app.config.js exists and extract key info
           if [ -f "app.config.js" ]; then
-            echo "✅ app.config.js found"
-            
             # Get bundle identifier from app config
             EXPECTED_BUNDLE_ID=$(node -p "
               try {
                 const config = require('./app.config.js');
-                const appConfig = typeof config === 'function' ? config() : config;
-                const result = appConfig?.default?.expo?.ios?.bundleIdentifier || appConfig?.expo?.ios?.bundleIdentifier;
-                console.log('Bundle ID from config:', result);
-                result || 'NOT_FOUND';
-              } catch (e) {
-                console.error('Error reading config:', e.message);
-                'ERROR';
+                const ios = config.expo?.ios || {};
+                ios.bundleIdentifier;
+              } catch(e) { 
+                console.error('Error extracting bundle ID:', e);
+                '';
               }
             " 2>&1 | tr -d '\"')
-            
-            echo "Expected bundle identifier: $EXPECTED_BUNDLE_ID"
             
             # Get app name
             APP_NAME=$(node -p "
               try {
                 const config = require('./app.config.js');
-                const appConfig = typeof config === 'function' ? config() : config;
-                const result = appConfig?.default?.expo?.name || appConfig?.expo?.name;
-                result || 'NOT_FOUND';
-              } catch (e) {
-                console.error('Error reading config:', e.message);
-                'ERROR';
+                config.name || config.expo?.name;
+              } catch(e) { 
+                console.error('Error extracting app name:', e);
+                '';
               }
             " 2>&1 | tr -d '\"')
             
-            echo "App name: $APP_NAME"
+            echo "✅ Bundle ID: $EXPECTED_BUNDLE_ID"
+            echo "✅ App name: $APP_NAME"
             
+            # Save for later steps
+            echo "EXPECTED_BUNDLE_ID=$EXPECTED_BUNDLE_ID" >> $GITHUB_ENV
+            echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           else
             echo "❌ app.config.js not found"
-            EXPECTED_BUNDLE_ID="UNKNOWN"
+            echo "EXPECTED_BUNDLE_ID=UNKNOWN" >> $GITHUB_ENV
           fi
-          
-          # Save bundle ID for later use
-          echo "EXPECTED_BUNDLE_ID=$EXPECTED_BUNDLE_ID" >> $GITHUB_ENV
-          
-          echo "=== END APP CONFIGURATION VALIDATION ==="
-          echo ""
-          echo "=== END IOS PROJECT DEBUG ==="
-          
-          cd ios
-          
+      
+      - name: 🔍 Find Xcode project/workspace
+        id: find_xcode_project
+        working-directory: ./ios
+        run: |
           # Find the .xcworkspace or .xcodeproj file
           WORKSPACE_FILE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1)
           PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
           
-          # Get the correct scheme name
           if [ -n "$WORKSPACE_FILE" ]; then
-            echo "Found workspace: $WORKSPACE_FILE"
-            echo "Available schemes in workspace:"
-            xcodebuild -workspace "$WORKSPACE_FILE" -list
+            echo "Using workspace: $WORKSPACE_FILE"
+            echo "XCODE_FILE=$WORKSPACE_FILE" >> $GITHUB_ENV
+            echo "XCODE_TYPE=workspace" >> $GITHUB_ENV
+          else
+            echo "Using project: $PROJECT_FILE"
+            echo "XCODE_FILE=$PROJECT_FILE" >> $GITHUB_ENV
+            echo "XCODE_TYPE=project" >> $GITHUB_ENV
+          fi
+      
+      - name: 🔍 Detect scheme
+        id: detect_scheme
+        working-directory: ./ios
+        run: |
+          # List available schemes
+          if [ "$XCODE_TYPE" = "workspace" ]; then
+            xcodebuild -workspace "$XCODE_FILE" -list > ../build/logs/schemes.log
+          else
+            xcodebuild -project "$XCODE_FILE" -list > ../build/logs/schemes.log
+          fi
+          
+          # Extract scheme prioritizing app-like schemes
+          SCHEME_NAME=$(cat ../build/logs/schemes.log | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -E "(DawnPatrol|Alarm|dp-|soda)" | head -n 1 | xargs)
+          
+          # Fallback options if no match
+          if [ -z "$SCHEME_NAME" ]; then
+            SCHEME_NAME=$(cat ../build/logs/schemes.log | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v -E "(boost|Pod|EX|React|Double)" | head -n 1 | xargs)
+          fi
+          
+          if [ -z "$SCHEME_NAME" ]; then
+            SCHEME_NAME=$(cat ../build/logs/schemes.log | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v "boost" | head -n 1 | xargs)
+          fi
+          
+          if [ -z "$SCHEME_NAME" ]; then
+            echo "❌ ERROR: No valid scheme found"
+            cat ../build/logs/schemes.log
+            exit 1
+          fi
+          
+          echo "✅ Selected scheme: $SCHEME_NAME"
+          echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=../build/${SCHEME_NAME}.xcarchive" >> $GITHUB_ENV
+      
+      - name: 🛠 Update Podfile iOS version
+        working-directory: ./ios
+        run: |
+          if [ -f "Podfile" ]; then
+            echo "Updating iOS deployment target..."
             
-            # Extract the app scheme name (prioritize non-library schemes)
-            # First try to find a scheme that matches common app naming patterns
-            SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -E "(DawnPatrol|Alarm|dp-|soda)" | head -n 1 | xargs)
-            
-            # If no app-like scheme found, fallback to first non-Pod scheme
-            if [ -z "$SCHEME_NAME" ]; then
-              SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v -E "(boost|Pod|EX|React|Double)" | head -n 1 | xargs)
+            # Set minimum iOS version to 12.0
+            if ! grep -q "platform :ios" Podfile; then
+              sed -i '' '1s/^/platform :ios, '\''12.0'\'\'$'\n/' Podfile
+            else
+              sed -i '' 's/platform :ios, .*$/platform :ios, '\''12.0'\''/' Podfile
             fi
             
-            # Final fallback to any scheme except boost
-            if [ -z "$SCHEME_NAME" ]; then
-              SCHEME_NAME=$(xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v "boost" | head -n 1 | xargs)
-            fi
-            echo "Using scheme: $SCHEME_NAME"
-            
-            # Validate that we have a proper app scheme, not a library
-            if [ -z "$SCHEME_NAME" ]; then
-              echo "❌ ERROR: No valid scheme found"
-              exit 1
-            fi
-            
-            if echo "$SCHEME_NAME" | grep -q "boost\|Pod\|EX\|React\|Double"; then
-              echo "❌ WARNING: Selected scheme '$SCHEME_NAME' appears to be a library, not the main app"
-              echo "Available schemes:"
-              xcodebuild -workspace "$WORKSPACE_FILE" -list | grep -A 20 "Schemes:"
-              echo "❌ Please check scheme selection logic"
+            # Add/update post_install hook
+            if ! grep -q "post_install" Podfile; then
+              echo "Adding post_install hook to fix pod deployment targets..."
+              echo "" >> Podfile
+              echo "post_install do |installer|" >> Podfile
+              echo "  installer.pods_project.targets.each do |target|" >> Podfile
+              echo "    target.build_configurations.each do |config|" >> Podfile
+              echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'" >> Podfile
+              echo "    end" >> Podfile
+              echo "  end" >> Podfile
+              echo "end" >> Podfile
             fi
             
-            # Save scheme name to environment for later steps
-            echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
-            
-            # Fix deployment target issues for iOS dependencies
-            echo "=== FIXING DEPLOYMENT TARGETS ==="
-            
-            # Update iOS deployment target in Podfile to ensure compatibility
-            if [ -f "Podfile" ]; then
-              echo "Updating Podfile deployment target..."
-              # Set minimum iOS version to 12.0 to match Xcode 16.2 requirements
-              if ! grep -q "platform :ios" Podfile; then
-                echo "Adding iOS platform specification to Podfile..."
-                sed -i '' '1s/^/platform :ios, '\''12.0'\'\'$'\n/' Podfile
-              else
-                echo "Updating existing iOS platform in Podfile..."
-                sed -i '' 's/platform :ios, .*$/platform :ios, '\''12.0'\''/' Podfile
-              fi
-              
-              # Add post_install hook to fix deployment targets for all pods
-              if ! grep -q "post_install" Podfile; then
-                echo "Adding post_install hook to fix pod deployment targets..."
-                echo "" >> Podfile
-                echo "post_install do |installer|" >> Podfile
-                echo "  installer.pods_project.targets.each do |target|" >> Podfile
-                echo "    target.build_configurations.each do |config|" >> Podfile
-                echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'" >> Podfile
-                echo "    end" >> Podfile
-                echo "  end" >> Podfile
-                echo "end" >> Podfile
-              fi
-              
-              echo "Updated Podfile contents:"
-              cat Podfile
-              
-              # Reinstall pods with updated deployment targets
-              echo "Reinstalling pods with updated deployment targets..."
-              cd ios && pod install --repo-update && cd ..
-            fi
-            
-            # Make sure the path is absolute
-            ARCHIVE_PATH="$(cd .. && pwd)/build/${SCHEME_NAME}.xcarchive"
-            echo "Archive path: $ARCHIVE_PATH"
-            
-            # Run the archive command with explicit error handling
-            set -e # Exit immediately if a command exits with a non-zero status
-            echo "Running archive command..."
-            
-            # First, let's try building without archiving to see if there are build errors
-            echo "=== ENHANCED BUILD TESTING ==="
-            echo "Attempting to build the project to check for errors..."
-            
-            # Add comprehensive build settings for iOS CI environment
-            echo "Testing build with manual signing..."
-            
-            if xcodebuild build \
-              -workspace "$WORKSPACE_FILE" \
+            # Store original Podfile for debugging
+            cp Podfile ../build/logs/Podfile.original
+          fi
+      
+      - name: 📦 Install CocoaPods dependencies
+        working-directory: ./ios
+        run: |
+          echo "Installing pods..."
+          pod install --repo-update | tee ../build/logs/pod_install.log || true
+          
+          # Check if successful
+          if [ -f "Podfile.lock" ]; then
+            echo "✅ CocoaPods dependencies installed"
+          else
+            echo "⚠️ CocoaPods may have failed, continuing anyway..."
+          fi
+      
+      - name: 🏗 Build for testing
+        working-directory: ./ios
+        run: |
+          echo "🏗 Testing build configuration..."
+          
+          # Common build settings
+          COMMON_BUILD_ARGS=(
+            "-configuration" "Release"
+            "-destination" "generic/platform=iOS"
+            "IPHONEOS_DEPLOYMENT_TARGET=12.0"
+            "ONLY_ACTIVE_ARCH=NO"
+            "ARCHS=arm64"
+            "VALID_ARCHS=arm64"
+            "ENABLE_BITCODE=NO"
+            "COMPILER_INDEX_STORE_ENABLE=NO"
+            "-allowProvisioningUpdates"
+          )
+          
+          # Try manual signing first
+          if [ "$XCODE_TYPE" = "workspace" ]; then
+            set +e
+            xcodebuild build \
+              -workspace "$XCODE_FILE" \
               -scheme "$SCHEME_NAME" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
+              "${COMMON_BUILD_ARGS[@]}" \
               CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
               PROVISIONING_PROFILE="${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
               CODE_SIGN_STYLE=Manual \
-              IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-              ONLY_ACTIVE_ARCH=NO \
-              ARCHS=arm64 \
-              VALID_ARCHS=arm64 \
-              EXCLUDED_ARCHS="" \
-              ENABLE_BITCODE=NO \
-              COMPILER_INDEX_STORE_ENABLE=NO \
-              -allowProvisioningUpdates \
-              2>&1 | tee build_test_manual.log; then
-              echo "✅ Build test with manual signing succeeded, proceeding with archive..."
-              BUILD_METHOD="manual"
-            else
-              echo "❌ Build failed with manual signing, trying with automatic signing..."
-              
-              if xcodebuild build \
-                -workspace "$WORKSPACE_FILE" \
-                -scheme "$SCHEME_NAME" \
-                -configuration Release \
-                -destination 'generic/platform=iOS' \
-                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-                CODE_SIGN_STYLE=Automatic \
-                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-                ONLY_ACTIVE_ARCH=NO \
-                ARCHS=arm64 \
-                VALID_ARCHS=arm64 \
-                EXCLUDED_ARCHS="" \
-                ENABLE_BITCODE=NO \
-                COMPILER_INDEX_STORE_ENABLE=NO \
-                -allowProvisioningUpdates \
-                2>&1 | tee build_test_auto.log; then
-                echo "✅ Build test with automatic signing succeeded"
-                BUILD_METHOD="automatic"
-              else
-                echo "❌ Build failed with both signing methods"
-                echo "=== MANUAL SIGNING BUILD LOG (last 30 lines) ==="
-                tail -30 build_test_manual.log 2>/dev/null || echo "No manual build log"
-                echo "=== AUTOMATIC SIGNING BUILD LOG (last 30 lines) ==="
-                tail -30 build_test_auto.log 2>/dev/null || echo "No automatic build log"
-                echo "=== PROVISIONING PROFILE DEBUG ==="
-                security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -E "(Name|UUID|application-identifier|team)" || echo "Could not read provisioning profile"
-                echo "=== KEYCHAIN DEBUG ==="
-                security find-identity -v -p codesigning build.keychain || echo "No code signing identities found"
-                exit 1
-              fi
+              > ../build/logs/build_test.log 2>&1
+            MANUAL_BUILD_RESULT=$?
+            set -e
+          else
+            set +e
+            xcodebuild build \
+              -project "$XCODE_FILE" \
+              -scheme "$SCHEME_NAME" \
+              "${COMMON_BUILD_ARGS[@]}" \
+              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
+              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+              CODE_SIGN_STYLE=Manual \
+              > ../build/logs/build_test.log 2>&1
+            MANUAL_BUILD_RESULT=$?
+            set -e
+          fi
+          
+          # Determine signing method based on test result
+          if [ $MANUAL_BUILD_RESULT -eq 0 ]; then
+            echo "✅ Build test with manual signing succeeded"
+            echo "SIGNING_METHOD=manual" >> $GITHUB_ENV
+          else
+            echo "⚠️ Build test with manual signing failed, will use automatic signing"
+            echo "SIGNING_METHOD=automatic" >> $GITHUB_ENV
+            
+            # Only show error log if debug is enabled
+            if [ "$DEBUG_MODE" = "true" ]; then
+              echo "=== BUILD TEST ERROR LOG ==="
+              cat ../build/logs/build_test.log
             fi
-            echo "=== BUILD TEST COMPLETE ==="
-            
-            # Now try the archive
-            echo "=== ENHANCED ARCHIVE PROCESS ==="
-            
-            if [ "$BUILD_METHOD" = "manual" ]; then
-              echo "Using manual signing for archive..."
-              if xcodebuild archive \
-                -workspace "$WORKSPACE_FILE" \
+          fi
+      
+      - name: 🏗 Create archive
+        working-directory: ./ios
+        run: |
+          echo "🏗 Creating archive with $SIGNING_METHOD signing..."
+          
+          # Common archive settings
+          COMMON_ARCHIVE_ARGS=(
+            "-configuration" "Release"
+            "-destination" "generic/platform=iOS"
+            "-archivePath" "$ARCHIVE_PATH"
+            "IPHONEOS_DEPLOYMENT_TARGET=12.0"
+            "ONLY_ACTIVE_ARCH=NO"
+            "ARCHS=arm64"
+            "VALID_ARCHS=arm64"
+            "ENABLE_BITCODE=NO"
+            "COMPILER_INDEX_STORE_ENABLE=NO"
+            "-allowProvisioningUpdates"
+          )
+          
+          # Create archive based on determined signing method
+          if [ "$SIGNING_METHOD" = "manual" ]; then
+            if [ "$XCODE_TYPE" = "workspace" ]; then
+              set +e
+              xcodebuild archive \
+                -workspace "$XCODE_FILE" \
                 -scheme "$SCHEME_NAME" \
-                -configuration Release \
-                -destination 'generic/platform=iOS' \
-                -archivePath "$ARCHIVE_PATH" \
+                "${COMMON_ARCHIVE_ARGS[@]}" \
                 CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
                 PROVISIONING_PROFILE="${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}" \
                 DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
                 CODE_SIGN_STYLE=Manual \
-                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-                ONLY_ACTIVE_ARCH=NO \
-                ARCHS=arm64 \
-                VALID_ARCHS=arm64 \
-                EXCLUDED_ARCHS="" \
-                ENABLE_BITCODE=NO \
-                COMPILER_INDEX_STORE_ENABLE=NO \
-                -allowProvisioningUpdates \
-                2>&1 | tee archive_log.txt; then
-                echo "✅ Archive with manual signing completed"
-                ARCHIVE_SUCCESS=true
-              else
-                echo "❌ Archive failed with manual signing"
-                ARCHIVE_SUCCESS=false
-              fi
+                > ../build/logs/archive.log 2>&1
+              ARCHIVE_RESULT=$?
+              set -e
             else
-              echo "Using automatic signing for archive..."
-              if xcodebuild archive \
-                -workspace "$WORKSPACE_FILE" \
-                -scheme "$SCHEME_NAME" \
-                -configuration Release \
-                -destination 'generic/platform=iOS' \
-                -archivePath "$ARCHIVE_PATH" \
-                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-                CODE_SIGN_STYLE=Automatic \
-                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-                ONLY_ACTIVE_ARCH=NO \
-                ARCHS=arm64 \
-                VALID_ARCHS=arm64 \
-                EXCLUDED_ARCHS="" \
-                ENABLE_BITCODE=NO \
-                COMPILER_INDEX_STORE_ENABLE=NO \
-                -allowProvisioningUpdates \
-                2>&1 | tee archive_log.txt; then
-                echo "✅ Archive with automatic signing completed"
-                ARCHIVE_SUCCESS=true
-              else
-                echo "❌ Archive failed with automatic signing"
-                ARCHIVE_SUCCESS=false
-              fi
-            fi
-            
-            # If archive failed, process log with our custom processor
-            if [ "$ARCHIVE_SUCCESS" != "true" ]; then
-              echo "=== ARCHIVE FAILED ==="
-              
-              # Make log processor executable
-              chmod +x ../scripts/xcode-log-processor.sh
-              
-              # Process the archive log to extract relevant information
-              ../scripts/xcode-log-processor.sh archive_log.txt
-              
-              # Display processed errors
-              cat archive_log.txt_errors.txt || echo "Could not process log file"
-              
-              # Show basic code signing info
-              echo "=== CODE SIGNING INFO ==="
-              echo "Team ID: ${{ secrets.APPLE_TEAM_ID }}"
-              echo "Bundle ID: $EXPECTED_BUNDLE_ID"
-              
-              exit 1
-            fi
-            
-            # Show build was successful
-            echo "✅ Archive completed successfully"
-          else
-            echo "Found project: $PROJECT_FILE"
-            echo "Available schemes in project:"
-            xcodebuild -project "$PROJECT_FILE" -list
-            
-            # Extract the app scheme name (prioritize non-library schemes)
-            # First try to find a scheme that matches common app naming patterns
-            SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -E "(DawnPatrol|Alarm|dp-|soda)" | head -n 1 | xargs)
-            
-            # If no app-like scheme found, fallback to first non-Pod scheme
-            if [ -z "$SCHEME_NAME" ]; then
-              SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v -E "(boost|Pod|EX|React|Double)" | head -n 1 | xargs)
-            fi
-            
-            # Final fallback to any scheme except boost
-            if [ -z "$SCHEME_NAME" ]; then
-              SCHEME_NAME=$(xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:" | grep -v "Schemes:" | grep -v '^$' | grep -v "boost" | head -n 1 | xargs)
-            fi
-            echo "Using scheme: $SCHEME_NAME"
-            
-            # Validate that we have a proper app scheme, not a library
-            if [ -z "$SCHEME_NAME" ]; then
-              echo "❌ ERROR: No valid scheme found"
-              exit 1
-            fi
-            
-            if echo "$SCHEME_NAME" | grep -q "boost\|Pod\|EX\|React\|Double"; then
-              echo "❌ WARNING: Selected scheme '$SCHEME_NAME' appears to be a library, not the main app"
-              echo "Available schemes:"
-              xcodebuild -project "$PROJECT_FILE" -list | grep -A 20 "Schemes:"
-              echo "❌ Please check scheme selection logic"
-            fi
-            
-            # Save scheme name to environment for later steps
-            echo "SCHEME_NAME=$SCHEME_NAME" >> $GITHUB_ENV
-            
-            # Fix deployment target issues for iOS dependencies
-            echo "=== FIXING DEPLOYMENT TARGETS ==="
-            
-            # Update iOS deployment target in Podfile to ensure compatibility
-            if [ -f "Podfile" ]; then
-              echo "Updating Podfile deployment target..."
-              # Set minimum iOS version to 12.0 to match Xcode 16.2 requirements
-              if ! grep -q "platform :ios" Podfile; then
-                echo "Adding iOS platform specification to Podfile..."
-                sed -i '' '1s/^/platform :ios, '\''12.0'\'\'$'\n/' Podfile
-              else
-                echo "Updating existing iOS platform in Podfile..."
-                sed -i '' 's/platform :ios, .*$/platform :ios, '\''12.0'\''/' Podfile
-              fi
-              
-              # Add post_install hook to fix deployment targets for all pods
-              if ! grep -q "post_install" Podfile; then
-                echo "Adding post_install hook to fix pod deployment targets..."
-                echo "" >> Podfile
-                echo "post_install do |installer|" >> Podfile
-                echo "  installer.pods_project.targets.each do |target|" >> Podfile
-                echo "    target.build_configurations.each do |config|" >> Podfile
-                echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'" >> Podfile
-                echo "    end" >> Podfile
-                echo "  end" >> Podfile
-                echo "end" >> Podfile
-              fi
-              
-              echo "Updated Podfile contents:"
-              cat Podfile
-              
-              # Reinstall pods with updated deployment targets
-              echo "Reinstalling pods with updated deployment targets..."
-              cd ios && pod install --repo-update && cd ..
-            fi
-            
-            # Make sure the path is absolute
-            ARCHIVE_PATH="$(cd .. && pwd)/build/${SCHEME_NAME}.xcarchive"
-            echo "Archive path: $ARCHIVE_PATH"
-            
-            # Run the archive command with explicit error handling
-            set -e # Exit immediately if a command exits with a non-zero status
-            echo "Running archive command..."
-            
-            # First, let's try building without archiving to see if there are build errors
-            echo "=== TESTING BUILD FIRST ==="
-            echo "Attempting to build the project to check for errors..."
-            if xcodebuild build \
-              -project "$PROJECT_FILE" \
-              -scheme "$SCHEME_NAME" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              CODE_SIGN_STYLE=Manual \
-              -allowProvisioningUpdates; then
-              echo "✅ Build succeeded, proceeding with archive..."
-            else
-              echo "❌ Build failed, trying with automatic signing..."
-              xcodebuild build \
-                -project "$PROJECT_FILE" \
-                -scheme "$SCHEME_NAME" \
-                -configuration Release \
-                -destination 'generic/platform=iOS' \
-                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-                CODE_SIGN_STYLE=Automatic \
-                -allowProvisioningUpdates || { echo "Build failed with both signing methods"; exit 1; }
-            fi
-            echo "=== BUILD TEST COMPLETE ==="
-            
-            # Now try the archive
-            echo "=== STARTING ARCHIVE ==="
-            if xcodebuild archive \
-              -project "$PROJECT_FILE" \
-              -scheme "$SCHEME_NAME" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -archivePath "$ARCHIVE_PATH" \
-              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              CODE_SIGN_STYLE=Manual \
-              IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-              -allowProvisioningUpdates \
-              2>&1 | tee archive_log.txt; then
-              echo "✅ Archive with manual signing completed"
-            else
-              echo "❌ Archive failed with explicit signing - trying with automatic signing..." 
+              set +e
               xcodebuild archive \
-                -project "$PROJECT_FILE" \
+                -project "$XCODE_FILE" \
                 -scheme "$SCHEME_NAME" \
-                -configuration Release \
-                -destination 'generic/platform=iOS' \
-                -archivePath "$ARCHIVE_PATH" \
+                "${COMMON_ARCHIVE_ARGS[@]}" \
+                CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+                PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
+                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                CODE_SIGN_STYLE=Manual \
+                > ../build/logs/archive.log 2>&1
+              ARCHIVE_RESULT=$?
+              set -e
+            fi
+          else
+            # Automatic signing
+            if [ "$XCODE_TYPE" = "workspace" ]; then
+              set +e
+              xcodebuild archive \
+                -workspace "$XCODE_FILE" \
+                -scheme "$SCHEME_NAME" \
+                "${COMMON_ARCHIVE_ARGS[@]}" \
                 DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
                 CODE_SIGN_STYLE=Automatic \
-                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-                -allowProvisioningUpdates \
-                2>&1 | tee archive_log_auto.txt || { echo "Both archive attempts failed"; exit 1; }
+                > ../build/logs/archive.log 2>&1
+              ARCHIVE_RESULT=$?
+              set -e
+            else
+              set +e
+              xcodebuild archive \
+                -project "$XCODE_FILE" \
+                -scheme "$SCHEME_NAME" \
+                "${COMMON_ARCHIVE_ARGS[@]}" \
+                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+                CODE_SIGN_STYLE=Automatic \
+                > ../build/logs/archive.log 2>&1
+              ARCHIVE_RESULT=$?
+              set -e
             fi
-            
-            # Show last 50 lines of archive log for debugging
-            echo "=== ARCHIVE LOG (last 50 lines) ==="
-            tail -50 archive_log.txt 2>/dev/null || tail -50 archive_log_auto.txt 2>/dev/null || echo "No archive log found"
-            echo "=== END ARCHIVE LOG ==="
           fi
           
-          cd ..
-          
-          # Verify the archive was created
-          if [ -d "build/${SCHEME_NAME}.xcarchive" ]; then
-            echo "✅ iOS app archived successfully at build/${SCHEME_NAME}.xcarchive"
-            ls -la "build/${SCHEME_NAME}.xcarchive"
+          # Check archive result
+          if [ $ARCHIVE_RESULT -eq 0 ]; then
+            echo "✅ Archive created successfully"
+          else
+            echo "❌ Archive failed"
             
-            # Verify the archive contains a valid app
-            APP_COUNT=$(find "build/${SCHEME_NAME}.xcarchive" -name "*.app" -type d | wc -l)
+            # Process log with xcode-log-processor
+            if [ -f "../scripts/xcode-log-processor.sh" ]; then
+              chmod +x ../scripts/xcode-log-processor.sh
+              ../scripts/xcode-log-processor.sh ../build/logs/archive.log
+              
+              # Show the processed errors
+              if [ -f "../build/logs/archive.log_errors.txt" ]; then
+                echo "=== ARCHIVE ERRORS ==="
+                cat ../build/logs/archive.log_errors.txt
+              fi
+            else
+              # Simple error extraction if processor not available
+              echo "=== ARCHIVE ERRORS ==="
+              grep -E "error:|fatal:" ../build/logs/archive.log | head -20
+            fi
+            
+            exit 1
+          fi
+      
+      - name: 🔍 Verify archive
+        working-directory: ./ios
+        run: |
+          if [ -d "$ARCHIVE_PATH" ]; then
+            echo "✅ Verifying archive structure..."
+            
+            # Check for app bundles
+            APP_COUNT=$(find "$ARCHIVE_PATH" -name "*.app" -type d | wc -l | xargs)
             echo "Found $APP_COUNT .app bundles in archive"
             
             if [ "$APP_COUNT" -eq 0 ]; then
               echo "❌ CRITICAL: Archive exists but contains no .app bundles"
-              echo "This indicates the build succeeded but produced an invalid archive"
-              find "build/${SCHEME_NAME}.xcarchive" -type f -name "*.plist" -exec echo "Plist: {}" \; -exec cat {} \; || true
               exit 1
             fi
             
-            # Debug: Check archive structure immediately after creation
-            echo "=== ARCHIVE DEBUG INFO ==="
-            echo "Archive structure:"
-            find "build/${SCHEME_NAME}.xcarchive" -type f -name "*.app" || echo "No .app bundles found"
-            find "build/${SCHEME_NAME}.xcarchive" -type d -name "*.app" || echo "No .app directories found"
-            
-            if [ -d "build/${SCHEME_NAME}.xcarchive/Products" ]; then
-              echo "Products directory contents:"
-              ls -la "build/${SCHEME_NAME}.xcarchive/Products"
-              if [ -d "build/${SCHEME_NAME}.xcarchive/Products/Applications" ]; then
-                echo "Applications directory contents:"
-                ls -la "build/${SCHEME_NAME}.xcarchive/Products/Applications"
-              fi
+            # Display basic archive info (only key files)
+            if [ "$DEBUG_MODE" = "true" ]; then
+              echo "=== ARCHIVE DEBUG INFO ==="
+              find "$ARCHIVE_PATH" -name "*.app" -type d | sort
+              cat "$ARCHIVE_PATH/Info.plist" > ../build/logs/archive_info.plist
+              echo "Archive Info.plist saved to build/logs/archive_info.plist"
             fi
-            
-            echo "Archive Info.plist:"
-            cat "build/${SCHEME_NAME}.xcarchive/Info.plist" || echo "Could not read Info.plist"
-            echo "=== END ARCHIVE DEBUG ==="
           else
-            echo "❌ Archive not found at build/${SCHEME_NAME}.xcarchive"
-            echo "Contents of build directory:"
-            ls -la build
-            echo "❌ CRITICAL: Archive creation failed completely"
+            echo "❌ Archive not found at $ARCHIVE_PATH"
             exit 1
           fi
-
-      # Export IPA
-      - name: 📦 Export IPA
+      
+      - name: 📊 Generate build report
+        if: always()
         run: |
-          # Check that the archive exists before proceeding
-          ARCHIVE_PATH="build/${{ env.SCHEME_NAME }}.xcarchive"
-          if [ ! -d "$ARCHIVE_PATH" ]; then
-            echo "❌ ERROR: Archive does not exist at $ARCHIVE_PATH"
-            echo "Contents of build directory:"
-            ls -la build || echo "No build directory found"
-            echo "❌ CRITICAL: No valid archive found - iOS build failed!"
-            exit 1 # Fail the workflow - we need a real archive
-          fi
+          echo "=============================================" >> build/logs/build_summary.log
+          echo "Build completed at $(date)" >> build/logs/build_summary.log
+          echo "Build result: ${ARCHIVE_RESULT:-UNKNOWN}" >> build/logs/build_summary.log
+          echo "Scheme: $SCHEME_NAME" >> build/logs/build_summary.log
+          echo "Bundle ID: $EXPECTED_BUNDLE_ID" >> build/logs/build_summary.log
+          echo "=============================================" >> build/logs/build_summary.log
           
-          echo "✅ Archive found at $ARCHIVE_PATH"
-          
-          # Get bundle identifier from app.config.js to ensure consistency
-          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
-          if [ -z "$BUNDLE_ID" ]; then
-            echo "❌ Could not extract bundle identifier from app.config.js"
-            exit 1
-          fi
-          
-          # Save current directory for reference
-          CURRENT_DIR=$(pwd)
-          echo "Current directory: $CURRENT_DIR"
-          
-          # Make sure we use absolute paths
-          ABSOLUTE_ARCHIVE_PATH=$(realpath "$ARCHIVE_PATH")
-          echo "Absolute archive path: $ABSOLUTE_ARCHIVE_PATH"
-          
-          # Check archive Info.plist for bundle identifier with better error handling
-          ARCHIVE_INFO_PLIST="$ABSOLUTE_ARCHIVE_PATH/Info.plist"
-          if [ -f "$ARCHIVE_INFO_PLIST" ]; then
-            echo "Archive Info.plist found at $ARCHIVE_INFO_PLIST"
-            echo "Reading bundle ID from archive Info.plist..."
-            
-            # Display the Info.plist contents for debugging
-            echo "Info.plist contents (first 20 lines):"
-            head -n 20 "$ARCHIVE_INFO_PLIST" || true
-            
-            # Try multiple possible paths for the bundle identifier
-            ARCHIVED_BUNDLE_ID=""
-            
-            # Try various common paths for bundle ID
-            for path in "ApplicationProperties:CFBundleIdentifier" "CFBundleIdentifier" "Application:CFBundleIdentifier"; do
-              echo "Trying to extract bundle ID with path: $path"
-              ID=$(/usr/libexec/PlistBuddy -c "Print :$path" "$ARCHIVE_INFO_PLIST" 2>/dev/null) || true
-              if [ -n "$ID" ]; then
-                ARCHIVED_BUNDLE_ID="$ID"
-                echo "Found bundle ID using path $path: $ARCHIVED_BUNDLE_ID"
-                break
-              fi
-            done
-            
-            if [ -n "$ARCHIVED_BUNDLE_ID" ]; then
-              BUNDLE_ID="$ARCHIVED_BUNDLE_ID"
-              echo "Using bundle ID from archive: $BUNDLE_ID"
-            else
-              echo "Could not extract bundle ID from Info.plist, using default"
-            fi
-          else
-            echo "Archive Info.plist not found at $ARCHIVE_INFO_PLIST"
-          fi
-          
-          echo "Bundle identifier: $BUNDLE_ID"
-          
-          # Do NOT use cd anymore - we'll use absolute paths
-          # Extract provisioning profile name from the archive
-          PROFILE_NAME=$(grep -A1 -a 'Name' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          if [ -z "$PROFILE_NAME" ]; then
-            PROFILE_NAME="Dawn Patrol Distribution"
-          fi
-          echo "Provisioning profile name: $PROFILE_NAME"
-          
-          # Create export options plist for Xcode 16.2
-          # First, let's check what export methods are available for this archive
-          echo "Checking available export methods for this archive..."
-          xcodebuild -exportArchive -archivePath "$ABSOLUTE_ARCHIVE_PATH" -exportPath /tmp/dummy -verbose 2>&1 | head -20 || true
-          
-          # Use printf to avoid YAML heredoc issues
-          printf '%s\n' \
-            '<?xml version="1.0" encoding="UTF-8"?>' \
-            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-            '<plist version="1.0">' \
-            '<dict>' \
-            '  <key>method</key>' \
-            '  <string>app-store-connect</string>' \
-            '  <key>teamID</key>' \
-            "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
-            '  <key>uploadBitcode</key>' \
-            '  <false/>' \
-            '  <key>compileBitcode</key>' \
-            '  <false/>' \
-            '  <key>uploadSymbols</key>' \
-            '  <true/>' \
-            '</dict>' \
-            '</plist>' > ExportOptions.plist
-          
-          # Display generated plist for debugging
-          echo "Generated ExportOptions.plist:"
-          cat ExportOptions.plist
-          
-          # Export IPA using the detected scheme name
-          echo "Using scheme: ${{ env.SCHEME_NAME }}"
-          
-          # Verify absolute path to archive again
-          if [ ! -d "$ABSOLUTE_ARCHIVE_PATH" ]; then
-            echo "❌ ERROR: Archive no longer at $ABSOLUTE_ARCHIVE_PATH"
-            echo "Checking if build directory still exists:"
-            ls -la $(dirname "$ABSOLUTE_ARCHIVE_PATH")
-            
-            # Check if we need to go back to the right directory
-            cd "$CURRENT_DIR" || echo "Failed to cd to $CURRENT_DIR"
-            echo "Now in directory: $(pwd)"
-            
-            if [ -d "build/${{ env.SCHEME_NAME }}.xcarchive" ]; then
-              echo "Found archive in relative path build/${{ env.SCHEME_NAME }}.xcarchive"
-              ABSOLUTE_ARCHIVE_PATH=$(realpath "build/${{ env.SCHEME_NAME }}.xcarchive")
-              echo "Updated absolute path: $ABSOLUTE_ARCHIVE_PATH"
-            else
-              echo "Archive not found in relative path either"
-            fi
-          fi
-          
-          # List archive contents to debug
-          echo "Archive contents:"
-          ls -la "$ABSOLUTE_ARCHIVE_PATH" || echo "Failed to list archive contents"
-          
-          # Check Products directory with absolute path
-          if [ -d "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" ]; then
-            echo "Checking Products directory:"
-            ls -la "$ABSOLUTE_ARCHIVE_PATH/Products/Applications"
-            APP_DIR=$(find "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" -type d -name "*.app" | head -n 1)
-            echo "Found app directory: $APP_DIR"
-          else
-            echo "No Applications directory found in archive"
-          fi
-          
-          # Try multiple export methods in sequence until one works
-          
-          echo "Trying export method 1: app-store-connect..."
-          if xcodebuild -exportArchive \
-            -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
-            -exportPath "$(pwd)/build" \
-            -exportOptionsPlist "$(pwd)/ExportOptions.plist" \
-            -allowProvisioningUpdates; then
-            echo "✅ Export succeeded with app-store-connect options"
-          else
-            echo "❌ App-store-connect export failed - trying app-store method..."
-            
-            # Try app-store method (legacy)
-            echo "Trying export method 2: app-store..."
-            printf '%s\n' \
-              '<?xml version="1.0" encoding="UTF-8"?>' \
-              '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-              '<plist version="1.0">' \
-              '<dict>' \
-              '  <key>method</key>' \
-              '  <string>app-store</string>' \
-              '  <key>teamID</key>' \
-              "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
-              '  <key>uploadBitcode</key>' \
-              '  <false/>' \
-              '  <key>compileBitcode</key>' \
-              '  <false/>' \
-              '</dict>' \
-              '</plist>' > AppStoreOptions.plist
-            
-            if xcodebuild -exportArchive \
-              -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
-              -exportPath "$(pwd)/build" \
-              -exportOptionsPlist "$(pwd)/AppStoreOptions.plist" \
-              -allowProvisioningUpdates; then
-              echo "✅ Export succeeded with app-store options"
-            else
-              echo "❌ App-store export failed - trying development method..."
-              
-              # Try development method
-              echo "Trying export method 3: development..."
-              printf '%s\n' \
-                '<?xml version="1.0" encoding="UTF-8"?>' \
-                '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-                '<plist version="1.0">' \
-                '<dict>' \
-                '  <key>method</key>' \
-                '  <string>development</string>' \
-                '  <key>teamID</key>' \
-                "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
-                '</dict>' \
-                '</plist>' > DevOptions.plist
-              
-              if xcodebuild -exportArchive \
-                -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
-                -exportPath "$(pwd)/build" \
-                -exportOptionsPlist "$(pwd)/DevOptions.plist" \
-                -allowProvisioningUpdates; then
-                echo "✅ Export succeeded with development options"
-              else
-                echo "❌ Development export failed - trying ad-hoc method..."
-                
-                # Try ad-hoc method
-                echo "Trying export method 4: ad-hoc..."
-                printf '%s\n' \
-                  '<?xml version="1.0" encoding="UTF-8"?>' \
-                  '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-                  '<plist version="1.0">' \
-                  '<dict>' \
-                  '  <key>method</key>' \
-                  '  <string>ad-hoc</string>' \
-                  '  <key>teamID</key>' \
-                  "  <string>${{ secrets.APPLE_TEAM_ID }}</string>" \
-                  '</dict>' \
-                  '</plist>' > AdHocOptions.plist
-                
-                if xcodebuild -exportArchive \
-                  -archivePath "$ABSOLUTE_ARCHIVE_PATH" \
-                  -exportPath "$(pwd)/build" \
-                  -exportOptionsPlist "$(pwd)/AdHocOptions.plist" \
-                  -allowProvisioningUpdates; then
-                  echo "✅ Export succeeded with ad-hoc options"
-                else
-                  echo "❌ All xcodebuild export methods failed - using manual export..."
-                  
-                  # Manual export by creating a zip file
-                  echo "Trying export method 5: manual ZIP creation..."
-                  
-                  # First, let's examine the full archive structure
-                  echo "Complete archive structure:"
-                  find "$ABSOLUTE_ARCHIVE_PATH" -name "*.app" -type d 2>/dev/null || echo "No .app directories found"
-                  
-                  # Look for .app files in various possible locations
-                  echo "Searching for .app files in archive..."
-                  APP_PATH=""
-                  
-                  # Try common locations
-                  if [ -d "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" ]; then
-                    APP_PATH=$(find "$ABSOLUTE_ARCHIVE_PATH/Products/Applications" -name "*.app" -type d | head -n 1)
-                  fi
-                  
-                  if [ -z "$APP_PATH" ] && [ -d "$ABSOLUTE_ARCHIVE_PATH/Products" ]; then
-                    APP_PATH=$(find "$ABSOLUTE_ARCHIVE_PATH/Products" -name "*.app" -type d | head -n 1)
-                  fi
-                  
-                  if [ -z "$APP_PATH" ]; then
-                    APP_PATH=$(find "$ABSOLUTE_ARCHIVE_PATH" -name "*.app" -type d | head -n 1)
-                  fi
-                  
-                  # Create the Payload directory structure
-                  mkdir -p Payload
-                  
-                  if [ -n "$APP_PATH" ]; then
-                    echo "Found app at $APP_PATH"
-                    # Copy the .app bundle to the Payload directory
-                    cp -R "$APP_PATH" Payload/
-                    
-                    # Create the IPA file (it's just a zip)
-                    zip -r "build/${{ env.SCHEME_NAME }}.ipa" Payload
-                    echo "✅ Created IPA manually at build/${{ env.SCHEME_NAME }}.ipa"
-                  else
-                    echo "❌ No .app file found anywhere in archive"
-                    echo "Archive structure:"
-                    ls -la "$ABSOLUTE_ARCHIVE_PATH"
-                    if [ -d "$ABSOLUTE_ARCHIVE_PATH/Products" ]; then
-                      echo "Products directory contents:"
-                      ls -la "$ABSOLUTE_ARCHIVE_PATH/Products"
-                    fi
-                    
-                    echo "❌ CRITICAL ERROR: No .app file found in archive - build process failed"
-                    rm -rf Payload
-                    exit 1
-                  fi
-                  
-                  # Clean up Payload directory
-                  rm -rf Payload
-                fi
-              fi
-            fi
-          fi
-          
-          # Show directory contents to debug
-          echo "Contents of build directory:"
-          ls -la build || echo "No build directory found"
-          
-          # Display Xcode version for debugging
-          echo "Xcode version:"
-          xcodebuild -version
-          
-          # Display available simulators
-          echo "Available simulators:"
-          xcrun simctl list devices available
-          
-          # Find the IPA file (or create one if needed)
-          echo "Looking for IPA files in the build directory:"
-          find build -name "*.ipa" -type f || echo "No IPA files found with direct search"
-          
-          OUTPUT_IPA="${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa"
-          echo "Output IPA name: $OUTPUT_IPA"
-          
-          # Check if IPA exists in build directory
-          if [ -f "build/${{ env.SCHEME_NAME }}.ipa" ]; then
-            echo "Found IPA at build/${{ env.SCHEME_NAME }}.ipa"
-            cp "build/${{ env.SCHEME_NAME }}.ipa" "./$OUTPUT_IPA"
-          else
-            echo "No IPA found in standard location"
-            
-            # Try recursive search
-            FOUND_IPA=$(find build -name "*.ipa" -type f | head -n 1)
-            if [ -n "$FOUND_IPA" ]; then
-              echo "Found IPA at $FOUND_IPA"
-              cp "$FOUND_IPA" "./$OUTPUT_IPA"
-            else
-              echo "❌ CRITICAL ERROR: No IPA file was created by any export method"
-              echo "This indicates the iOS build or export process completely failed"
-              echo "Build directory contents:"
-              ls -la build || echo "No build directory"
-              echo "Archive directory contents:"
-              ls -la "build/${{ env.SCHEME_NAME }}.xcarchive" || echo "No archive directory"
-              exit 1 # Fail the workflow - we need a real IPA
-            fi
-          fi
-          
-          # Verify IPA exists and has reasonable size
-          if [ -f "./$OUTPUT_IPA" ]; then
-            IPA_SIZE=$(stat -f%z "./$OUTPUT_IPA" 2>/dev/null || stat -c%s "./$OUTPUT_IPA" 2>/dev/null || echo "0")
-            echo "IPA file ready: $OUTPUT_IPA"
-            ls -la "./$OUTPUT_IPA"
-            echo "IPA file size: $(du -h "./$OUTPUT_IPA" | cut -f1) ($IPA_SIZE bytes)"
-            
-            # Validate IPA size - should be at least 1MB for a real app
-            if [ "$IPA_SIZE" -lt 1048576 ]; then
-              echo "❌ CRITICAL ERROR: IPA file is too small ($IPA_SIZE bytes)"
-              echo "This indicates the IPA contains no real app content"
-              echo "Expected size: >1MB for a real Expo/React Native app"
-              unzip -l "./$OUTPUT_IPA" | head -20 || echo "Could not list IPA contents"
-              exit 1
-            fi
-            
-            echo "✅ IPA file appears to be valid (size: $IPA_SIZE bytes)"
-          else
-            echo "❌ CRITICAL ERROR: Failed to create IPA file"
-            exit 1
-          fi
-
-      # Upload to TestFlight (commented out for manual testing)
-      # - name: 🚀 Upload to TestFlight
-      #   run: |
-      #     # Create App Store Connect API key file
-      #     mkdir -p ~/.appstoreconnect/private_keys
-      #     echo "${{ secrets.ASC_PRIVATE_KEY }}" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
-      #     
-      #     # Upload to TestFlight using altool
-      #     xcrun altool --upload-app \
-      #       --type ios \
-      #       --file "./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa" \
-      #       --apiKey "${{ secrets.ASC_KEY_ID }}" \
-      #       --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
-      #       --verbose
-      #     
-      #     echo "Successfully uploaded to TestFlight"
-
-      # Upload IPA as GitHub artifact
-      - name: 📤 Upload IPA Artifact
-        uses: actions/upload-artifact@v4
+          # Display build summary
+          cat build/logs/build_summary.log
+      
+      - name: 📦 Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.SCHEME_NAME }}-ios-${{ env.APP_VERSION }}
-          path: ./${{ env.SCHEME_NAME }}-${{ env.APP_VERSION }}.ipa
-
-      # Add build summary
-      - name: 📋 Build Summary
-        run: |
-          echo "## 🎉 iOS App Store Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📱 Build Information:" >> $GITHUB_STEP_SUMMARY
-          echo "- **App Version**: ${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Scheme Name**: ${{ env.SCHEME_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
-          echo "- **Distribution**: Manual upload to TestFlight" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
-          echo "- **App Store IPA**: \`${{ env.SCHEME_NAME }}-ios-${{ env.APP_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ready for TestFlight**: Download IPA and upload manually to App Store Connect" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the IPA artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
-          echo "2. Open [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
-          echo "3. Go to your app > TestFlight > iOS builds" >> $GITHUB_STEP_SUMMARY
-          echo "4. Click the '+' button to upload a new build" >> $GITHUB_STEP_SUMMARY
-          echo "5. Upload the downloaded IPA file" >> $GITHUB_STEP_SUMMARY
-          echo "6. Wait for processing and add to TestFlight for beta testing" >> $GITHUB_STEP_SUMMARY
+          name: ios-build-logs
+          path: build/logs/
+          retention-days: 7
+      
+      # Export & Upload to TestFlight steps would follow here

@@ -25,8 +25,11 @@ export default function StandleyLakeScreen() {
     clearCache
   } = useStandleyLakeWind();
 
+  // Not using these theme colors currently, but we're keeping them here for future styling needs
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 
