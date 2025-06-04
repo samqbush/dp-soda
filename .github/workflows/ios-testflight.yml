@@ -692,7 +692,7 @@ jobs:
               CODE_SIGN_STYLE=Manual \
               IPHONEOS_DEPLOYMENT_TARGET=12.0 \
               -allowProvisioningUpdates \
-              -verbose 2>&1 | tee archive_log.txt; then
+              2>&1 | tee archive_log.txt; then
               echo "✅ Archive with manual signing completed"
             else
               echo "❌ Archive failed with explicit signing - trying with automatic signing..." 
@@ -706,7 +706,7 @@ jobs:
                 CODE_SIGN_STYLE=Automatic \
                 IPHONEOS_DEPLOYMENT_TARGET=12.0 \
                 -allowProvisioningUpdates \
-                -verbose 2>&1 | tee archive_log_auto.txt || { echo "Both archive attempts failed"; exit 1; }
+                2>&1 | tee archive_log_auto.txt || { echo "Both archive attempts failed"; exit 1; }
             fi
             
             # Show last 50 lines of archive log for debugging
