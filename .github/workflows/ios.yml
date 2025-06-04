@@ -118,16 +118,20 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath ../build/dpsoda.xcarchive \
             CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             CODE_SIGN_STYLE="Manual" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
+            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_NAME }}"
           echo "iOS app archived successfully"
 
       # Export IPA
       - name: 📦 Export IPA
         run: |
-          # Create export options plist
+          # Extract bundle identifier from the archived Info.plist
+          BUNDLE_ID=$(defaults read build/dpsoda.xcarchive/Info.plist CFBundleIdentifier)
+          echo "Bundle Identifier: $BUNDLE_ID"
+          
+          # Create export options plist with provisioning profile
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -141,6 +145,13 @@ jobs:
             <true/>
             <key>uploadBitcode</key>
             <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>${{ secrets.IOS_DIST_PROVISIONING_PROFILE_NAME }}</string>
+            </dict>
           </dict>
           </plist>
           EOF
