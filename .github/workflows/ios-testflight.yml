@@ -2,7 +2,7 @@ name: Build and Deploy iOS to TestFlight
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, ios]
   workflow_dispatch:
 
 jobs:
@@ -104,17 +104,13 @@ jobs:
         run: |
           cd ios
           
-          # Find the .xcworkspace or .xcodeproj file
-          if [ -f *.xcworkspace ]; then
-            WORKSPACE_FILE=$(find . -name "*.xcworkspace" -maxdepth 1 -print | sed 's|./||')
-            echo "Found workspace: $WORKSPACE_FILE"
-            BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
-            # Extract provisioning profile UUID
-            PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-            echo "Provisioning Profile UUID: $PROFILE_UUID"
-          else
-            echo "No .xcworkspace found!"
-          fi
+          # Find the .xcworkspace (required)
+          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
+          echo "Found workspace: $WORKSPACE_FILE"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          # Extract provisioning profile UUID
+          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Provisioning Profile UUID: $PROFILE_UUID"
           
           # Build and archive
           $BUILD_COMMAND \
