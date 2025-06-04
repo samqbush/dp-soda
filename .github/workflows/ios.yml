@@ -176,8 +176,14 @@ jobs:
             -exportPath build \
             -exportOptionsPlist ExportOptions.plist
           
+          # Find and rename the exported IPA 
+          echo "Searching for IPA file in build directory..."
+          ls -la build/
+          EXPORTED_IPA=$(find build -name "*.ipa" | head -1)
+          echo "Found IPA file: $EXPORTED_IPA"
+          
           # Rename IPA to include version
-          mv build/dpsoda.ipa ./dp-soda-${{ env.APP_VERSION }}.ipa
+          mv "$EXPORTED_IPA" ./dp-soda-${{ env.APP_VERSION }}.ipa
           
           echo "IPA exported successfully"
 
