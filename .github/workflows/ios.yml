@@ -108,9 +108,11 @@ jobs:
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           echo "Found workspace: $WORKSPACE_FILE"
           BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
-          # Extract provisioning profile UUID
+          # Extract provisioning profile UUID and name
           PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          PROFILE_NAME=$(grep -A1 -a '<key>Name</key>' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           echo "Provisioning Profile UUID: $PROFILE_UUID"
+          echo "Provisioning Profile Name: $PROFILE_NAME"
           
           # Build and archive
           $BUILD_COMMAND \
@@ -121,7 +123,7 @@ jobs:
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             CODE_SIGN_STYLE="Manual" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_NAME }}"
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
           echo "iOS app archived successfully"
 
       # Export IPA
@@ -150,7 +152,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>$BUNDLE_ID</key>
-              <string>${{ secrets.IOS_DIST_PROVISIONING_PROFILE_NAME }}</string>
+              <string>$PROFILE_NAME</string>
             </dict>
           </dict>
           </plist>
