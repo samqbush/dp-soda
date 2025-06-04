@@ -310,7 +310,7 @@ jobs:
                 console.error('Error reading config:', e.message);
                 'ERROR';
               }
-            " 2>&1)
+            " 2>&1 | tr -d '\"')
             
             echo "Expected bundle identifier: $EXPECTED_BUNDLE_ID"
             
@@ -325,7 +325,7 @@ jobs:
                 console.error('Error reading config:', e.message);
                 'ERROR';
               }
-            " 2>&1)
+            " 2>&1 | tr -d '\"')
             
             echo "App name: $APP_NAME"
             
@@ -335,7 +335,7 @@ jobs:
           fi
           
           # Save bundle ID for later use
-          echo "EXPECTED_BUNDLE_ID=\"$EXPECTED_BUNDLE_ID\"" >> $GITHUB_ENV
+          echo "EXPECTED_BUNDLE_ID=$EXPECTED_BUNDLE_ID" >> $GITHUB_ENV
           
           echo "=== END APP CONFIGURATION VALIDATION ==="
           echo ""

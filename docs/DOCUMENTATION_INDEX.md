@@ -19,6 +19,7 @@ This index provides quick access to all documentation resources for the Dawn Pat
 | [Standley Lake Monitor](./feature_guides/STANDLEY_LAKE_MONITOR.md) | Ecowitt integration for Standley Lake wind monitoring |
 | [Android Crash & White Screen](./feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) | Handling and debugging Android crash issues |
 | [iOS Build Troubleshooting](./feature_guides/IOS_BUILD_TROUBLESHOOTING.md) | Solutions for common iOS build failures |
+| [Bundle Identifier Fix](./feature_guides/BUNDLE_IDENTIFIER_FIX.md) | Fixing bundle identifier format issues in GitHub Actions |
 | [Managing Build Logs](./feature_guides/MANAGING_BUILD_LOGS.md) | Tools and techniques for analyzing large build logs |
 
 ## Quick Links by Topic
