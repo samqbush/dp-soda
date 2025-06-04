@@ -74,43 +74,183 @@ jobs:
       # Set up iOS signing
       - name: 🔐 Set up iOS signing
         run: |
-          # Create keychain
+          echo "=== ENHANCED IOS SIGNING SETUP ==="
+          
+          # Validate required secrets first
+          if [ -z "${{ secrets.KEYCHAIN_PASSWORD }}" ]; then
+            echo "❌ KEYCHAIN_PASSWORD secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}" ]; then
+            echo "❌ IOS_DIST_CERTIFICATE_P12_BASE64 secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.IOS_DIST_PROVISIONING_PROFILE_BASE64 }}" ]; then
+            echo "❌ IOS_DIST_PROVISIONING_PROFILE_BASE64 secret is missing"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are present"
+          
+          # Create and configure keychain
+          echo "Setting up keychain..."
           security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security set-keychain-settings -t 1800 -l build.keychain
+          security set-keychain-settings -t 3600 -l build.keychain
           
           # Import distribution certificate
+          echo "Importing distribution certificate..."
           echo "${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          
+          # Verify certificate file was created
+          if [ ! -f "certificate.p12" ]; then
+            echo "❌ Failed to decode certificate"
+            exit 1
+          fi
+          
+          # Import with verbose output
+          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/security
+          
+          # Verify certificate was imported
+          echo "Verifying certificate import..."
+          security find-identity -v -p codesigning build.keychain
           
           # Import provisioning profile
+          echo "Setting up provisioning profiles..."
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          
+          # Decode and save provisioning profile
           echo "${{ secrets.IOS_DIST_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          
+          # Verify provisioning profile was created
+          if [ ! -f ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision ]; then
+            echo "❌ Failed to decode provisioning profile"
+            exit 1
+          fi
+          
+          # Extract and display provisioning profile info
+          echo "Provisioning profile details:"
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | head -20
+          
+          # Extract bundle ID from provisioning profile
+          PROFILE_BUNDLE_ID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 "application-identifier" | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | sed 's/.*\.//')
+          echo "Provisioning profile bundle ID: $PROFILE_BUNDLE_ID"
+          
+          # Extract team ID from provisioning profile
+          PROFILE_TEAM_ID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 -E "com\.apple\.developer\.team-identifier|TeamIdentifier" | grep string | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Provisioning profile team ID: $PROFILE_TEAM_ID"
           
           # Set code signing permissions
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
           
-          echo "iOS distribution signing setup complete"
+          # List all available provisioning profiles
+          echo "Available provisioning profiles:"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "No profiles directory found"
+          
+          echo "✅ iOS distribution signing setup complete"
 
       # Configure Xcode project for signing
       - name: 🔏 Configure Xcode project signing
         run: |
+          echo "=== ENHANCED XCODE PROJECT CONFIGURATION ==="
           cd ios
           
-          # Extract team ID and provisioning profile UUID
+          # Extract team ID and provisioning profile UUID with validation
           TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
-          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          
+          # Extract provisioning profile UUID more reliably
+          PROFILE_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -A1 UUID | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           
           echo "Team ID: $TEAM_ID"
           echo "Provisioning Profile UUID: $PROFILE_UUID"
           
-          # Update project.pbxproj with signing configuration
-          sed -i '' "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $TEAM_ID;/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g" *.xcodeproj/project.pbxproj
+          # Validate that we have the required values
+          if [ -z "$TEAM_ID" ]; then
+            echo "❌ APPLE_TEAM_ID is missing"
+            exit 1
+          fi
           
-          echo "Xcode project signing configuration complete"
+          if [ -z "$PROFILE_UUID" ]; then
+            echo "❌ Could not extract provisioning profile UUID"
+            exit 1
+          fi
+          
+          # Find the Xcode project file
+          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "❌ No Xcode project file found"
+            exit 1
+          fi
+          
+          echo "Configuring project: $PROJECT_FILE"
+          
+          # Backup original project file
+          cp "$PROJECT_FILE/project.pbxproj" "$PROJECT_FILE/project.pbxproj.backup"
+          
+          # Extract current bundle identifier from app.config.js
+          cd ..
+          EXPECTED_BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
+          cd ios
+          
+          echo "Expected bundle ID from app.config.js: $EXPECTED_BUNDLE_ID"
+          
+          # Update project.pbxproj with enhanced configuration
+          echo "Updating Xcode project configuration..."
+          
+          # Set development team
+          sed -i '' "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PROJECT_FILE/project.pbxproj"
+          
+          # Set provisioning profile specifier
+          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" "$PROJECT_FILE/project.pbxproj"
+          
+          # Set code sign style to manual
+          sed -i '' "s/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g" "$PROJECT_FILE/project.pbxproj"
+          
+          # Ensure bundle identifier is correct (if it exists in project)
+          if grep -q "PRODUCT_BUNDLE_IDENTIFIER" "$PROJECT_FILE/project.pbxproj"; then
+            echo "Updating bundle identifier in project..."
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = $EXPECTED_BUNDLE_ID;/g" "$PROJECT_FILE/project.pbxproj"
+            
+            # Double-check the bundle ID was set correctly
+            CURRENT_BUNDLE_ID=$(grep "PRODUCT_BUNDLE_IDENTIFIER" "$PROJECT_FILE/project.pbxproj" | head -1 | sed 's/.*PRODUCT_BUNDLE_IDENTIFIER = \(.*\);.*/\1/')
+            echo "Current bundle ID in project: $CURRENT_BUNDLE_ID"
+            
+            # Validate it matches what we expect
+            if [ "$CURRENT_BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
+              echo "⚠️ Bundle ID mismatch detected!"
+              echo "Expected: $EXPECTED_BUNDLE_ID"
+              echo "Found: $CURRENT_BUNDLE_ID"
+              echo "This may cause provisioning profile issues"
+            fi
+          else
+            echo "⚠️ No PRODUCT_BUNDLE_IDENTIFIER found in project file"
+          fi
+          
+          # Add additional required build settings for Release configuration
+          if ! grep -q "ONLY_ACTIVE_ARCH.*Release" "$PROJECT_FILE/project.pbxproj"; then
+            echo "Adding ONLY_ACTIVE_ARCH = NO for Release builds..."
+            # This is a complex sed operation to add build settings in the right place
+            # For now, we'll handle this via xcodebuild parameters instead
+          fi
+          
+          # Verify changes were applied
+          echo "Verifying project configuration changes..."
+          if grep -q "DEVELOPMENT_TEAM = $TEAM_ID" "$PROJECT_FILE/project.pbxproj"; then
+            echo "✅ Development team set correctly"
+          else
+            echo "⚠️ Development team setting may not have been applied"
+          fi
+          
+          if grep -q "PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\"" "$PROJECT_FILE/project.pbxproj"; then
+            echo "✅ Provisioning profile specifier set correctly"
+          else
+            echo "⚠️ Provisioning profile specifier setting may not have been applied"
+          fi
+          
+          echo "✅ Xcode project signing configuration complete"
 
       # Build and archive iOS app
       - name: 🏗️ Build and Archive iOS App
@@ -119,7 +259,7 @@ jobs:
           mkdir -p build
           
           # Debug: Check iOS project structure
-          echo "=== iOS PROJECT STRUCTURE DEBUG ==="
+          echo "=== ENHANCED IOS PROJECT STRUCTURE DEBUG ==="
           echo "Contents of ios directory:"
           ls -la ios/
           echo ""
@@ -129,7 +269,58 @@ jobs:
           echo "Checking Info.plist and project files:"
           find ios -name "Info.plist" | head -5
           find ios -name "project.pbxproj" | head -5
-          echo "=== END iOS PROJECT DEBUG ==="
+          echo ""
+          
+          # App configuration validation
+          echo "=== APP CONFIGURATION VALIDATION ==="
+          
+          # Check if app.config.js exists and is valid
+          if [ -f "app.config.js" ]; then
+            echo "✅ app.config.js found"
+            echo "Extracting app configuration..."
+            
+            # Get bundle identifier from app config
+            EXPECTED_BUNDLE_ID=$(node -p "
+              try {
+                const config = require('./app.config.js');
+                const appConfig = typeof config === 'function' ? config() : config;
+                const result = appConfig?.default?.expo?.ios?.bundleIdentifier || appConfig?.expo?.ios?.bundleIdentifier;
+                console.log('Bundle ID from config:', result);
+                result || 'NOT_FOUND';
+              } catch (e) {
+                console.error('Error reading config:', e.message);
+                'ERROR';
+              }
+            " 2>&1)
+            
+            echo "Expected bundle identifier: $EXPECTED_BUNDLE_ID"
+            
+            # Get app name
+            APP_NAME=$(node -p "
+              try {
+                const config = require('./app.config.js');
+                const appConfig = typeof config === 'function' ? config() : config;
+                const result = appConfig?.default?.expo?.name || appConfig?.expo?.name;
+                result || 'NOT_FOUND';
+              } catch (e) {
+                console.error('Error reading config:', e.message);
+                'ERROR';
+              }
+            " 2>&1)
+            
+            echo "App name: $APP_NAME"
+            
+          else
+            echo "❌ app.config.js not found"
+            EXPECTED_BUNDLE_ID="UNKNOWN"
+          fi
+          
+          # Save bundle ID for later use
+          echo "EXPECTED_BUNDLE_ID=$EXPECTED_BUNDLE_ID" >> $GITHUB_ENV
+          
+          echo "=== END APP CONFIGURATION VALIDATION ==="
+          echo ""
+          echo "=== END IOS PROJECT DEBUG ==="
           
           cd ios
           
@@ -219,66 +410,141 @@ jobs:
             echo "Running archive command..."
             
             # First, let's try building without archiving to see if there are build errors
-            echo "=== TESTING BUILD FIRST ==="
+            echo "=== ENHANCED BUILD TESTING ==="
             echo "Attempting to build the project to check for errors..."
+            
+            # Add comprehensive build settings for iOS CI environment
+            BUILD_SETTINGS="
+              CODE_SIGN_IDENTITY='${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}'
+              PROVISIONING_PROFILE='${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}'
+              DEVELOPMENT_TEAM='${{ secrets.APPLE_TEAM_ID }}'
+              CODE_SIGN_STYLE=Manual
+              IPHONEOS_DEPLOYMENT_TARGET=12.0
+              ONLY_ACTIVE_ARCH=NO
+              ARCHS='arm64'
+              VALID_ARCHS='arm64'
+              EXCLUDED_ARCHS=''
+              ENABLE_BITCODE=NO
+              COMPILER_INDEX_STORE_ENABLE=NO
+            "
+            
+            AUTO_BUILD_SETTINGS="
+              DEVELOPMENT_TEAM='${{ secrets.APPLE_TEAM_ID }}'
+              CODE_SIGN_STYLE=Automatic
+              IPHONEOS_DEPLOYMENT_TARGET=12.0
+              ONLY_ACTIVE_ARCH=NO
+              ARCHS='arm64'
+              VALID_ARCHS='arm64'
+              EXCLUDED_ARCHS=''
+              ENABLE_BITCODE=NO
+              COMPILER_INDEX_STORE_ENABLE=NO
+            "
+            
+            echo "Build settings for manual signing:"
+            echo "$BUILD_SETTINGS"
+            
             if xcodebuild build \
               -workspace "$WORKSPACE_FILE" \
               -scheme "$SCHEME_NAME" \
               -configuration Release \
               -destination 'generic/platform=iOS' \
-              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              CODE_SIGN_STYLE=Manual \
-              -allowProvisioningUpdates; then
-              echo "✅ Build succeeded, proceeding with archive..."
+              $BUILD_SETTINGS \
+              -allowProvisioningUpdates \
+              -verbose 2>&1 | tee build_test_manual.log; then
+              echo "✅ Build test with manual signing succeeded, proceeding with archive..."
+              BUILD_METHOD="manual"
             else
-              echo "❌ Build failed, trying with automatic signing..."
-              xcodebuild build \
+              echo "❌ Build failed with manual signing, trying with automatic signing..."
+              
+              echo "Build settings for automatic signing:"
+              echo "$AUTO_BUILD_SETTINGS"
+              
+              if xcodebuild build \
                 -workspace "$WORKSPACE_FILE" \
                 -scheme "$SCHEME_NAME" \
                 -configuration Release \
                 -destination 'generic/platform=iOS' \
-                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-                CODE_SIGN_STYLE=Automatic \
-                -allowProvisioningUpdates || { echo "Build failed with both signing methods"; exit 1; }
+                $AUTO_BUILD_SETTINGS \
+                -allowProvisioningUpdates \
+                -verbose 2>&1 | tee build_test_auto.log; then
+                echo "✅ Build test with automatic signing succeeded"
+                BUILD_METHOD="automatic"
+              else
+                echo "❌ Build failed with both signing methods"
+                echo "=== MANUAL SIGNING BUILD LOG (last 30 lines) ==="
+                tail -30 build_test_manual.log 2>/dev/null || echo "No manual build log"
+                echo "=== AUTOMATIC SIGNING BUILD LOG (last 30 lines) ==="
+                tail -30 build_test_auto.log 2>/dev/null || echo "No automatic build log"
+                echo "=== PROVISIONING PROFILE DEBUG ==="
+                security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -E "(Name|UUID|application-identifier|team)" || echo "Could not read provisioning profile"
+                echo "=== KEYCHAIN DEBUG ==="
+                security find-identity -v -p codesigning build.keychain || echo "No code signing identities found"
+                exit 1
+              fi
             fi
             echo "=== BUILD TEST COMPLETE ==="
             
             # Now try the archive
-            echo "=== STARTING ARCHIVE ==="
-            if xcodebuild archive \
-              -workspace "$WORKSPACE_FILE" \
-              -scheme "$SCHEME_NAME" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -archivePath "$ARCHIVE_PATH" \
-              CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-              PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-              CODE_SIGN_STYLE=Manual \
-              IPHONEOS_DEPLOYMENT_TARGET=12.0 \
-              -allowProvisioningUpdates \
-              -verbose 2>&1 | tee archive_log.txt; then
-              echo "✅ Archive with manual signing completed"
-            else
-              echo "❌ Archive failed with explicit signing - trying with automatic signing..." 
-              xcodebuild archive \
+            echo "=== ENHANCED ARCHIVE PROCESS ==="
+            
+            if [ "$BUILD_METHOD" = "manual" ]; then
+              echo "Using manual signing for archive..."
+              if xcodebuild archive \
                 -workspace "$WORKSPACE_FILE" \
                 -scheme "$SCHEME_NAME" \
                 -configuration Release \
                 -destination 'generic/platform=iOS' \
                 -archivePath "$ARCHIVE_PATH" \
-                DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-                CODE_SIGN_STYLE=Automatic \
-                IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+                $BUILD_SETTINGS \
                 -allowProvisioningUpdates \
-                -verbose 2>&1 | tee archive_log_auto.txt || { echo "Both archive attempts failed"; exit 1; }
+                -verbose 2>&1 | tee archive_log.txt; then
+                echo "✅ Archive with manual signing completed"
+                ARCHIVE_SUCCESS=true
+              else
+                echo "❌ Archive failed with manual signing"
+                ARCHIVE_SUCCESS=false
+              fi
+            else
+              echo "Using automatic signing for archive..."
+              if xcodebuild archive \
+                -workspace "$WORKSPACE_FILE" \
+                -scheme "$SCHEME_NAME" \
+                -configuration Release \
+                -destination 'generic/platform=iOS' \
+                -archivePath "$ARCHIVE_PATH" \
+                $AUTO_BUILD_SETTINGS \
+                -allowProvisioningUpdates \
+                -verbose 2>&1 | tee archive_log.txt; then
+                echo "✅ Archive with automatic signing completed"
+                ARCHIVE_SUCCESS=true
+              else
+                echo "❌ Archive failed with automatic signing"
+                ARCHIVE_SUCCESS=false
+              fi
             fi
             
-            # Show last 50 lines of archive log for debugging
-            echo "=== ARCHIVE LOG (last 50 lines) ==="
-            tail -50 archive_log.txt 2>/dev/null || tail -50 archive_log_auto.txt 2>/dev/null || echo "No archive log found"
+            # If archive failed, show detailed debug information
+            if [ "$ARCHIVE_SUCCESS" != "true" ]; then
+              echo "=== ARCHIVE FAILURE DEBUG ==="
+              echo "Archive log (last 50 lines):"
+              tail -50 archive_log.txt 2>/dev/null || echo "No archive log found"
+              
+              echo "=== CODE SIGNING DEBUG ==="
+              echo "Available code signing identities:"
+              security find-identity -v -p codesigning build.keychain || echo "No identities found"
+              
+              echo "Provisioning profile details:"
+              security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -E "(Name|UUID|application-identifier|DeveloperCertificates|ProvisionedDevices)" || echo "Could not read profile"
+              
+              echo "Xcode project bundle identifier:"
+              grep -A1 -B1 "PRODUCT_BUNDLE_IDENTIFIER" *.xcodeproj/project.pbxproj | head -10 || echo "Could not find bundle ID in project"
+              
+              exit 1
+            fi
+            
+            # Show last 30 lines of archive log for debugging
+            echo "=== ARCHIVE LOG (last 30 lines) ==="
+            tail -30 archive_log.txt 2>/dev/null || echo "No archive log found"
             echo "=== END ARCHIVE LOG ==="
           else
             echo "Found project: $PROJECT_FILE"
