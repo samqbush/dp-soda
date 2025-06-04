@@ -43,6 +43,24 @@ jobs:
           npm run lint
           npx tsc --noEmit --skipLibCheck
 
+      # Validate bundle identifiers
+      - name: 🔍 Validate bundle identifiers
+        run: |
+          echo "Validating bundle identifiers..."
+          chmod +x ./scripts/check-bundle-identifier.mjs
+          node ./scripts/check-bundle-identifier.mjs
+          
+          # Extract and validate bundle IDs directly
+          IOS_BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
+          ANDROID_PACKAGE=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.android.package")
+          
+          echo "iOS Bundle ID: $IOS_BUNDLE_ID"
+          echo "Android Package: $ANDROID_PACKAGE"
+          
+          # Set in environment without quotes to avoid quotation issues
+          echo "IOS_BUNDLE_ID=$IOS_BUNDLE_ID" >> $GITHUB_ENV
+          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+
       # Extract app version from app.config.js
       - name: 🏷️ Extract app version from app.config.js
         id: get_version

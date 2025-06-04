@@ -18,6 +18,7 @@ This index provides quick access to all documentation resources for the Dawn Pat
 |---------|-------------|
 | [Standley Lake Monitor](./feature_guides/STANDLEY_LAKE_MONITOR.md) | Ecowitt integration for Standley Lake wind monitoring |
 | [Android Crash & White Screen](./feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) | Handling and debugging Android crash issues |
+| [iOS Build Troubleshooting](./feature_guides/IOS_BUILD_TROUBLESHOOTING.md) | Solutions for common iOS build failures |
 
 ## Quick Links by Topic
 
