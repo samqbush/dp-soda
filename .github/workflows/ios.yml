@@ -1,4 +1,4 @@
-name: Build and Deploy iOS to TestFlight
+name: Build Dawn Patrol Alarm - iOS
 
 on:
   pull_request:
@@ -134,7 +134,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>uploadSymbols</key>
