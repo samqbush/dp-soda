@@ -291,26 +291,12 @@ jobs:
           # Create build directory
           mkdir -p build
           
-          # Debug: Check iOS project structure
-          echo "=== ENHANCED IOS PROJECT STRUCTURE DEBUG ==="
-          echo "Contents of ios directory:"
-          ls -la ios/
-          echo ""
-          echo "Looking for .xcworkspace and .xcodeproj files:"
-          find ios -name "*.xcworkspace" -o -name "*.xcodeproj" | head -10
-          echo ""
-          echo "Checking Info.plist and project files:"
-          find ios -name "Info.plist" | head -5
-          find ios -name "project.pbxproj" | head -5
-          echo ""
-          
           # App configuration validation
-          echo "=== APP CONFIGURATION VALIDATION ==="
+          echo "=== APP CONFIGURATION ==="
           
           # Check if app.config.js exists and is valid
           if [ -f "app.config.js" ]; then
             echo "✅ app.config.js found"
-            echo "Extracting app configuration..."
             
             # Get bundle identifier from app config
             EXPECTED_BUNDLE_ID=$(node -p "
@@ -447,13 +433,7 @@ jobs:
             echo "Attempting to build the project to check for errors..."
             
             # Add comprehensive build settings for iOS CI environment
-            echo "Build settings for manual signing:"
-            echo "CODE_SIGN_IDENTITY: ${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}"
-            echo "PROVISIONING_PROFILE: ${{ env.IOS_DIST_PROVISIONING_PROFILE_UUID_EXTRACTED }}"
-            echo "DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}"
-            
-            echo "Build settings for automatic signing:"
-            echo "DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}"
+            echo "Testing build with manual signing..."
             
             if xcodebuild build \
               -workspace "$WORKSPACE_FILE" \
@@ -472,7 +452,7 @@ jobs:
               ENABLE_BITCODE=NO \
               COMPILER_INDEX_STORE_ENABLE=NO \
               -allowProvisioningUpdates \
-              -verbose 2>&1 | tee build_test_manual.log; then
+              2>&1 | tee build_test_manual.log; then
               echo "✅ Build test with manual signing succeeded, proceeding with archive..."
               BUILD_METHOD="manual"
             else
@@ -493,7 +473,7 @@ jobs:
                 ENABLE_BITCODE=NO \
                 COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
-                -verbose 2>&1 | tee build_test_auto.log; then
+                2>&1 | tee build_test_auto.log; then
                 echo "✅ Build test with automatic signing succeeded"
                 BUILD_METHOD="automatic"
               else
@@ -534,7 +514,7 @@ jobs:
                 ENABLE_BITCODE=NO \
                 COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
-                -verbose 2>&1 | tee archive_log.txt; then
+                2>&1 | tee archive_log.txt; then
                 echo "✅ Archive with manual signing completed"
                 ARCHIVE_SUCCESS=true
               else
@@ -559,7 +539,7 @@ jobs:
                 ENABLE_BITCODE=NO \
                 COMPILER_INDEX_STORE_ENABLE=NO \
                 -allowProvisioningUpdates \
-                -verbose 2>&1 | tee archive_log.txt; then
+                2>&1 | tee archive_log.txt; then
                 echo "✅ Archive with automatic signing completed"
                 ARCHIVE_SUCCESS=true
               else
@@ -568,29 +548,29 @@ jobs:
               fi
             fi
             
-            # If archive failed, show detailed debug information
+            # If archive failed, process log with our custom processor
             if [ "$ARCHIVE_SUCCESS" != "true" ]; then
-              echo "=== ARCHIVE FAILURE DEBUG ==="
-              echo "Archive log (last 50 lines):"
-              tail -50 archive_log.txt 2>/dev/null || echo "No archive log found"
+              echo "=== ARCHIVE FAILED ==="
               
-              echo "=== CODE SIGNING DEBUG ==="
-              echo "Available code signing identities:"
-              security find-identity -v -p codesigning build.keychain || echo "No identities found"
+              # Make log processor executable
+              chmod +x ../scripts/xcode-log-processor.sh
               
-              echo "Provisioning profile details:"
-              security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep -E "(Name|UUID|application-identifier|DeveloperCertificates|ProvisionedDevices)" || echo "Could not read profile"
+              # Process the archive log to extract relevant information
+              ../scripts/xcode-log-processor.sh archive_log.txt
               
-              echo "Xcode project bundle identifier:"
-              grep -A1 -B1 "PRODUCT_BUNDLE_IDENTIFIER" *.xcodeproj/project.pbxproj | head -10 || echo "Could not find bundle ID in project"
+              # Display processed errors
+              cat archive_log.txt_errors.txt || echo "Could not process log file"
+              
+              # Show basic code signing info
+              echo "=== CODE SIGNING INFO ==="
+              echo "Team ID: ${{ secrets.APPLE_TEAM_ID }}"
+              echo "Bundle ID: $EXPECTED_BUNDLE_ID"
               
               exit 1
             fi
             
-            # Show last 30 lines of archive log for debugging
-            echo "=== ARCHIVE LOG (last 30 lines) ==="
-            tail -30 archive_log.txt 2>/dev/null || echo "No archive log found"
-            echo "=== END ARCHIVE LOG ==="
+            # Show build was successful
+            echo "✅ Archive completed successfully"
           else
             echo "Found project: $PROJECT_FILE"
             echo "Available schemes in project:"
