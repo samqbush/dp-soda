@@ -12,6 +12,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.samqbush.dpsoda",
+      buildNumber: "2",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
       }
