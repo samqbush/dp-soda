@@ -42,13 +42,17 @@ jobs:
         run: |
           npm run lint
 
-      # Extract app version from app.config.js
-      - name: 🏷️ Extract app version from app.config.js
+      # Extract app version and bundle identifier from app.config.js
+      - name: 🏷️ Extract app version and bundle ID from app.config.js
         id: get_version
         run: |
           VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
+          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "App Version: $VERSION"
+          echo "Bundle Identifier: $BUNDLE_ID"
           
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
@@ -116,10 +120,8 @@ jobs:
           echo "Provisioning Profile Name: $PROFILE_NAME"
           echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
           
-          # Extract bundle identifier from project's Info.plist
-          BUNDLE_ID=$(grep -A1 "PRODUCT_BUNDLE_IDENTIFIER" DawnPatrolAlarm.xcodeproj/project.pbxproj | grep -v PRODUCT_BUNDLE_IDENTIFIER | head -1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
-          echo "Bundle Identifier: $BUNDLE_ID"
-          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+          # Confirm the bundle identifier we're using
+          echo "Using bundle identifier: ${{ env.BUNDLE_ID }}"
           
           # Build and archive
           $BUILD_COMMAND \
@@ -163,6 +165,10 @@ jobs:
           </dict>
           </plist>
           EOF
+          
+          # Display export options for debugging
+          echo "Export options:"
+          cat ExportOptions.plist
           
           # Export IPA
           xcodebuild -exportArchive \
