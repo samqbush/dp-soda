@@ -91,6 +91,7 @@ For a detailed overview of implemented features, see [IMPLEMENTATION_SUMMARY.md]
 The project includes a GitHub Actions workflow (`build.yml`) that builds the app with specialized Android optimizations and white screen fixes. See the workflow file for details.
 
 ### Local Debug Instructions
+#### Android
 ```shell
 # install new apk
 VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
@@ -106,10 +107,20 @@ adb logcat -s "ReactNative:*" "ReactNativeJS:*" "AndroidRuntime:*" "System.err:*
 This project uses EAS for managed builds. Configuration is in `eas.json`.
 
 ```bash
-# Build for production
+# Android Build for local
 npx expo prebuild --platform android --clean
 ```
+#### iOS
+```bash
+# iOS Build for local
+npx expo prebuild --platform ios --clean
 
+cd ios
+pod install
+cd ..
+
+open ios/DawnPatrolAlarm.xcworkspace
+```
 ## Testing
 
 TODO: Develop unit tests
