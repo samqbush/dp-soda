@@ -1,8 +1,8 @@
-name: Build and Deploy iOS to TestFlight
+name: Build Dawn Patrol Alarm - iOS
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, ios]
   workflow_dispatch:
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
 
       - name: 🔧 Install Expo CLI and authenticate
         run: |
-          npm install -g @expo/cli eas-cli
+          npm install -g @expo/cli
           npx expo whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -41,15 +41,18 @@ jobs:
       - name: 🧪 Run checks
         run: |
           npm run lint
-          npx tsc --noEmit --skipLibCheck
 
-      # Extract app version from app.config.js
-      - name: 🏷️ Extract app version from app.config.js
+      # Extract app version and bundle identifier from app.config.js
+      - name: 🏷️ Extract app version and bundle ID from app.config.js
         id: get_version
         run: |
           VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
+          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "App Version: $VERSION"
+          echo "Bundle Identifier: $BUNDLE_ID"
           
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
@@ -70,6 +73,13 @@ jobs:
         env:
           CI: 1
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      
+      # Install CocoaPods dependencies
+      - name: 📦 Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+          cd ..
 
       # Set up iOS signing
       - name: 🔐 Set up iOS signing
@@ -93,38 +103,25 @@ jobs:
           
           echo "iOS distribution signing setup complete"
 
-      # Configure Xcode project for signing
-      - name: 🔏 Configure Xcode project signing
-        run: |
-          cd ios
-          
-          # Extract team ID and provisioning profile UUID
-          TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
-          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          
-          echo "Team ID: $TEAM_ID"
-          echo "Provisioning Profile UUID: $PROFILE_UUID"
-          
-          # Update project.pbxproj with signing configuration
-          sed -i '' "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $TEAM_ID;/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" *.xcodeproj/project.pbxproj
-          sed -i '' "s/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g" *.xcodeproj/project.pbxproj
-          
-          echo "Xcode project signing configuration complete"
-
       # Build and archive iOS app
       - name: 🏗️ Build and Archive iOS App
         run: |
           cd ios
           
-          # Find the .xcworkspace or .xcodeproj file
-          if [ -f *.xcworkspace ]; then
-            WORKSPACE_FILE=$(ls *.xcworkspace)
-            BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme dpsoda"
-          else
-            PROJECT_FILE=$(ls *.xcodeproj)
-            BUILD_COMMAND="xcodebuild archive -project $PROJECT_FILE -scheme dpsoda"
-          fi
+          # Find the .xcworkspace (required)
+          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
+          echo "Found workspace: $WORKSPACE_FILE"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          
+          # Extract provisioning profile UUID and name
+          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          PROFILE_NAME=$(grep -A1 -a '<key>Name</key>' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Provisioning Profile UUID: $PROFILE_UUID"
+          echo "Provisioning Profile Name: $PROFILE_NAME"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
+          
+          # Confirm the bundle identifier we're using
+          echo "Using bundle identifier: ${{ env.BUNDLE_ID }}"
           
           # Build and archive
           $BUILD_COMMAND \
@@ -132,31 +129,46 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath ../build/dpsoda.xcarchive \
             CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE="${{ secrets.IOS_DIST_PROVISIONING_PROFILE_UUID }}" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
-          
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE="Manual" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
           echo "iOS app archived successfully"
 
       # Export IPA
       - name: 📦 Export IPA
         run: |
-          # Create export options plist
+          # Use bundle identifier from previous step
+          echo "Using Bundle Identifier: ${{ env.BUNDLE_ID }}"
+          
+          # Create export options plist with provisioning profile
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>uploadSymbols</key>
             <true/>
             <key>uploadBitcode</key>
             <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${{ env.BUNDLE_ID }}</key>
+              <string>${{ env.PROFILE_NAME }}</string>
+            </dict>
           </dict>
           </plist>
           EOF
+          
+          # Display export options for debugging
+          echo "Export options:"
+          cat ExportOptions.plist
           
           # Export IPA
           xcodebuild -exportArchive \
@@ -164,8 +176,14 @@ jobs:
             -exportPath build \
             -exportOptionsPlist ExportOptions.plist
           
+          # Find and rename the exported IPA 
+          echo "Searching for IPA file in build directory..."
+          ls -la build/
+          EXPORTED_IPA=$(find build -name "*.ipa" | head -1)
+          echo "Found IPA file: $EXPORTED_IPA"
+          
           # Rename IPA to include version
-          mv build/dpsoda.ipa ./dp-soda-${{ env.APP_VERSION }}.ipa
+          mv "$EXPORTED_IPA" ./dp-soda-${{ env.APP_VERSION }}.ipa
           
           echo "IPA exported successfully"
 

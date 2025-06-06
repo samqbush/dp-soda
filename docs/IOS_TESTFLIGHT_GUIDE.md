@@ -128,6 +128,76 @@ After a successful build, you'll find:
 - **App Store IPA file**: Automatically uploaded to TestFlight
 - **GitHub Artifact**: Backup IPA file available for download
 
+## Manually Uploading IPA to TestFlight
+
+If you already have an IPA file (either from a local build or downloaded from GitHub artifacts) and need to manually upload it to TestFlight, follow these steps:
+
+### Prerequisites
+- Active Apple Developer Program membership ($99/year)
+- App already created in App Store Connect
+- App Store Connect API key credentials (for Transporter authentication)
+- Distribution IPA file properly signed for App Store distribution
+
+### Method 1: Using Transporter App (Recommended)
+1. Download and install Apple's [Transporter app](https://apps.apple.com/us/app/transporter/id1450874784) from the Mac App Store
+2. Open Transporter and sign in with your Apple ID
+3. Click the "+" button to add your IPA file
+4. Select your IPA file from your file system
+5. Click "Upload" to begin the upload process
+6. Wait for upload and processing to complete (can take 5-30 minutes)
+7. Once processed, the build will appear in App Store Connect under TestFlight
+
+### Method 2: Using xcrun altool Command Line
+1. Open Terminal on your Mac
+2. Run the following command to authenticate and upload:
+   ```bash
+   xcrun altool --upload-app -f /path/to/your/app.ipa -t ios -u "your_apple_id@example.com" -p "your_app_specific_password"
+   ```
+   
+   Alternatively, using API Key authentication (more secure):
+   ```bash
+   xcrun altool --upload-app -f /path/to/your/app.ipa -t ios --apiKey YOUR_API_KEY_ID --apiIssuer YOUR_ISSUER_ID
+   ```
+3. Wait for the upload to complete (you'll see progress in Terminal)
+4. The build will appear in TestFlight after processing
+
+### Method 3: Using App Store Connect Website
+1. Sign in to [App Store Connect](https://appstoreconnect.apple.com)
+2. Navigate to your app > TestFlight
+3. Click the "+" button and select "Import Build"
+4. Select your IPA file
+5. Click "Upload" and wait for processing to complete
+
+### After Upload
+1. Processing typically takes 5-30 minutes
+2. You'll receive an email when the build is ready for testing
+3. Sign in to App Store Connect > Your App > TestFlight
+4. Select the build and add it to testing groups
+5. Set required information (what to test, etc.)
+6. Save and distribute to testers
+
+### Troubleshooting Manual Uploads
+
+**Upload fails with "No suitable application records found":**
+- Verify the bundle ID in the IPA matches your App Store Connect app
+- Check that your Apple Developer account has access to the app
+- Ensure the app exists in App Store Connect
+
+**Upload fails with signature/certificate errors:**
+- Verify the IPA is signed with a valid distribution certificate
+- Check that the provisioning profile is for App Store distribution
+- Ensure your certificates haven't expired
+
+**Processing fails with compliance issues:**
+- Check the rejection details in App Store Connect
+- Common issues include missing encryption declaration or privacy policy
+- Make required updates in App Store Connect and try again
+
+**Upload fails with authentication errors:**
+- For App-specific password: regenerate a new app-specific password
+- For API keys: verify key has proper permissions and hasn't expired
+- Check that you're using the correct Apple ID associated with the Developer account
+
 ## Installing via TestFlight
 
 ### For Beta Testers
