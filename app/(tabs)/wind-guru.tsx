@@ -38,6 +38,7 @@ export default function WindGuruScreen() {
     getBasicKatabaticConditions,
     katabaticAnalysis,
     getTomorrowPrediction,
+    getDataSourceInfo,
   } = useWeatherData();
 
   // Get current analysis data
@@ -640,6 +641,81 @@ export default function WindGuruScreen() {
           )}
         </ThemedView>
 
+        {/* Data Source Status Indicator */}
+        <ThemedView style={[styles.dataSourceStatus, { 
+          backgroundColor: (() => {
+            const sourceInfo = getDataSourceInfo();
+            if (!sourceInfo) return 'rgba(128, 128, 128, 0.1)'; // Gray for unknown
+            switch (sourceInfo.source) {
+              case 'api': return 'rgba(76, 175, 80, 0.1)'; // Green for API
+              case 'cache': return 'rgba(255, 152, 0, 0.1)'; // Orange for cache
+              case 'mock': return 'rgba(244, 67, 54, 0.1)'; // Red for mock
+              default: return 'rgba(128, 128, 128, 0.1)';
+            }
+          })(),
+          borderRadius: 8, 
+          padding: 12,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: (() => {
+            const sourceInfo = getDataSourceInfo();
+            if (!sourceInfo) return 'rgba(128, 128, 128, 0.3)';
+            switch (sourceInfo.source) {
+              case 'api': return 'rgba(76, 175, 80, 0.3)';
+              case 'cache': return 'rgba(255, 152, 0, 0.3)';
+              case 'mock': return 'rgba(244, 67, 54, 0.3)';
+              default: return 'rgba(128, 128, 128, 0.3)';
+            }
+          })()
+        }]}>
+          <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>
+            {(() => {
+              const sourceInfo = getDataSourceInfo();
+              if (!sourceInfo) return '❓ Data Status: Unknown';
+              switch (sourceInfo.source) {
+                case 'api': return '🌐 Data Status: Live API Data';
+                case 'cache': return '💾 Data Status: Cached Data';
+                case 'mock': return '⚠️ Data Status: DEMO DATA (NOT REAL)';
+                default: return '❓ Data Status: Unknown';
+              }
+            })()}
+          </ThemedText>
+          <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
+            {(() => {
+              const sourceInfo = getDataSourceInfo();
+              if (!sourceInfo) return 'Unable to determine data source status.';
+              
+              switch (sourceInfo.source) {
+                case 'api':
+                  return '✅ Receiving real-time weather data from OpenWeatherMap API. Predictions are based on current meteorological conditions.';
+                case 'cache':
+                  return `📱 Using recent weather data from cache (fetched ${sourceInfo.lastFetch ? new Date(sourceInfo.lastFetch).toLocaleTimeString() : 'recently'}). Predictions may be slightly outdated but still reliable.`;
+                case 'mock':
+                  return '🚨 WARNING: This is DEMO DATA for testing purposes only. These are NOT real weather conditions! Configure your OpenWeatherMap API key in settings to see real data.';
+                default:
+                  return 'Data source status unclear. Check your internet connection and API configuration.';
+              }
+            })()}
+          </ThemedText>
+          {(() => {
+            const sourceInfo = getDataSourceInfo();
+            if (sourceInfo?.source === 'mock') {
+              return (
+                <ThemedText style={[styles.mockDataWarning, { 
+                  color: '#F44336', 
+                  fontWeight: 'bold',
+                  marginTop: 8,
+                  fontSize: 14
+                }]}>
+                  🔧 To fix: Add your OpenWeatherMap API key to .env file{'\n'}
+                  📖 See: docs/OPENWEATHERMAP_SETUP.md for setup instructions
+                </ThemedText>
+              );
+            }
+            return null;
+          })()}
+        </ThemedView>
+        
         {/* Pressure Trend Chart */}
         <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
           <PressureChart 
@@ -1104,5 +1180,12 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 13,
     lineHeight: 20,
+  },
+  // New styles for data source status indicator
+  dataSourceStatus: {
+    marginVertical: 8,
+  },
+  mockDataWarning: {
+    textAlign: 'left',
   },
 });

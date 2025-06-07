@@ -659,6 +659,18 @@ function WindDataDisplayContent() {
         </ThemedText>
       )}
       
+      {/* Wind Data Quality Indicator */}
+      <View style={styles.dataQualityRow}>
+        <ThemedText style={[styles.dataQualityText, { 
+          color: windData.length > 0 ? '#4CAF50' : '#F44336'
+        }]}>
+          {windData.length > 0 
+            ? `🌐 Live Wind Data (${windData.length} points from Soda Lake sensors)`
+            : '⚠️ No Wind Data Available - Check connection or try refresh'
+          }
+        </ThemedText>
+      </View>
+
       {/* Diagnostics button - only show in development or if there are errors */}
       {(__DEV__ || error) && (
         <TouchableOpacity 
@@ -923,5 +935,15 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  dataQualityRow: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dataQualityText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

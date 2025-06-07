@@ -67,33 +67,8 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
     
     console.log(`📱 Platform detected: ${Platform.OS}, isWeb: ${isWeb}`);
     
-    if (isWeb) {
-      console.log('🌐 Web environment detected - checking for cached data first');
-      const cachedData = await getCachedWindData();
-      if (cachedData && cachedData.length > 0) {
-        console.log('💾 Using cached wind data in web environment');
-        return cachedData;
-      }
-      
-      console.log('🌐 No cached data in web environment, using sample data for testing');
-      try {
-        const sampleData = generateSampleData();
-        await cacheWindData(sampleData);
-        return sampleData;
-      } catch (sampleError) {
-        console.error('❌ Error generating sample data:', sampleError);
-        // Return minimal data if even sample generation fails
-        return [{
-          time: new Date().toISOString(),
-          windSpeed: "0",
-          windGust: "0",
-          windDirection: "0"
-        }];
-      }
-    }
-    
-    // Mobile environment - make real API call
-    console.log('📱 Mobile environment - making real API call');
+    // Try real API call for both web and mobile environments
+    console.log('🌐 Attempting real API call...');
     const now = Date.now();
     const params = {
       callback: `jQuery17206585233276552562_${now}`,
@@ -114,7 +89,7 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       _: now
     };
 
-    console.log('📡 Making API request to mobile environment with params:', { spot_id: SPOT_ID });
+    console.log('📡 Making API request with params:', { spot_id: SPOT_ID });
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -126,41 +101,61 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
 
     // Use the API endpoint as seen in the working script
     const apiUrl = 'https://api.weatherflow.com/wxengine/rest/graph/getGraph';
-    const response = await axios.get(apiUrl, {
-      params,
-      headers,
-      timeout: 15000 // 15 second timeout for mobile
-    });
+    
+    try {
+      const response = await axios.get(apiUrl, {
+        params,
+        headers,
+        timeout: 15000 // 15 second timeout
+      });
 
-    console.log('✅ API response received:', {
-      status: response.status,
-      hasData: !!response.data,
-      dataType: typeof response.data
-    });
-    
-    // The API returns JSONP, so we need to extract the JSON
-    const text = response.data;
-    const match = text.match(/^[^(]+\((.*)\)$/s);
-    
-    if (!match) {
-      throw new Error('Failed to parse JSONP response');
+      console.log('✅ API response received:', {
+        status: response.status,
+        hasData: !!response.data,
+        dataType: typeof response.data
+      });
+      
+      // The API returns JSONP, so we need to extract the JSON
+      const text = response.data;
+      const match = text.match(/^[^(]+\((.*)\)$/s);
+      
+      if (!match) {
+        throw new Error('Failed to parse JSONP response');
+      }
+      
+      const json = JSON.parse(match[1]);
+      
+      // Process data similar to the original script
+      const processedData = processWindData(json);
+      
+      console.log('📊 Processed wind data:', {
+        totalPoints: processedData.length,
+        firstPoint: processedData[0],
+        lastPoint: processedData[processedData.length - 1]
+      });
+      
+      // Cache the data for offline access
+      await cacheWindData(processedData);
+      
+      return processedData;
+      
+    } catch (apiError) {
+      console.warn(`⚠️ API call failed (${isWeb ? 'web' : 'mobile'} environment):`, apiError);
+      
+      // For web environment, CORS is expected - try cache first
+      if (isWeb) {
+        console.log('🌐 Web environment - trying cached data due to expected CORS issues');
+        const cachedData = await getCachedWindData();
+        if (cachedData && cachedData.length > 0) {
+          console.log('💾 Using cached wind data in web environment');
+          return cachedData;
+        }
+        console.warn('❌ No cached data available in web environment');
+      }
+      
+      // Re-throw the error to be handled by outer catch block
+      throw apiError;
     }
-    
-    const json = JSON.parse(match[1]);
-    
-    // Process data similar to the original script
-    const processedData = processWindData(json);
-    
-    console.log('📊 Processed wind data:', {
-      totalPoints: processedData.length,
-      firstPoint: processedData[0],
-      lastPoint: processedData[processedData.length - 1]
-    });
-    
-    // Cache the data for offline access
-    await cacheWindData(processedData);
-    
-    return processedData;
   } catch (error: any) {
     console.error('❌ Error fetching wind data:', error);
     
@@ -171,22 +166,13 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       return cachedData;
     }
     
-    // If no cached data, generate sample data for testing
-    console.log('🔄 No cached data available, generating sample data for testing');
-    try {
-      const sampleData = generateSampleData();
-      await cacheWindData(sampleData);
-      return sampleData;
-    } catch (sampleError) {
-      console.error('❌ Error generating sample data fallback:', sampleError);
-      // Return minimal data if even sample generation fails
-      return [{
-        time: new Date().toISOString(),
-        windSpeed: "0",
-        windGust: "0", 
-        windDirection: "0"
-      }];
-    }
+    // NO SAMPLE DATA FALLBACK - Force user to fix connection or get real data
+    console.error('🚫 NO SAMPLE DATA FALLBACK - Real data required');
+    console.error('❌ Cannot fetch wind data and no cached data available');
+    console.error('💡 Check internet connection or try again later');
+    
+    // Return empty data set instead of fake data
+    return [];
   }
 };
 
@@ -586,69 +572,17 @@ export const verifyWindConditions = (
 };
 
 /**
- * Generates realistic sample wind data for testing purposes
- * Creates 24 hours of wind data with patterns similar to Soda Lake
- * Includes scenarios that would trigger alarms for testing
+ * SAMPLE DATA GENERATION DISABLED
+ * 
+ * Sample data generation has been disabled to force use of real data only.
+ * The app should never use fake/mock data for wind measurements.
+ * 
+ * If you need test data, use cached real data or fix the API connection.
  */
-const generateSampleData = (): WindDataPoint[] => {
-  const data: WindDataPoint[] = [];
-  const now = new Date();
-  
-  // Create a scenario where early morning conditions are good for an alarm
-  const isGoodWindDay = Math.random() > 0.3; // 70% chance of good wind day for testing
-  
-  // Generate data for the last 24 hours
-  for (let i = 0; i < 96; i++) { // 15-minute intervals
-    const time = new Date(now.getTime() - (95 - i) * 15 * 60 * 1000);
-    
-    // Create realistic wind patterns for Soda Lake
-    const hour = time.getHours();
-    let baseSpeed = 2;
-    
-    // Morning buildup pattern (typical for mountain lakes)
-    if (hour >= 3 && hour <= 6) {
-      // This is the critical alarm window - make it good on good wind days
-      if (isGoodWindDay) {
-        baseSpeed = 12 + Math.random() * 8; // 12-20 mph in early morning (alarm worthy!)
-      } else {
-        baseSpeed = 4 + Math.random() * 4; // 4-8 mph (not alarm worthy)
-      }
-    } else if (hour >= 7 && hour <= 10) {
-      baseSpeed = isGoodWindDay ? 15 + Math.random() * 10 : 8 + Math.random() * 6; // Building or moderate
-    } else if (hour >= 11 && hour <= 16) {
-      baseSpeed = 15 + Math.random() * 10; // 15-25 mph peak (both scenarios)
-    } else if (hour >= 17 && hour <= 20) {
-      baseSpeed = 8 + Math.random() * 7; // 8-15 mph declining
-    } else {
-      baseSpeed = 2 + Math.random() * 4; // 2-6 mph overnight
-    }
-    
-    // Add some variation but keep it consistent for alarm analysis
-    const variation = isGoodWindDay && hour >= 3 && hour <= 6 ? 2 : 4; // Less variation during alarm hours on good days
-    const speed = Math.max(0, baseSpeed + (Math.random() - 0.5) * variation);
-    const gust = speed + Math.random() * 5;
-    
-    // Wind direction - make it more consistent during alarm hours on good days
-    let baseDirection = 315; // NW - optimal for Soda Lake
-    let directionVariation = 60;
-    
-    if (isGoodWindDay && hour >= 3 && hour <= 6) {
-      directionVariation = 30; // More consistent direction for alarm hours
-    }
-    
-    const direction = baseDirection + (Math.random() - 0.5) * directionVariation;
-    
-    data.push({
-      time: time.toISOString(),
-      windSpeed: speed.toFixed(2),
-      windGust: gust.toFixed(2),
-      windDirection: Math.round(Math.max(0, Math.min(360, direction))).toString()
-    });
-  }
-  
-  console.log(`🎲 Generated sample data for ${isGoodWindDay ? 'GOOD' : 'POOR'} wind day`);
-  return data;
-};
+// const generateSampleData = (): WindDataPoint[] => {
+//   console.error('🚫 Sample data generation is disabled - use real data only');
+//   return [];
+// };
 
 /**
  * Manually load real wind data from a preload file for testing
@@ -665,8 +599,8 @@ export const loadPreloadedData = async (): Promise<WindDataPoint[]> => {
     ];
     
     if (realWindData.length === 0) {
-      console.log('📝 No preloaded data available, generating sample data');
-      return generateSampleData();
+      console.log('📝 No preloaded data available, returning empty array');
+      return [];
     }
     
     console.log(`📊 Loaded ${realWindData.length} preloaded data points`);
@@ -674,7 +608,7 @@ export const loadPreloadedData = async (): Promise<WindDataPoint[]> => {
     return realWindData;
   } catch (error) {
     console.error('❌ Error loading preloaded data:', error);
-    return generateSampleData();
+    return [];
   }
 };
 
