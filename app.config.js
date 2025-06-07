@@ -90,6 +90,7 @@ export default {
         projectId: "c70a6758-5324-40f2-ae28-646f452607f2"
       },
       // Environment variables for secure API access
+      OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY,
       ECOWITT_APPLICATION_KEY: process.env.ECOWITT_APPLICATION_KEY,
       ECOWITT_API_KEY: process.env.ECOWITT_API_KEY
     },

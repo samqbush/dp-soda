@@ -257,6 +257,33 @@ export const useWeatherData = () => {
     }
   }, [weatherData]);
 
+  /**
+   * Set OpenWeatherMap API key manually
+   */
+  const setApiKey = useCallback((apiKey: string) => {
+    weatherService.setApiKey(apiKey);
+  }, []);
+
+  /**
+   * Check if API key is configured
+   */
+  const isApiKeyConfigured = useCallback(() => {
+    return weatherService.isApiKeyConfigured();
+  }, []);
+
+  /**
+   * Get data source information
+   */
+  const getDataSourceInfo = useCallback(() => {
+    if (!weatherData) return null;
+    return {
+      source: weatherData.dataSource,
+      apiKeyConfigured: weatherData.apiKeyConfigured,
+      lastFetch: weatherData.lastFetch,
+      hasError: !!weatherData.error
+    };
+  }, [weatherData]);
+
   // Initialize data on mount
   useEffect(() => {
     fetchWeatherData();
@@ -281,6 +308,7 @@ export const useWeatherData = () => {
     // Actions
     refreshData,
     clearCache,
+    setApiKey,
     
     // Getters
     getCurrentConditions,
@@ -289,6 +317,8 @@ export const useWeatherData = () => {
     getTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
+    isApiKeyConfigured,
+    getDataSourceInfo,
     
     // Phase 2: Katabatic prediction engine
     katabaticAnalysis,

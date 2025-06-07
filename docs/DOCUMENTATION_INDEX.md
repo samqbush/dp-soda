@@ -19,6 +19,8 @@ This index provides quick access to all documentation resources for the Dawn Pat
 | [Phase 2 Implementation](./PHASE_2_IMPLEMENTATION.md) | Advanced katabatic wind prediction system (technical documentation) |
 | [Katabatic Prediction User Guide](./KATABATIC_PREDICTION_GUIDE.md) | How to understand and use wind predictions |
 | [Standley Lake Monitor](./STANDLEY_LAKE_MONITOR.md) | Ecowitt integration for Standley Lake wind monitoring |
+| [OpenWeatherMap Setup](./OPENWEATHERMAP_SETUP.md) | Configure real weather API (fixes mock data issues) |
+| [Weather Data Validation](./WEATHER_DATA_VALIDATION.md) | Troubleshoot prediction accuracy and data sources |
 
 ## Quick Links by Topic
 
