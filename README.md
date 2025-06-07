@@ -149,17 +149,17 @@ Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
 ## Documentation
 
-Comprehensive documentation for this application can be found in the `docs/` directory:
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
-- [Documentation Index](docs/DOCUMENTATION_INDEX.md) - Complete list of all documentation resources
-- [Developer Guide](docs/DEVELOPMENT.md) - For developers contributing to the project
-- [Architecture & Implementation](docs/ARCHITECTURE_AND_IMPLEMENTATION.md) - System design and features
-- [Build & Deployment](docs/BUILD_AND_DEPLOYMENT.md) - Building and deploying the application
+**Quick Links:**
+- 📖 **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
+- 👤 **[User Guide](docs/user-guide.md)** - How to use the app effectively
+- 🔬 **[Wind Prediction Guide](docs/wind-prediction-guide.md)** - Understanding katabatic wind analysis
+- 👨‍💻 **[Developer Setup](docs/developer-setup.md)** - Contributing to the project
+- 🚀 **[Deployment Guide](docs/deployment.md)** - Build and release processes
+- 🛠️ **[Troubleshooting Guide](docs/troubleshooting.md)** - Fixing common issues
 
-### Feature-Specific Documentation
-
-- [Standley Lake Wind Monitor](docs/feature_guides/STANDLEY_LAKE_MONITOR.md) - Using the Standley Lake wind monitoring feature
-- [Android Crash Guide](docs/feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) - Debugging Android-specific issues
+The documentation has been recently reorganized (June 2025) to eliminate sprawl and improve accessibility. Historical documentation is preserved in `docs/archive/` for reference.
 
 ## CI/CD with GitHub Actions
 
