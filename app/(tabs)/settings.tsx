@@ -7,12 +7,14 @@ import { debugSettings } from '@/services/debugSettings';
 import type { AlarmCriteria } from '@/services/windService';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useWindData();
   const [localCriteria, setLocalCriteria] = useState<AlarmCriteria>(criteria);
   const [hasChanges, setHasChanges] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
@@ -70,7 +72,15 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor }]}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor }]}
+      contentContainerStyle={[
+        styles.scrollContentContainer,
+        { 
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 80 : 20 // Extra padding for iOS tab bar
+        }
+      ]}
+    >
       <ThemedView style={styles.content}>
         <ThemedText type="title" style={styles.title}>Alarm Settings</ThemedText>
         <ThemedText style={styles.subtitle}>
@@ -402,6 +412,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+  },
   content: {
     padding: 16,
   },
@@ -541,8 +554,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   versionContainer: {
-    marginTop: 24,
+    marginTop: 32,
+    marginBottom: 20,
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Subtle background to make it more visible
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)', // Light border for definition
+    minHeight: 60, // Ensure minimum tappable area
   },
   testLinkContainer: {
     marginTop: 24,

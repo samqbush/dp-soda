@@ -19,6 +19,10 @@ interface DebugSettingsUIProps {
 
 // Component for managing debug settings
 export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
+  // Platform checks
+  const isIOS = Platform.OS === 'ios';
+  const isAndroid = Platform.OS === 'android';
+  
   // State for settings
   const [developerMode, setDeveloperMode] = useState(false);
   const [showAndroidDebugger, setShowAndroidDebugger] = useState(false);
@@ -212,7 +216,10 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
     <View style={styles.container}>
       <Text style={styles.title}>Debug Settings</Text>
       <Text style={styles.subtitle}>
-        Enable or disable debugging components
+        {isIOS 
+          ? 'Enable debugging tools and testing features for iOS'
+          : 'Enable or disable debugging components and testing tools'
+        }
       </Text>
       
       <ScrollView style={styles.settingsContainer}>
@@ -235,87 +242,7 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
         {/* Only show component toggles if developer mode is enabled */}
         {developerMode && (
           <>
-            {/* Android Crash Logger Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingName}>Android Crash Logger</Text>
-                <Text style={styles.settingDescription}>
-                  Logs and displays Android-specific crashes
-                </Text>
-              </View>
-              <Switch
-                value={showAndroidCrashLogger}
-                onValueChange={(value) => handleComponentToggle('showAndroidCrashLogger', value)}
-                trackColor={{ false: '#767577', true: '#2196F3' }}
-                thumbColor={showAndroidCrashLogger ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-            
-            {/* Android Debugger Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingName}>Android Debugger</Text>
-                <Text style={styles.settingDescription}>
-                  Basic debug information and white screen diagnostics
-                </Text>
-              </View>
-              <Switch
-                value={showAndroidDebugger}
-                onValueChange={(value) => handleComponentToggle('showAndroidDebugger', value)}
-                trackColor={{ false: '#767577', true: '#2196F3' }}
-                thumbColor={showAndroidDebugger ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-            
-            {/* APK Diagnostics Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingName}>APK Diagnostics</Text>
-                <Text style={styles.settingDescription}>
-                  APK-specific crash diagnostics and testing
-                </Text>
-              </View>
-              <Switch
-                value={showApkDiagnostics}
-                onValueChange={(value) => handleComponentToggle('showApkDiagnostics', value)}
-                trackColor={{ false: '#767577', true: '#2196F3' }}
-                thumbColor={showApkDiagnostics ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-            
-            {/* Enhanced Android Debugger Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingName}>Enhanced Android Debugger</Text>
-                <Text style={styles.settingDescription}>
-                  Advanced debugging tools for Android
-                </Text>
-              </View>
-              <Switch
-                value={showEnhancedAndroidDebugger}
-                onValueChange={(value) => handleComponentToggle('showEnhancedAndroidDebugger', value)}
-                trackColor={{ false: '#767577', true: '#2196F3' }}
-                thumbColor={showEnhancedAndroidDebugger ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-            
-            {/* Quick Export Button Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingName}>Quick Export Button</Text>
-                <Text style={styles.settingDescription}>
-                  Floating button for exporting crash data
-                </Text>
-              </View>
-              <Switch
-                value={showQuickExportButton}
-                onValueChange={(value) => handleComponentToggle('showQuickExportButton', value)}
-                trackColor={{ false: '#767577', true: '#2196F3' }}
-                thumbColor={showQuickExportButton ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-            
-            {/* Wind Alarm Tester Toggle */}
+            {/* Wind Alarm Tester Toggle - Available on all platforms */}
             <View style={styles.settingRow}>
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingName}>Wind Alarm Tester</Text>
@@ -330,6 +257,117 @@ export function DebugSettingsUI({ onClose }: DebugSettingsUIProps) {
                 thumbColor={showWindAlarmTester ? '#fff' : '#f4f3f4'}
               />
             </View>
+
+            {/* Android-specific debugging tools - Only show on Android */}
+            {isAndroid && (
+              <>
+                {/* Android Crash Logger Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingName}>Android Crash Logger</Text>
+                    <Text style={styles.settingDescription}>
+                      Logs and displays Android-specific crashes
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showAndroidCrashLogger}
+                    onValueChange={(value) => handleComponentToggle('showAndroidCrashLogger', value)}
+                    trackColor={{ false: '#767577', true: '#2196F3' }}
+                    thumbColor={showAndroidCrashLogger ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+                
+                {/* Android Debugger Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingName}>Android Debugger</Text>
+                    <Text style={styles.settingDescription}>
+                      Basic debug information and white screen diagnostics
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showAndroidDebugger}
+                    onValueChange={(value) => handleComponentToggle('showAndroidDebugger', value)}
+                    trackColor={{ false: '#767577', true: '#2196F3' }}
+                    thumbColor={showAndroidDebugger ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+                
+                {/* APK Diagnostics Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingName}>APK Diagnostics</Text>
+                    <Text style={styles.settingDescription}>
+                      APK-specific crash diagnostics and testing
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showApkDiagnostics}
+                    onValueChange={(value) => handleComponentToggle('showApkDiagnostics', value)}
+                    trackColor={{ false: '#767577', true: '#2196F3' }}
+                    thumbColor={showApkDiagnostics ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+                
+                {/* Enhanced Android Debugger Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingName}>Enhanced Android Debugger</Text>
+                    <Text style={styles.settingDescription}>
+                      Advanced debugging tools for Android
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showEnhancedAndroidDebugger}
+                    onValueChange={(value) => handleComponentToggle('showEnhancedAndroidDebugger', value)}
+                    trackColor={{ false: '#767577', true: '#2196F3' }}
+                    thumbColor={showEnhancedAndroidDebugger ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+                
+                {/* Quick Export Button Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingName}>Quick Export Button</Text>
+                    <Text style={styles.settingDescription}>
+                      Floating button for exporting crash data
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showQuickExportButton}
+                    onValueChange={(value) => handleComponentToggle('showQuickExportButton', value)}
+                    trackColor={{ false: '#767577', true: '#2196F3' }}
+                    thumbColor={showQuickExportButton ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+              </>
+            )}
+
+            {/* iOS-specific message */}
+            {isIOS && (
+              <View style={styles.platformMessageContainer}>
+                <Text style={styles.platformMessage}>
+                  🍎 iOS Debug Mode
+                </Text>
+                <Text style={styles.platformMessageDescription}>
+                  On iOS, developer mode enables the Wind Alarm Tester for testing different wind scenarios. 
+                  When you enable developer mode, Wind Alarm Tester will be automatically enabled.
+                  Advanced debugging tools are available through Xcode and iOS development tools.
+                </Text>
+              </View>
+            )}
+
+            {/* Android-specific message */}
+            {isAndroid && (
+              <View style={styles.platformMessageContainer}>
+                <Text style={styles.platformMessage}>
+                  🤖 Android Debug Mode
+                </Text>
+                <Text style={styles.platformMessageDescription}>
+                  Full debugging suite available including crash logging, diagnostics, and testing tools.
+                </Text>
+              </View>
+            )}
           </>
         )}
         
@@ -446,5 +484,24 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  platformMessageContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  platformMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1565c0',
+    marginBottom: 8,
+  },
+  platformMessageDescription: {
+    fontSize: 14,
+    color: '#1976d2',
+    lineHeight: 20,
   },
 });

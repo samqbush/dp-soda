@@ -1,5 +1,6 @@
 import { DebugSettingsUI } from '@/components/DebugSettingsUI';
 import { getBuildConfig } from '@/config/buildConfig';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { debugSettings } from '@/services/debugSettings';
 import React, { useState } from 'react';
 import {
@@ -80,12 +81,13 @@ export function SecretGestureActivator({ children, text }: SecretGestureActivato
 export function VersionDisplay() {
   const buildConfig = getBuildConfig();
   const versionText = `Version ${buildConfig.version} (${buildConfig.environment})`;
+  const textColor = useThemeColor({}, 'text');
 
   return (
     <SecretGestureActivator>
       <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>{versionText}</Text>
-        {/* Secret gesture hint is not shown to users */}
+        <Text style={[styles.versionText, { color: textColor }]}>{versionText}</Text>
+        <Text style={[styles.hintText, { color: textColor }]}>Tap version multiple times for debug options</Text>
       </View>
     </SecretGestureActivator>
   );
@@ -97,12 +99,13 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   versionText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   hintText: {
-    fontSize: 10,
-    color: '#999',
+    fontSize: 12,
+    opacity: 0.6,
     marginTop: 4,
     fontStyle: 'italic',
   },

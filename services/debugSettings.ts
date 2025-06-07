@@ -114,6 +114,12 @@ class DebugSettingsService {
       this.settings.showApkDiagnostics = false;
       this.settings.showEnhancedAndroidDebugger = false;
       this.settings.showQuickExportButton = false;
+      this.settings.showWindAlarmTester = false;
+    } else {
+      // When enabling developer mode, auto-enable Wind Alarm Tester for iOS users
+      if (Platform.OS === 'ios') {
+        this.settings.showWindAlarmTester = true;
+      }
     }
     
     // Save settings and notify components about visibility changes
@@ -128,13 +134,22 @@ class DebugSettingsService {
   async isComponentVisible(component: keyof Omit<DebugSettings, 'developerMode' | 'lastToggled'>): Promise<boolean> {
     await this.initialize();
     
-    // If not on Android, don't show Android-specific components
-    if (Platform.OS !== 'android') {
+    // If developer mode is disabled, don't show any debug components
+    if (!this.settings.developerMode) {
       return false;
     }
     
-    // If developer mode is disabled, don't show any debug components
-    if (!this.settings.developerMode) {
+    // Platform-specific component filtering
+    const androidOnlyComponents = [
+      'showAndroidDebugger',
+      'showAndroidCrashLogger', 
+      'showApkDiagnostics',
+      'showEnhancedAndroidDebugger',
+      'showQuickExportButton'
+    ];
+    
+    // If not on Android, don't show Android-specific components
+    if (Platform.OS !== 'android' && androidOnlyComponents.includes(component)) {
       return false;
     }
     
