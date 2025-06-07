@@ -11,6 +11,7 @@ The following secrets need to be configured in the GitHub repository:
 | `EXPO_TOKEN` | Expo access token for CI builds |
 | `ECOWITT_APPLICATION_KEY` | Ecowitt Application Key for API access |
 | `ECOWITT_API_KEY` | Ecowitt API Key for authentication |
+| `OPENWEATHER_API_KEY` | OpenWeatherMap API Key for weather data |
 | `KEYSTORE_BASE64` | Base64-encoded Android keystore file |
 | `STORE_PASSWORD` | Password for the Android keystore |
 
@@ -29,6 +30,16 @@ The following secrets need to be configured in the GitHub repository:
 2. Navigate to **API Management** in your account settings
 3. Create a new application if you don't have one already
 4. Copy the **Application Key** and **API Key** values
+
+### Obtaining OpenWeatherMap API Key
+
+1. Go to [https://openweathermap.org/api](https://openweathermap.org/api)
+2. Sign up for a free account (or log in if you have one)
+3. Navigate to **API keys** in your account dashboard
+4. Generate a new API key (or copy an existing one)
+5. Copy the API key value
+
+> **Note**: The free tier includes 1,000 API calls per day, which is sufficient for the Dawn Patrol app's weather forecasting needs.
 
 ### Creating and Encoding the Android Keystore
 
@@ -60,6 +71,7 @@ The GitHub Actions workflow handles environment variables as follows:
      run: |
        echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
        echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+       echo "OPENWEATHER_API_KEY=${{ secrets.OPENWEATHER_API_KEY }}" >> .env
    ```
 
 2. The app's configuration in `app.config.js` reads these values and makes them available to the app

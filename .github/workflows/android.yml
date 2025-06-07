@@ -47,6 +47,7 @@ jobs:
         run: |
           echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
           echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+          echo "OPENWEATHER_API_KEY=${{ secrets.OPENWEATHER_API_KEY }}" >> .env
           echo "✅ Created .env file with API credentials"
         
       # Android build setup
