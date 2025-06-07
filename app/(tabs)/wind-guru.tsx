@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { PressureChart } from '@/components/PressureChart';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 
@@ -41,7 +42,7 @@ export default function WindGuruScreen() {
 
   // Get current analysis data
   const tempDiff = getTemperatureDifferential();
-  const pressureTrend = getPressureTrend('morrison');
+  const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
 
@@ -639,14 +640,13 @@ export default function WindGuruScreen() {
           )}
         </ThemedView>
 
-        {/* Placeholder for future charts */}
+        {/* Pressure Trend Chart */}
         <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>📈 Pressure Trend (24h)</ThemedText>
-          <ThemedView style={styles.chartPlaceholder}>
-            <ThemedText style={[styles.placeholderText, { color: textColor, opacity: 0.5 }]}>
-              Pressure chart will appear here
-            </ThemedText>
-          </ThemedView>
+          <PressureChart 
+            pressureTrend={pressureTrend} 
+            title="📈 Pressure Trend (24h)"
+            location="Morrison, CO"
+          />
         </ThemedView>
 
         <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
