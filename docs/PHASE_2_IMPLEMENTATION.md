@@ -87,9 +87,9 @@ The katabatic prediction engine analyzes four critical meteorological factors:
 - **Weight**: 25%
 
 #### 4. Temperature Differential Analysis
-- **Threshold**: ≥5.0°C difference (Morrison warmer than mountain)
-- **Calculation**: Valley temperature - Mountain temperature
-- **Logic**: Temperature gradients drive katabatic flows
+- **Threshold**: ≥5.0°C difference (Morrison, CO warmer than Nederland, CO)
+- **Calculation**: Morrison temperature (1740m) - Nederland temperature (2540m)
+- **Logic**: Temperature gradients drive katabatic flows (800m elevation difference ideal)
 - **Weight**: 20%
 
 ### Probability Calculation Methodology
@@ -104,7 +104,7 @@ Each factor receives a confidence score (0-100) based on how well it meets the c
 - **Precipitation**: ✅ 17.8% (meets ≤20% threshold) → High confidence (~85)
 - **Sky Conditions**: ❌ 56% clear (below ≥70% threshold) → Low confidence (~40)  
 - **Pressure Change**: ✅ -7.3 hPa (exceeds ≥2.0 hPa threshold) → High confidence (~90)
-- **Temperature Differential**: ✅ 6.1°C (exceeds ≥5.0°C threshold) → High confidence (~80)
+- **Temperature Differential**: ✅ 6.1°C Morrison warmer than Nederland (exceeds ≥5.0°C threshold) → High confidence (~80)
 
 #### Step 2: Weighted Score Calculation
 

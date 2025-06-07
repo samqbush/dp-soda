@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { weatherService, WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
 import { useKatabaticAnalyzer } from '@/hooks/useKatabaticAnalyzer';
+import { katabaticAnalyzer } from '@/services/katabaticAnalyzer';
 
 /**
  * Custom hook for managing weather data state and operations
@@ -196,6 +197,66 @@ export const useWeatherData = () => {
     };
   }, [weatherData, getWeatherForTimeWindow, getTemperatureDifferential, getPressureTrend]);
 
+  /**
+   * Get preliminary katabatic prediction for tomorrow
+   * Note: This is a preliminary prediction based on current forecast models
+   */
+  const getTomorrowPrediction = useCallback(() => {
+    if (!weatherData) return null;
+    
+    try {
+      // Create a modified analyzer instance for tomorrow's data
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Filter weather data for tomorrow's 24-hour period
+      const tomorrowStart = new Date(tomorrow);
+      tomorrowStart.setHours(0, 0, 0, 0);
+      const tomorrowEnd = new Date(tomorrow);
+      tomorrowEnd.setHours(23, 59, 59, 999);
+      
+      // Create filtered weather data for tomorrow
+      const tomorrowWeatherData = {
+        ...weatherData,
+        morrison: {
+          ...weatherData.morrison,
+          hourlyForecast: weatherData.morrison.hourlyForecast.filter(point => {
+            const pointDate = new Date(point.timestamp);
+            return pointDate >= tomorrowStart && pointDate <= tomorrowEnd;
+          })
+        },
+        mountain: {
+          ...weatherData.mountain,
+          hourlyForecast: weatherData.mountain.hourlyForecast.filter(point => {
+            const pointDate = new Date(point.timestamp);
+            return pointDate >= tomorrowStart && pointDate <= tomorrowEnd;
+          })
+        }
+      };
+      
+      // Only proceed if we have tomorrow's data
+      if (tomorrowWeatherData.morrison.hourlyForecast.length === 0) {
+        return null;
+      }
+      
+      // Run katabatic analysis on tomorrow's data
+      const prediction = katabaticAnalyzer.analyzePrediction(tomorrowWeatherData);
+      
+      return {
+        prediction,
+        isPreliminary: true,
+        dataQuality: tomorrowWeatherData.morrison.hourlyForecast.length >= 20 ? 'good' : 'limited',
+        lastModelUpdate: weatherData.lastFetch,
+        nextUpdateExpected: '6:00 PM today',
+        disclaimer: 'Preliminary forecast - accuracy improves with evening weather model updates'
+      };
+      
+    } catch (error) {
+      console.error('Tomorrow prediction error:', error);
+      return null;
+    }
+  }, [weatherData]);
+
   // Initialize data on mount
   useEffect(() => {
     fetchWeatherData();
@@ -231,5 +292,6 @@ export const useWeatherData = () => {
     
     // Phase 2: Katabatic prediction engine
     katabaticAnalysis,
+    getTomorrowPrediction,
   };
 };

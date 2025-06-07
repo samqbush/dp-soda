@@ -17,7 +17,7 @@
 ✅ **Rain**: <20% precipitation chance  
 ✅ **Clear Sky**: >70% clear during 2-5am  
 ✅ **Pressure**: >2.0 hPa pressure change  
-✅ **Temperature**: >5.0°C valley-mountain difference  
+✅ **Temperature**: >9.0°F Morrison warmer than Nederland (1740m vs 2540m elevation)  
 
 ## Key Insights
 
