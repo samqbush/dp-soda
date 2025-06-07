@@ -16,8 +16,9 @@ This index provides quick access to all documentation resources for the Dawn Pat
 
 | Feature | Description |
 |---------|-------------|
-| [Standley Lake Monitor](./feature_guides/STANDLEY_LAKE_MONITOR.md) | Ecowitt integration for Standley Lake wind monitoring |
-| [Android Crash & White Screen](./feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) | Handling and debugging Android crash issues |
+| [Phase 2 Implementation](./PHASE_2_IMPLEMENTATION.md) | Advanced katabatic wind prediction system (technical documentation) |
+| [Katabatic Prediction User Guide](./KATABATIC_PREDICTION_GUIDE.md) | How to understand and use wind predictions |
+| [Standley Lake Monitor](./STANDLEY_LAKE_MONITOR.md) | Ecowitt integration for Standley Lake wind monitoring |
 
 ## Quick Links by Topic
 
@@ -31,7 +32,8 @@ This index provides quick access to all documentation resources for the Dawn Pat
 - Check the GitHub Actions workflows in `.github/workflows/`
 
 ### For Feature Development
-- Reference relevant feature guides in `./feature_guides/`
+- Reference relevant feature guides for specific functionality
+- **For Wind Prediction**: Start with [Katabatic Prediction User Guide](./KATABATIC_PREDICTION_GUIDE.md), then [Phase 2 Implementation](./PHASE_2_IMPLEMENTATION.md)
 - Review [ARCHITECTURE_AND_IMPLEMENTATION.md](./ARCHITECTURE_AND_IMPLEMENTATION.md) for integration patterns
 
 ### For Troubleshooting
@@ -42,7 +44,9 @@ This index provides quick access to all documentation resources for the Dawn Pat
 
 | Document | Last Updated | Major Changes |
 |----------|--------------|--------------|
-| DOCUMENTATION_INDEX.md | 2025-06-03 | Initial creation |
+| KATABATIC_PREDICTION_GUIDE.md | 2025-06-06 | Created comprehensive user guide for understanding wind predictions |
+| PHASE_2_IMPLEMENTATION.md | 2025-06-06 | Added detailed calculation methodology and 47% prediction example |
+| DOCUMENTATION_INDEX.md | 2025-06-06 | Added Phase 2 documentation links and user guide |
 | ARCHITECTURE_AND_IMPLEMENTATION.md | 2025-06-03 | Consolidated from ARCHITECTURE.md and IMPLEMENTATION_SUMMARY.md |
 | BUILD_AND_DEPLOYMENT.md | 2025-06-03 | Consolidated from LOCAL_BUILD_INSTRUCTIONS.md, CI_CD_SECRETS_SETUP.md, and ENVIRONMENT_SETUP.md |
 | DEVELOPMENT.md | 2025-06-03 | Added React Navigation v7 fixes from REACT_NAVIGATION_V7_FIXES.md |
