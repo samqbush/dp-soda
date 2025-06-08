@@ -3,7 +3,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
-import { debugSettings } from '@/services/debugSettings';
+import { testBackgroundAlarms, cancelTestNotifications } from '@/services/backgroundAlarmTester';
 import type { AlarmCriteria } from '@/services/windService';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -343,8 +343,8 @@ export default function SettingsScreen() {
             <ThemedText style={styles.alarmInfo}>
               When enabled, the alarm will check wind conditions at {localCriteria.alarmTime} if the 3am-5am window analysis indicates favorable conditions.
             </ThemedText>
-            <ThemedText style={[styles.alarmInfo, { marginTop: 8, fontStyle: 'italic' }]}>
-              Note: The app must remain open for the alarm to function. Future updates will add background alarm support.
+            <ThemedText style={[styles.alarmInfo, { marginTop: 8, fontStyle: 'italic', color: '#4CAF50' }]}>
+              ✅ Background alarms are now supported! You&apos;ll receive notifications even when the app is closed.
             </ThemedText>
           </View>
         </View>
@@ -395,8 +395,11 @@ export default function SettingsScreen() {
             Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
 
-          {/* Developer Settings - Only shown when in developer mode */}
-          <DevModeTestLink />
+          {/* Wind Alarm Tester - Always visible */}
+          <WindAlarmTesterLink />
+          
+          {/* Background Alarm Testing - Only shown in dev mode */}
+          {__DEV__ && <BackgroundAlarmTester />}
         </View>
           
         {/* Version display with secret gesture detection */}
@@ -643,55 +646,66 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
+  backgroundAlarmTester: {
+    marginTop: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: 'rgba(76, 175, 80, 0.05)',
+  },
+  testerTitle: {
+    marginBottom: 16,
+    color: '#4CAF50',
+  },
+  testerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  testerButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  testerButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  testResult: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+  },
+  testResultText: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+  },
+  testerInfo: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
 });
 
-// Component for Wind Alarm Test link that's only visible in developer mode
-function DevModeTestLink() {
-  const [isVisible, setIsVisible] = useState(false);
-  
-  useEffect(() => {
-    // Check if developer mode is enabled and Wind Alarm Tester is visible
-    const checkVisibility = async () => {
-      try {
-        const isDeveloperMode = await debugSettings.isDeveloperModeEnabled();
-        const isComponentVisible = await debugSettings.isComponentVisible('showWindAlarmTester');
-        setIsVisible(isDeveloperMode && isComponentVisible);
-      } catch (error) {
-        console.error('Error checking Wind Alarm Tester visibility:', error);
-        setIsVisible(false);
-      }
-    };
-    
-    checkVisibility();
-    
-    // Set up a subscription to visibility changes
-    const unsubscribe = debugSettings.subscribeToVisibilityChanges(
-      'showWindAlarmTester',
-      async () => {
-        await checkVisibility();
-      }
-    );
-    
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-  
-  if (!isVisible) {
-    return null;
-  }
-  
+// Component for Wind Alarm Test link - Always visible
+function WindAlarmTesterLink() {
   return (
     <View style={styles.testLinkContainer}>
-      <ThemedText style={styles.testLinkHeader}>Developer Options</ThemedText>
+      <ThemedText style={styles.testLinkHeader}>Testing Tools</ThemedText>
       <Link href="/test-alarm" asChild>
         <TouchableOpacity 
           style={[
             styles.testButton, 
             { 
-              backgroundColor: '#FFF0E0', // Light orange background to indicate dev feature
+              backgroundColor: '#E3F2FD', // Light blue background
               borderWidth: 1,
-              borderColor: '#FFAA5A', // Medium orange border
+              borderColor: '#2196F3', // Blue border
               flexDirection: 'row',
               justifyContent: 'center',
               alignItems: 'center'
@@ -699,11 +713,99 @@ function DevModeTestLink() {
           ]}
           activeOpacity={0.7}
         >
-          <ThemedText style={styles.testButtonText}>🔧 Wind Alarm Tester (Developer)</ThemedText>
+          <ThemedText style={styles.testButtonText}>🔧 Wind Alarm Tester</ThemedText>
         </TouchableOpacity>
       </Link>
       <ThemedText style={styles.testLinkDescription}>
-        Developer tool: Test different wind scenarios to verify alarm trigger behavior
+        Test different wind scenarios to verify alarm trigger behavior
+      </ThemedText>
+    </View>
+  );
+}
+
+// Background Alarm Tester Component
+function BackgroundAlarmTester() {
+  const [testResult, setTestResult] = useState<string>('');
+  const [isTestRunning, setIsTestRunning] = useState(false);
+
+  const runBackgroundAlarmTest = async () => {
+    setIsTestRunning(true);
+    setTestResult('Running test...');
+    
+    try {
+      const result = await testBackgroundAlarms();
+      setTestResult(result.success 
+        ? `✅ ${result.message}` 
+        : `❌ ${result.message}`
+      );
+      
+      if (result.success) {
+        Alert.alert(
+          '🧪 Test Scheduled', 
+          result.message + '\n\nClose the app to test background notifications!',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult(`❌ Test failed: ${errorMsg}`);
+    } finally {
+      setIsTestRunning(false);
+    }
+  };
+
+  const cancelTests = async () => {
+    setIsTestRunning(true);
+    setTestResult('Cancelling tests...');
+    
+    try {
+      const result = await cancelTestNotifications();
+      setTestResult(result.success 
+        ? `✅ ${result.message}` 
+        : `❌ ${result.message}`
+      );
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult(`❌ Cancel failed: ${errorMsg}`);
+    } finally {
+      setIsTestRunning(false);
+    }
+  };
+
+  return (
+    <View style={styles.backgroundAlarmTester}>
+      <ThemedText type="subtitle" style={styles.testerTitle}>🔔 Background Alarm Testing</ThemedText>
+      
+      <View style={styles.testerButtons}>
+        <TouchableOpacity 
+          onPress={runBackgroundAlarmTest} 
+          style={[styles.testerButton, { backgroundColor: '#4CAF50' }]}
+          disabled={isTestRunning}
+        >
+          <ThemedText style={styles.testerButtonText}>
+            {isTestRunning ? 'Testing...' : '🧪 Test (1 min)'}
+          </ThemedText>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          onPress={cancelTests} 
+          style={[styles.testerButton, { backgroundColor: '#FF5722' }]}
+          disabled={isTestRunning}
+        >
+          <ThemedText style={styles.testerButtonText}>
+            🗑️ Cancel All
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+      
+      {testResult ? (
+        <View style={styles.testResult}>
+          <ThemedText style={styles.testResultText}>{testResult}</ThemedText>
+        </View>
+      ) : null}
+      
+      <ThemedText style={styles.testerInfo}>
+        Test creates a notification 1 minute from now. Close the app to verify background notifications work.
       </ThemedText>
     </View>
   );

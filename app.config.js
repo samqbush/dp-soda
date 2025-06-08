@@ -28,7 +28,9 @@ export default {
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
         "VIBRATE",
-        "AUDIO_SETTINGS"
+        "AUDIO_SETTINGS",
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK"
       ],
       blockedPermissions: [
         "android.permission.RECORD_AUDIO"
@@ -49,6 +51,15 @@ export default {
     },
     plugins: [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/notification-icon.png",
+          color: "#1E3D58",
+          sounds: ["./assets/sounds/alarm-sound.wav"],
+          mode: "production"
+        }
+      ],
       [
         "expo-splash-screen",
         {

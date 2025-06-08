@@ -25,8 +25,8 @@ export default function StandleyLakeScreen() {
     clearCache
   } = useStandleyLakeWind();
 
-  const textColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
+  // const textColor = useThemeColor({}, 'text'); // Currently unused
+  // const backgroundColor = useThemeColor({}, 'background'); // Currently unused
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 

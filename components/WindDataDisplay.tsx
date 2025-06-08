@@ -7,6 +7,7 @@ import { useAlarmAudio } from '@/hooks/useAlarmAudio';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindData } from '@/hooks/useWindData';
 import { AlarmLogger } from '@/services/alarmDebugLogger';
+import { alarmNotificationService } from '@/services/alarmNotificationService';
 import { crashMonitor } from '@/services/crashMonitor';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
@@ -145,6 +146,20 @@ function WindDataDisplayContent() {
       // Set up or clear alarm timer based on new state
       if (newState) {
         scheduleNextAlarmCheck();
+        
+        // Show background alarm info on first enable
+        if (alarmNotificationService.isNotificationSupported()) {
+          const hasPermissions = await alarmNotificationService.requestPermissions();
+          const message = hasPermissions
+            ? "✅ Background alarms enabled! You'll receive notifications even when the app is closed."
+            : "⚠️ For background alarms, please enable notifications in your device settings.\n\nFor now, keep the app open for alarms to work.";
+          
+          Alert.alert(
+            hasPermissions ? "🎉 Background Alarms Ready!" : "📱 Foreground Alarms Only",
+            message,
+            [{ text: "Got it!", style: "default" }]
+          );
+        }
       } else if (alarmCheckTimerRef.current) {
         clearTimeout(alarmCheckTimerRef.current);
         alarmCheckTimerRef.current = null;
@@ -283,15 +298,26 @@ function WindDataDisplayContent() {
     
     console.log(`🔔 Scheduling next alarm check at ${nextCheckTime.toLocaleString()} (in ${Math.round(msUntilCheck / 60000)} minutes)`);
     
-    // Set up timer
+    // Set up timer (for foreground operation)
     alarmCheckTimerRef.current = setTimeout(() => {
       checkAlarmConditions();
     }, msUntilCheck);
     
+    // Also schedule background notification as backup
+    if (alarmNotificationService.isNotificationSupported() && msUntilCheck > 60000) {
+      alarmNotificationService.scheduleAlarmNotification(
+        criteria.alarmTime,
+        '🌊 Dawn Patrol Alert!',
+        'Time to check wind conditions - they might be favorable for your session!'
+      ).catch(error => {
+        console.warn('Failed to schedule background notification:', error);
+      });
+    }
+    
     // Update state for UI
     setNextAlarmCheckTime(nextCheckTime);
     
-  }, [criteria.alarmEnabled, calculateNextAlarmCheckTime, alarmCheckedToday, checkAlarmConditions]);
+  }, [criteria.alarmEnabled, criteria.alarmTime, calculateNextAlarmCheckTime, alarmCheckedToday, checkAlarmConditions]);
   
   // Reset alarm checked status at midnight
   useEffect(() => {

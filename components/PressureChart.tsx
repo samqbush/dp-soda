@@ -47,7 +47,7 @@ export function PressureChart({
   const pressures = pressureTrend.pressures;
   const minPressure = Math.min(...pressures);
   const maxPressure = Math.max(...pressures);
-  const pressureRange = maxPressure - minPressure;
+  // const pressureRange = maxPressure - minPressure; // Currently unused
   
   // Create labels for time periods (e.g., "6h ago", "4h ago", etc.)
   const labels = pressures.map((_, index) => {

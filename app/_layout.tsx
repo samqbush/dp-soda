@@ -27,6 +27,7 @@ import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
+import { initializeNotificationService } from '@/services/alarmNotificationService';
 
 // Ignore specific warnings in production builds
 if (!__DEV__) {
@@ -102,6 +103,11 @@ export default function RootLayout() {
           setInitError('Storage initialization failed');
         } else {
           console.log('✅ Storage initialization successful');
+          
+          // Initialize notification service for background alarms
+          console.log('🔔 Initializing notification service...');
+          await initializeNotificationService();
+          console.log('✅ Notification service initialized');
         }
         
       } catch (e) {

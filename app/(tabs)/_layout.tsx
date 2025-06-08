@@ -29,6 +29,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'DP Wind Alert Alarm',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="alarm.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="soda-lake"
+        options={{
           title: 'Soda Lake',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
