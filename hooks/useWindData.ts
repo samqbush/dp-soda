@@ -1,5 +1,4 @@
 import { logBuildIssue } from '@/config/buildConfig';
-import EMERGENCY_FALLBACK_DATA from '@/services/fallbackData';
 import { clearWindDataCache } from '@/services/storageService';
 import {
     analyzeWindData,
@@ -112,7 +111,7 @@ export const useWindData = (): UseWindDataReturn => {
         setLastUpdated(new Date());
         return true;
       } else {
-        console.log('No valid cached data found, using emergency fallback');
+        console.log('No valid cached data found');
         return false;
       }
     } catch (err) {
@@ -216,19 +215,19 @@ export const useWindData = (): UseWindDataReturn => {
         // SAFETY: Ensure we never hang forever on initialization
         setTimeout(() => {
           if (!dataLoaded) {
-            console.warn('⚠️ Wind data initialization timeout - using emergency fallback');
-            handleEmergencyFallback();
+            console.warn('⚠️ Wind data initialization timeout - setting error state');
+            setError('Unable to load wind data. Please check your connection and try refreshing.');
+            setIsLoading(false);
+            dataLoaded = true;
           }
         }, Platform.OS === 'android' ? 2000 : 5000);
         
         // First try to load cached data
         const cachedDataLoaded = await loadCachedData();
         
-        // If no cached data, immediately use fallback first
+        // If no cached data, don't use fallback - let the refresh handle it
         if (!cachedDataLoaded) {
-          console.log('No cached data available, using emergency fallback first');
-          handleEmergencyFallback();
-          dataLoaded = true;
+          console.log('No cached data available, attempting fresh data fetch');
         }
         
         // Regardless, try to refresh with new data if possible
@@ -239,34 +238,16 @@ export const useWindData = (): UseWindDataReturn => {
         } catch (refreshErr) {
           console.error('💥 Error refreshing data:', refreshErr);
           if (!cachedDataLoaded) {
-            handleEmergencyFallback();
+            setError(refreshErr instanceof Error ? refreshErr.message : 'Failed to load wind data');
+            setIsLoading(false);
           }
           dataLoaded = true;
         }
       } catch (err) {
         console.error('💥 Fatal error during data initialization:', err);
-        handleEmergencyFallback();
-        dataLoaded = true;
-      }
-    };
-    
-    // Function to use emergency fallback data
-    const handleEmergencyFallback = () => {
-      try {
-        console.log('📊 Using emergency fallback data');
-        setIsLoading(true);
-        
-        setWindData(EMERGENCY_FALLBACK_DATA);
-        setLastUpdated(new Date());
-        
-        const fallbackAnalysis = analyzeWindData(EMERGENCY_FALLBACK_DATA, criteria);
-        setAnalysis(fallbackAnalysis);
-        setVerification(null);
-        setError("Using emergency fallback data - please pull down to refresh");
-      } catch (fallbackErr) {
-        console.error('💥 Even fallback data setup failed:', fallbackErr);
-      } finally {
+        setError(err instanceof Error ? err.message : 'Failed to initialize wind data');
         setIsLoading(false);
+        dataLoaded = true;
       }
     };
     

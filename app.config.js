@@ -56,7 +56,7 @@ export default {
         {
           icon: "./assets/images/notification-icon.png",
           color: "#1E3D58",
-          sounds: ["./assets/sounds/alarm-sound.wav"],
+          sounds: ["./assets/sounds/alarm.mp3"],
           mode: "production"
         }
       ],

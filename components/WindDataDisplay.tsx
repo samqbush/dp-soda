@@ -71,7 +71,8 @@ function WindDataDisplayContent() {
   } = useAlarmAudio();
 
   console.log('🌊 WindDataDisplayContent - useWindData result:', {
-    hasData: !!windData,
+    hasData: !!windData && windData.length > 0,
+    dataLength: windData?.length || 0,
     isLoading,
     hasError: !!error,
     lastUpdated,
@@ -467,6 +468,31 @@ function WindDataDisplayContent() {
               </ThemedText>
             </TouchableOpacity>
           )}
+        </View>
+      </ThemedView>
+    );
+  }
+
+  // Show no data message when not loading and no data available
+  if (!isLoading && !windData.length && !error) {
+    console.log('📊 No data available, displaying no data screen');
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText type="subtitle" style={styles.title}>Wind Conditions</ThemedText>
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>📊 No wind data available</ThemedText>
+          <ThemedText style={styles.debugText}>
+            Please check your internet connection and try refreshing.
+          </ThemedText>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: tintColor }]} 
+            onPress={handleRefresh}
+            disabled={isLoading}
+          >
+            <ThemedText style={styles.refreshButtonText}>
+              Refresh Data
+            </ThemedText>
+          </TouchableOpacity>
         </View>
       </ThemedView>
     );
