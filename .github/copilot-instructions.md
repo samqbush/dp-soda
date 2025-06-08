@@ -11,6 +11,7 @@
 - All documentation besides the README.md should be stored in the `docs` directory
 - Keep documentation up to date and clear
 - Update existing documentation insead of creating new files when possible, ask me if you are unsure
+  - Refer to the [README.md](../README.md) for documentation structure
 
 ## Cleanup
 - When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later

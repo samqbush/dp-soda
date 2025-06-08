@@ -456,10 +456,15 @@ export class KatabaticAnalyzer {
   ): string {
     const analysis = [];
     
+    // Helper function to convert Celsius to Fahrenheit
+    const celsiusToFahrenheit = (celsius: number): number => {
+      return (celsius * 9/5) + 32;
+    };
+    
     analysis.push(`PRECIPITATION: ${factors.precipitation.meets ? '✅' : '❌'} ${factors.precipitation.value.toFixed(1)}% (threshold: ${factors.precipitation.threshold}%)`);
     analysis.push(`SKY CONDITIONS: ${factors.skyConditions.meets ? '✅' : '❌'} ${factors.skyConditions.clearPeriodCoverage.toFixed(1)}% clear during 2-5am`);
     analysis.push(`PRESSURE CHANGE: ${factors.pressureChange.meets ? '✅' : '❌'} ${factors.pressureChange.change > 0 ? '+' : ''}${factors.pressureChange.change.toFixed(1)} hPa (${factors.pressureChange.trend})`);
-    analysis.push(`TEMPERATURE DIFF: ${factors.temperatureDifferential.meets ? '✅' : '❌'} ${factors.temperatureDifferential.differential.toFixed(1)}°C (${factors.temperatureDifferential.morrisonTemp.toFixed(1)}°C valley, ${factors.temperatureDifferential.mountainTemp.toFixed(1)}°C mountain)`);
+    analysis.push(`TEMPERATURE DIFF: ${factors.temperatureDifferential.meets ? '✅' : '❌'} ${celsiusToFahrenheit(factors.temperatureDifferential.differential).toFixed(1)}°F (${celsiusToFahrenheit(factors.temperatureDifferential.morrisonTemp).toFixed(1)}°F valley, ${celsiusToFahrenheit(factors.temperatureDifferential.mountainTemp).toFixed(1)}°F mountain)`);
     
     return analysis.join('\n');
   }

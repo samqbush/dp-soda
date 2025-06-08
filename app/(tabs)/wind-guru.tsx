@@ -26,6 +26,11 @@ export default function WindGuruScreen() {
     return `${celsiusToFahrenheit(celsius).toFixed(1)}°F`;
   };
 
+  // Helper to format temperature differential (already in Fahrenheit)
+  const formatTempDiffF = (fahrenheitDiff: number): string => {
+    return `${fahrenheitDiff.toFixed(1)}°F`;
+  };
+
   // Use the weather data hook with Phase 2 prediction engine
   const {
     weatherData,
@@ -75,7 +80,13 @@ export default function WindGuruScreen() {
   };
 
   const handleRefresh = async () => {
-    await refreshData();
+    console.log('Wind Guru: Pull-to-refresh triggered');
+    try {
+      await refreshData();
+      console.log('Wind Guru: Data refreshed successfully');
+    } catch (error) {
+      console.error('Wind Guru: Refresh failed:', error);
+    }
   };
 
   const formatLastUpdated = () => {
@@ -116,9 +127,16 @@ export default function WindGuruScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
+          <RefreshControl 
+            refreshing={isLoading} 
+            onRefresh={handleRefresh}
+            tintColor={tintColor}
+            colors={[tintColor]}
+            progressBackgroundColor={cardColor}
+          />
         }
       >
         {/* Header Section */}
@@ -498,7 +516,7 @@ export default function WindGuruScreen() {
                   {katabaticAnalysis.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
                 </ThemedText>
                 <ThemedText style={styles.conditionValue}>
-                  {formatTempF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
+                  {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
 
@@ -548,7 +566,7 @@ export default function WindGuruScreen() {
                 <ThemedText style={styles.conditionLabel}>🌡️ Temp Differential:</ThemedText>
                 <ThemedText style={styles.conditionValue}>
                   {tempDiff 
-                    ? formatTempF(tempDiff.differential)
+                    ? formatTempDiffF(tempDiff.differential)
                     : 'Loading...'
                   }
                 </ThemedText>
@@ -598,7 +616,7 @@ export default function WindGuruScreen() {
                   {tomorrowPrediction.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
                 </ThemedText>
                 <ThemedText style={styles.conditionValue}>
-                  {formatTempF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
+                  {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
 
@@ -740,7 +758,7 @@ export default function WindGuruScreen() {
               <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
                 <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Differential:</ThemedText>
                 <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
-                  {formatTempF(tempDiff.differential)}
+                  {formatTempDiffF(tempDiff.differential)}
                 </ThemedText>
               </ThemedView>
               <ThemedText style={[styles.tempExplanation, { color: textColor, opacity: 0.7 }]}>
