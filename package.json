@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
     "fetch-wind": "node ./scripts/fetch-wind-data.mjs",
+    "debug-devices": "node scripts/debug-ecowitt-devices.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
     "validate-env": "node scripts/validate-env.js",
     "prepare": "husky"

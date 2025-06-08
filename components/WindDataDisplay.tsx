@@ -306,7 +306,7 @@ function WindDataDisplayContent() {
     // Also schedule background notification as backup
     if (alarmNotificationService.isNotificationSupported() && msUntilCheck > 60000) {
       alarmNotificationService.scheduleAlarmNotification(
-        criteria.alarmTime,
+        nextCheckTime,
         '🌊 Dawn Patrol Alert!',
         'Time to check wind conditions - they might be favorable for your session!'
       ).catch(error => {
@@ -317,7 +317,7 @@ function WindDataDisplayContent() {
     // Update state for UI
     setNextAlarmCheckTime(nextCheckTime);
     
-  }, [criteria.alarmEnabled, criteria.alarmTime, calculateNextAlarmCheckTime, alarmCheckedToday, checkAlarmConditions]);
+  }, [criteria.alarmEnabled, calculateNextAlarmCheckTime, alarmCheckedToday, checkAlarmConditions]);
   
   // Reset alarm checked status at midnight
   useEffect(() => {

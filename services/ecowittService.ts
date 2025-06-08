@@ -29,10 +29,16 @@ export interface EcowittApiConfig {
 }
 
 export interface EcowittDevice {
+  id: number;
   name: string;
   mac: string;
-  model: string;
-  online: boolean;
+  type: number;
+  date_zone_id: string;
+  createtime: number;
+  longitude: number;
+  latitude: number;
+  stationtype: string;
+  iotdevice_list: any[];
 }
 
 export interface EcowittDeviceListResponse {
@@ -239,16 +245,20 @@ export async function getDeviceMacAddress(): Promise<string> {
       throw new Error('No devices found in your Ecowitt account. Please check your API credentials and ensure you have registered devices.');
     }
 
-    // For now, use the first online device, or first device if none are online
-    let selectedDevice = devices.find(device => device && device.online);
+    // Select the best device for Standley Lake monitoring
+    // Look for "DP Standley West" device first, otherwise use first device
+    let selectedDevice = devices.find(device => 
+      device && device.name && device.name.toLowerCase().includes('standley')
+    );
+    
     if (!selectedDevice) {
       selectedDevice = devices[0];
       if (!selectedDevice) {
         throw new Error('No valid devices found in your Ecowitt account.');
       }
-      console.log('⚠️ No online devices found, using first device:', selectedDevice.name || 'Unknown');
+      console.log('⚠️ No Standley device found, using first device:', selectedDevice.name || 'Unknown');
     } else {
-      console.log('✅ Using online device:', selectedDevice.name || 'Unknown');
+      console.log('✅ Using Standley device:', selectedDevice.name || 'Unknown');
     }
 
     // Validate device has required fields
@@ -261,7 +271,7 @@ export async function getDeviceMacAddress(): Promise<string> {
       macAddress: selectedDevice.mac,
       timestamp: Date.now(),
       deviceName: selectedDevice.name || 'Unknown Device',
-      deviceModel: selectedDevice.model || 'Unknown Model'
+      deviceModel: selectedDevice.stationtype || 'Unknown Model'
     };
     
     await AsyncStorage.setItem(DEVICE_MAC_STORAGE_KEY, JSON.stringify(cacheData));
