@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -8,6 +8,7 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { PressureChart } from '@/components/PressureChart';
+import { WeeklyForecast } from '@/components/WeeklyForecast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 
@@ -15,6 +16,9 @@ export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+  
+  // State for collapsible sections
+  const [isHowItWorksExpanded, setIsHowItWorksExpanded] = useState(false);
 
   // Temperature conversion helper
   const celsiusToFahrenheit = (celsius: number): number => {
@@ -44,6 +48,9 @@ export default function WindGuruScreen() {
     katabaticAnalysis,
     getTomorrowPrediction,
     getDataSourceInfo,
+    // Phase 2.5: Extended predictions
+    getWeeklyPredictions,
+    getForecastAvailability,
   } = useWeatherData();
 
   // Get current analysis data
@@ -51,6 +58,10 @@ export default function WindGuruScreen() {
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
+  
+  // Phase 2.5: Extended forecast data
+  const weeklyPredictions = getWeeklyPredictions();
+  const forecastAvailability = getForecastAvailability();
 
   // Helper functions for Phase 2 UI
   const getProbabilityColor = (probability: number): string => {
@@ -169,76 +180,90 @@ export default function WindGuruScreen() {
           </ThemedView>
         </ThemedView>
 
-        {/* How Predictions Work - User Guide Section */}
+        {/* How Predictions Work - Collapsible User Guide Section */}
         <ThemedView style={[styles.infoCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>🧠 How Wind Predictions Work</ThemedText>
-          
-          <ThemedView style={styles.infoContent}>
-            <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>
-              Our katabatic wind prediction analyzes <ThemedText style={styles.highlightText}>4 key meteorological factors</ThemedText> to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
+          <TouchableOpacity 
+            onPress={() => setIsHowItWorksExpanded(!isHowItWorksExpanded)}
+            activeOpacity={0.7}
+            style={styles.collapsibleHeader}
+          >
+            <ThemedView style={styles.headerContent}>
+              <ThemedText style={styles.sectionTitle}>🧠 How Wind Predictions Work</ThemedText>
+              <ThemedText style={[styles.expandIcon, { color: tintColor }]}>
+                {isHowItWorksExpanded ? '▼' : '▶'}
+              </ThemedText>
+            </ThemedView>
+            <ThemedText style={[styles.collapsibleHint, { color: textColor, opacity: 0.6 }]}>
+              {isHowItWorksExpanded ? 'Tap to collapse' : 'Tap to learn about our 4-factor analysis'}
             </ThemedText>
-            
-            <ThemedView style={styles.factorsList}>
-              <ThemedView style={styles.factorItem}>
-                <ThemedText style={styles.factorEmoji}>☔</ThemedText>
-                <ThemedView style={styles.factorContent}>
-                  <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (30% weight)</ThemedText>
-                  <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤20% rain chance - rain disrupts wind formation</ThemedText>
+          </TouchableOpacity>
+          
+          {isHowItWorksExpanded && (
+            <ThemedView style={styles.infoContent}>
+              <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>
+                Our katabatic wind prediction analyzes <ThemedText style={styles.highlightText}>4 key meteorological factors</ThemedText> to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
+              </ThemedText>
+              
+              <ThemedView style={styles.factorsList}>
+                <ThemedView style={styles.factorItem}>
+                  <ThemedText style={styles.factorEmoji}>☔</ThemedText>
+                  <ThemedView style={styles.factorContent}>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (30% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤20% rain chance - rain disrupts wind formation</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+                
+                <ThemedView style={styles.factorItem}>
+                  <ThemedText style={styles.factorEmoji}>🌙</ThemedText>
+                  <ThemedView style={styles.factorContent}>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 2-5am (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥70% clear - needed for radiative cooling</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+                
+                <ThemedView style={styles.factorItem}>
+                  <ThemedText style={styles.factorEmoji}>📈</ThemedText>
+                  <ThemedView style={styles.factorContent}>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Pressure Change (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥2.0 hPa change - indicates air movement</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+                
+                <ThemedView style={styles.factorItem}>
+                  <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
+                  <ThemedView style={styles.factorContent}>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (20% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥9.0°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives katabatic flow</ThemedText>
+                  </ThemedView>
                 </ThemedView>
               </ThemedView>
               
-              <ThemedView style={styles.factorItem}>
-                <ThemedText style={styles.factorEmoji}>🌙</ThemedText>
-                <ThemedView style={styles.factorContent}>
-                  <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 2-5am (25% weight)</ThemedText>
-                  <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥70% clear - needed for radiative cooling</ThemedText>
-                </ThemedView>
+              <ThemedView style={[styles.calculationExample, { borderColor: tintColor, borderWidth: 1 }]}>
+                <ThemedText style={[styles.exampleTitle, { color: tintColor }]}>📚 Example: How 47% is Calculated</ThemedText>
+                <ThemedText style={[styles.exampleText, { color: textColor, opacity: 0.8 }]}>
+                  ✅ Rain: 17.8% (good) → 85 confidence × 30% = 25.5 points{'\n'}
+                  ❌ Sky: 56% clear (poor) → 40 confidence × 25% = 10.0 points{'\n'}
+                  ✅ Pressure: -7.3 hPa (good) → 90 confidence × 25% = 22.5 points{'\n'}
+                  ✅ Temp: 11.0°F Morrison warmer than Nederland (good) → 80 confidence × 20% = 16.0 points{'\n'}
+                  {'\n'}
+                  <ThemedText style={[styles.resultText, { color: tintColor }]}>Total: ~47% probability</ThemedText>
+                </ThemedText>
+                <ThemedText style={[styles.keyInsight, { color: '#FF9800' }]}>
+                  💡 Key Insight: Even with 3/4 factors good, poor sky conditions (56% vs 70% needed) significantly reduce the overall probability. The algorithm is intentionally conservative - better to miss good conditions than recommend poor ones!
+                </ThemedText>
               </ThemedView>
               
-              <ThemedView style={styles.factorItem}>
-                <ThemedText style={styles.factorEmoji}>📈</ThemedText>
-                <ThemedView style={styles.factorContent}>
-                  <ThemedText style={[styles.factorName, { color: textColor }]}>Pressure Change (25% weight)</ThemedText>
-                  <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥2.0 hPa change - indicates air movement</ThemedText>
-                </ThemedView>
+              <ThemedView style={[styles.locationInfo, { backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12 }]}>
+                <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>📍 Weather Data Sources:</ThemedText>
+                <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
+                  • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (1740m elevation) - Valley reference for katabatic flow formation{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (2540m elevation) - Mountain reference for temperature gradient{'\n'}
+                  • <ThemedText style={{ fontStyle: 'italic' }}>800m elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
+                </ThemedText>
               </ThemedView>
               
-              <ThemedView style={styles.factorItem}>
-                <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
-                <ThemedView style={styles.factorContent}>
-                  <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (20% weight)</ThemedText>
-                  <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥9.0°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives katabatic flow</ThemedText>
-                </ThemedView>
-              </ThemedView>
-            </ThemedView>
-            
-            <ThemedView style={[styles.calculationExample, { borderColor: tintColor, borderWidth: 1 }]}>
-              <ThemedText style={[styles.exampleTitle, { color: tintColor }]}>📚 Example: How 47% is Calculated</ThemedText>
-              <ThemedText style={[styles.exampleText, { color: textColor, opacity: 0.8 }]}>
-                ✅ Rain: 17.8% (good) → 85 confidence × 30% = 25.5 points{'\n'}
-                ❌ Sky: 56% clear (poor) → 40 confidence × 25% = 10.0 points{'\n'}
-                ✅ Pressure: -7.3 hPa (good) → 90 confidence × 25% = 22.5 points{'\n'}
-                ✅ Temp: 11.0°F Morrison warmer than Nederland (good) → 80 confidence × 20% = 16.0 points{'\n'}
-                {'\n'}
-                <ThemedText style={[styles.resultText, { color: tintColor }]}>Total: ~47% probability</ThemedText>
-              </ThemedText>
-              <ThemedText style={[styles.keyInsight, { color: '#FF9800' }]}>
-                💡 Key Insight: Even with 3/4 factors good, poor sky conditions (56% vs 70% needed) significantly reduce the overall probability. The algorithm is intentionally conservative - better to miss good conditions than recommend poor ones!
-              </ThemedText>
-            </ThemedView>
-            
-            <ThemedView style={[styles.locationInfo, { backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12 }]}>
-              <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>📍 Weather Data Sources:</ThemedText>
-              <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
-                • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (1740m elevation) - Valley reference for katabatic flow formation{'\n'}
-                • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (2540m elevation) - Mountain reference for temperature gradient{'\n'}
-                • <ThemedText style={{ fontStyle: 'italic' }}>800m elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
-              </ThemedText>
-            </ThemedView>
-            
-            <ThemedView style={styles.quickTips}>
-              <ThemedText style={[styles.tipsTitle, { color: textColor }]}>Quick Tips:</ThemedText>
-              <ThemedText style={[styles.tipText, { color: textColor, opacity: 0.8 }]}>
+              <ThemedView style={styles.quickTips}>
+                <ThemedText style={[styles.tipsTitle, { color: textColor }]}>Quick Tips:</ThemedText>              <ThemedText style={[styles.tipText, { color: textColor, opacity: 0.8 }]}>
                 • <ThemedText style={{ color: '#4CAF50' }}>75-100%</ThemedText>: Excellent conditions - GO!{'\n'}
                 • <ThemedText style={{ color: '#FF9800' }}>50-74%</ThemedText>: Good conditions - likely favorable{'\n'}
                 • <ThemedText style={{ color: '#F44336' }}>25-49%</ThemedText>: Marginal - mixed conditions{'\n'}
@@ -252,11 +277,49 @@ export default function WindGuruScreen() {
                 {'\n'}
                 Always check <ThemedText style={styles.highlightText}>confidence level</ThemedText> - low confidence means uncertain conditions even with decent probability.
               </ThemedText>
+              
+              {/* Data Quality Explanation */}
+              <ThemedView style={[styles.dataQualitySection, { 
+                backgroundColor: 'rgba(33, 150, 243, 0.05)', 
+                borderRadius: 8, 
+                padding: 12, 
+                marginTop: 16,
+                borderLeftWidth: 3,
+                borderLeftColor: '#2196F3'
+              }]}>
+                <ThemedText style={[styles.dataQualityTitle, { color: '#2196F3', fontWeight: '600', marginBottom: 8 }]}>
+                  📊 Understanding Data Quality Indicators
+                </ThemedText>
+                
+                <ThemedView style={styles.dataQualityItem}>
+                  <ThemedText style={[styles.dataQualityLabel, { color: '#4CAF50', fontWeight: '500' }]}>
+                    ✅ &ldquo;Good Data&rdquo;
+                  </ThemedText>
+                  <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
+                    18+ hours of forecast data available for the day. Provides comprehensive analysis of all 4 factors with high confidence. Typical for today and tomorrow.
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.dataQualityItem}>
+                  <ThemedText style={[styles.dataQualityLabel, { color: '#FF9800', fontWeight: '500' }]}>
+                    ⚠️ &ldquo;Limited Data&rdquo;
+                  </ThemedText>
+                  <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
+                    &lt;18 hours of forecast data available. Common for days 3-5 as forecast models provide fewer data points further out. Predictions are still useful but less detailed.
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedText style={[styles.dataQualityExplanation, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8, fontStyle: 'italic' }]}>
+                  <ThemedText style={{ fontWeight: '500' }}>Why this happens:</ThemedText> OpenWeatherMap provides forecasts in 3-hour intervals. For distant days (3-5 days out), fewer forecast points may be available in our analysis window, but the 4-factor algorithm still works effectively with available data.
+                </ThemedText>
+              </ThemedView>
+              
               <ThemedText style={[styles.learnMoreText, { color: tintColor, opacity: 0.8 }]}>
                 📖 For detailed explanations, see docs/KATABATIC_PREDICTION_GUIDE.md
               </ThemedText>
+              </ThemedView>
             </ThemedView>
-          </ThemedView>
+          )}
         </ThemedView>
 
         {/* Katabatic Prediction Section - Today & Tomorrow */}
@@ -779,19 +842,29 @@ export default function WindGuruScreen() {
           )}
         </ThemedView>
 
+        {/* Phase 2.5: Weekly Forecast */}
+        <WeeklyForecast 
+          predictions={weeklyPredictions}
+          forecastAvailability={forecastAvailability}
+          isLoading={isLoading}
+        />
+
         {/* Development Info */}
         <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
           <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🎯 Phase 2.5: Today & Tomorrow View Active!
+            🎯 Phase 3: Weekly Forecast Active!
           </ThemedText>
           <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            ✅ Today&apos;s predictions for accuracy verification
+            ✅ Today & Tomorrow detailed analysis
           </ThemedText>
           <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🔮 Tomorrow&apos;s predictions coming soon (multi-day engine)
+            📅 5-day extended forecast with quick overview
           </ThemedText>
           <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            Next: Enhanced forecasting & charts (Phase 3)
+            🌤️ Using OpenWeatherMap API (up to 5 days available)
+          </ThemedText>
+          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+            Next: Historical accuracy tracking & push notifications
           </ThemedText>
         </ThemedView>
       </ScrollView>
@@ -1205,5 +1278,46 @@ const styles = StyleSheet.create({
   },
   mockDataWarning: {
     textAlign: 'left',
+  },
+  // Collapsible section styles
+  collapsibleHeader: {
+    paddingBottom: 12,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  expandIcon: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  collapsibleHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  // Data quality explanation styles
+  dataQualitySection: {
+    marginTop: 16,
+  },
+  dataQualityTitle: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  dataQualityItem: {
+    marginBottom: 12,
+  },
+  dataQualityLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  dataQualityDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  dataQualityExplanation: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

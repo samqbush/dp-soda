@@ -38,7 +38,7 @@ export interface WeatherDataPoint {
 export interface LocationWeatherData {
   location: string;
   current: WeatherDataPoint;
-  hourlyForecast: WeatherDataPoint[]; // Next 48 hours
+  hourlyForecast: WeatherDataPoint[]; // Next 5 days (up to 120 hours)
   lastUpdated: number;
 }
 
@@ -355,7 +355,7 @@ export class WeatherService {
    * Transform OpenWeatherMap forecast to our format
    */
   private transformHourlyForecast(data: OpenWeatherForecastResponse): WeatherDataPoint[] {
-    return data.list.slice(0, 48).map(item => ({ // Limit to 48 hours
+    return data.list.map(item => ({ // Use all available forecast data (up to 5 days)
       timestamp: item.dt * 1000, // Convert to milliseconds
       temperature: item.main.temp,
       pressure: item.main.pressure,
@@ -444,10 +444,10 @@ export class WeatherService {
       weatherDescription: 'clear sky',
     };
 
-    // Generate 48 hours of forecast data
+    // Generate 5 days of forecast data (120 hours)
     const generateHourlyForecast = (baseTemp: number): WeatherDataPoint[] => {
       const forecast: WeatherDataPoint[] = [];
-      for (let i = 0; i < 48; i++) {
+      for (let i = 0; i < 120; i++) { // 5 days * 24 hours
         const hour = new Date(now + i * 60 * 60 * 1000).getHours();
         const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 6;
         forecast.push({

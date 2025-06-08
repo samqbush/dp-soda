@@ -258,6 +258,120 @@ export const useWeatherData = () => {
   }, [weatherData]);
 
   /**
+   * Get katabatic prediction for a specific day (0 = today, 1 = tomorrow, etc.)
+   */
+  const getDayPrediction = useCallback((dayOffset: number) => {
+    if (!weatherData) return null;
+    
+    try {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + dayOffset);
+      
+      // Filter weather data for the target day's 24-hour period
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(targetDate);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      // Create filtered weather data for the target day
+      const dayWeatherData = {
+        ...weatherData,
+        morrison: {
+          ...weatherData.morrison,
+          hourlyForecast: weatherData.morrison.hourlyForecast.filter(point => {
+            const pointDate = new Date(point.timestamp);
+            return pointDate >= dayStart && pointDate <= dayEnd;
+          })
+        },
+        mountain: {
+          ...weatherData.mountain,
+          hourlyForecast: weatherData.mountain.hourlyForecast.filter(point => {
+            const pointDate = new Date(point.timestamp);
+            return pointDate >= dayStart && pointDate <= dayEnd;
+          })
+        }
+      };
+      
+      // Only proceed if we have the day's data
+      if (dayWeatherData.morrison.hourlyForecast.length === 0) {
+        return null;
+      }
+      
+      // Run katabatic analysis on the day's data
+      const prediction = katabaticAnalyzer.analyzePrediction(dayWeatherData);
+      
+      // Determine data quality and preliminary status
+      const dataQuality = dayWeatherData.morrison.hourlyForecast.length >= 18 ? 'good' : 'limited';
+      const isPreliminary = dayOffset > 1; // Days beyond tomorrow are more preliminary
+      
+      return {
+        prediction,
+        dayOffset,
+        targetDate,
+        isPreliminary,
+        dataQuality,
+        lastModelUpdate: weatherData.lastFetch,
+        nextUpdateExpected: dayOffset <= 1 ? '6:00 PM today' : 'Next model update',
+        disclaimer: dayOffset === 0 
+          ? 'Current day analysis based on latest conditions'
+          : dayOffset === 1 
+          ? 'Preliminary forecast - accuracy improves with evening weather model updates'
+          : 'Extended forecast - conditions may change significantly'
+      };
+      
+    } catch (error) {
+      console.error(`Day ${dayOffset} prediction error:`, error);
+      return null;
+    }
+  }, [weatherData]);
+
+  /**
+   * Get predictions for the next 5 days (maximum available from free API)
+   */
+  const getWeeklyPredictions = useCallback(() => {
+    if (!weatherData) return [];
+    
+    const predictions = [];
+    
+    // Get predictions for today through day 4 (5 days total)
+    for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
+      const prediction = getDayPrediction(dayOffset);
+      if (prediction) {
+        predictions.push(prediction);
+      }
+    }
+    
+    return predictions;
+  }, [weatherData, getDayPrediction]);
+
+  /**
+   * Get available forecast days with data availability info
+   */
+  const getForecastAvailability = useCallback(() => {
+    if (!weatherData) return null;
+    
+    const now = new Date();
+    const forecastHours = weatherData.morrison.hourlyForecast;
+    
+    if (forecastHours.length === 0) return null;
+    
+    // Find the last forecast point
+    const lastForecast = forecastHours[forecastHours.length - 1];
+    const lastForecastDate = new Date(lastForecast.timestamp);
+    
+    // Calculate how many full days we have
+    const daysAvailable = Math.floor((lastForecastDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    
+    return {
+      totalHours: forecastHours.length,
+      daysAvailable: Math.min(daysAvailable, 5), // Cap at 5 days
+      lastForecastTime: lastForecastDate,
+      dataSource: weatherData.dataSource,
+      isComplete: daysAvailable >= 4 // We consider 4+ days "complete"
+    };
+  }, [weatherData]);
+
+  /**
    * Set OpenWeatherMap API key manually
    */
   const setApiKey = useCallback((apiKey: string) => {
@@ -323,5 +437,10 @@ export const useWeatherData = () => {
     // Phase 2: Katabatic prediction engine
     katabaticAnalysis,
     getTomorrowPrediction,
+    
+    // Phase 2.5: Extended predictions
+    getDayPrediction,
+    getWeeklyPredictions,
+    getForecastAvailability,
   };
 };
