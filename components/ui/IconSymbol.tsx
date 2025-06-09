@@ -20,6 +20,8 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'gear': 'settings',
   'wind': 'air',
+  'alarm.fill': 'alarm',
+  'cloud.sun.fill': 'wb-sunny',
 } as IconMapping;
 
 /**
