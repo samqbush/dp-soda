@@ -90,6 +90,65 @@ The app includes comprehensive crash protection:
 3. **Update Android OS** if available
 4. **Check available storage** (keep >1GB free)
 
+### Android SDK Setup Without Android Studio
+
+**Install Android Command Line Tools via Homebrew**:
+```bash
+# Install command line tools
+brew install android-commandlinetools
+
+# Set up environment variables
+echo 'export ANDROID_HOME="$HOME/Library/Android/sdk"' >> ~/.zshrc
+echo 'export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"' >> ~/.zshrc
+
+# Create SDK directory and reload environment
+mkdir -p $HOME/Library/Android/sdk
+source ~/.zshrc
+```
+
+**Install Required SDK Components**:
+```bash
+# Install essential Android SDK packages
+$(brew --prefix)/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager \
+  --sdk_root=$ANDROID_HOME \
+  --install "cmdline-tools;latest" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" \
+            "emulator"
+
+# For Apple Silicon Macs, install ARM64 system image
+yes | $(brew --prefix)/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager \
+  --sdk_root=$ANDROID_HOME \
+  --install "system-images;android-34;google_apis;arm64-v8a"
+
+# For Intel Macs, install x86_64 system image  
+yes | $(brew --prefix)/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager \
+  --sdk_root=$ANDROID_HOME \
+  --install "system-images;android-34;google_apis;x86_64"
+```
+
+**Create and Start Android Emulator**:
+```bash
+# Create AVD (Android Virtual Device) - use ARM64 for Apple Silicon Macs
+avdmanager create avd -n "DawnPatrol_Emulator" -k "system-images;android-34;google_apis;arm64-v8a"
+
+# For Intel Macs, use x86_64 instead:
+# avdmanager create avd -n "DawnPatrol_Emulator" -k "system-images;android-34;google_apis;x86_64"
+
+# Start emulator
+emulator -avd DawnPatrol_Emulator
+```
+
+**Verify Setup**:
+```bash
+# Check installed packages
+sdkmanager --list_installed
+
+# Check available emulators
+emulator -list-avds
+```
+
 ## API and Data Issues
 
 ### No Weather Data

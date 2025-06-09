@@ -51,10 +51,11 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-audio",
       [
         "expo-notifications",
         {
-          icon: "./assets/images/notification-icon.png",
+          icon: "./assets/images/icon.png",
           color: "#1E3D58",
           sounds: ["./assets/sounds/alarm.mp3"],
           mode: "production"
