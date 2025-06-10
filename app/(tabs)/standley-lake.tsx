@@ -165,7 +165,7 @@ export default function StandleyLakeScreen() {
         {/* Analysis */}
         {analysis && (
           <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>Wind Analysis</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
             <ThemedText style={styles.analysisText}>
               Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
               Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}

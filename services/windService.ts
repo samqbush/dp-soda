@@ -790,3 +790,106 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     };
   }
 };
+
+/**
+ * Analyzes recent wind data for current conditions monitoring
+ * Focuses on the last hour for real-time analysis
+ */
+export const analyzeRecentWindData = (
+  data: WindDataPoint[], 
+  criteria: AlarmCriteria = DEFAULT_CRITERIA,
+  targetTime?: Date
+): WindAnalysis => {
+  if (!data.length) {
+    return {
+      isAlarmWorthy: false,
+      averageSpeed: 0,
+      directionConsistency: 0,
+      consecutiveGoodPoints: 0,
+      analysis: 'No wind data available'
+    };
+  }
+
+  // Filter data for the last hour
+  const now = targetTime || new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const recentData = data.filter(point => {
+    const pointTime = new Date(point.time);
+    return pointTime >= oneHourAgo;
+  });
+
+  if (recentData.length === 0) {
+    return {
+      isAlarmWorthy: false,
+      averageSpeed: 0,
+      directionConsistency: 0,
+      consecutiveGoodPoints: 0,
+      analysis: 'No data available for the last hour'
+    };
+  }
+
+  // Calculate average wind speed
+  const speeds = recentData
+    .map(point => {
+      // Handle both string and number types for windSpeed
+      return typeof point.windSpeed === 'string' 
+        ? parseFloat(point.windSpeed) 
+        : point.windSpeed;
+    })
+    .filter(speed => !isNaN(speed));
+  
+  const averageSpeed = speeds.length > 0 
+    ? speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length 
+    : 0;
+
+  // Calculate direction consistency
+  const directions = recentData
+    .map(point => {
+      if (typeof point.windDirection === 'string') {
+        return parseFloat(point.windDirection);
+      }
+      return NaN;
+    })
+    .filter(dir => !isNaN(dir));
+
+  const directionConsistency = calculateDirectionConsistency(directions);
+
+  // Count consecutive good data points
+  const consecutiveGoodPoints = countConsecutiveGoodPoints(
+    recentData, 
+    criteria
+  );
+
+  // Calculate how many directions are in the preferred range
+  const avgDirection = calculateAverageDirection(directions);
+  const isPreferredDirection = isDirectionInPreferredRange(
+    avgDirection, 
+    criteria.preferredDirection, 
+    criteria.preferredDirectionRange
+  );
+
+  // For recent data analysis, we focus on current conditions rather than alarm worthiness
+  // But we can still evaluate if current conditions would meet criteria
+  const meetsSpeedCriteria = averageSpeed >= criteria.minimumAverageSpeed;
+  const meetsDirectionCriteria = directionConsistency >= criteria.directionConsistencyThreshold;
+  const meetsConsistencyCriteria = consecutiveGoodPoints >= criteria.minimumConsecutivePoints;
+  const isCurrentlyFavorable = meetsSpeedCriteria && meetsDirectionCriteria && meetsConsistencyCriteria && isPreferredDirection;
+
+  const dataPointsCount = recentData.length;
+  const timeRange = dataPointsCount > 0 ? `${dataPointsCount} data points in last hour` : 'No recent data';
+  
+  const analysis = `Recent Conditions (${timeRange}): ` +
+    `Avg Speed: ${averageSpeed.toFixed(1)}mph, ` +
+    `Direction: ${avgDirection.toFixed(0)}° (${getDirectionName(avgDirection)}), ` +
+    `Direction Consistency: ${directionConsistency.toFixed(1)}%, ` +
+    `Consecutive Good Points: ${consecutiveGoodPoints}`;
+
+  return {
+    isAlarmWorthy: isCurrentlyFavorable, // Renamed for clarity - this indicates if current conditions are favorable
+    averageSpeed,
+    directionConsistency,
+    consecutiveGoodPoints,
+    analysis
+  };
+};

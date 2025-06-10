@@ -238,6 +238,22 @@ export default function SettingsScreen() {
             we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 12 mph, you get woken up for great conditions!
           </ThemedText>
 
+          <ThemedText type="subtitle" style={styles.subsectionTitle}>Wind Analysis on Lake Tabs</ThemedText>
+          <ThemedText style={styles.infoText}>
+            The Soda Lake and Standley Lake tabs show detailed wind analysis for monitoring current conditions (separate from the alarm system).
+          </ThemedText>
+          
+          <ThemedText style={styles.infoText}>
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Analysis Calculations Explained:{'\n'}</ThemedText>
+            
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>1. Average Speed</ThemedText> - Simple arithmetic mean of wind speeds from the last hour. This is the most important metric for wind sports.{'\n'}
+            
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>2. Direction Consistency (0-100%)</ThemedText> - Uses circular statistics to measure how consistent wind directions are. 100% means perfectly steady direction, 0% means completely random. Calculated using vector mathematics on wind direction data.{'\n'}
+            
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>3. Consecutive Good Points</ThemedText> - Counts the maximum number of consecutive data points that meet speed criteria. Ensures sustained favorable conditions rather than brief gusts.{'\n'}
+          </ThemedText>
+          
+
           {/* Unified Alarm Testing Panel */}
           <SimpleAlarmTester />
         </View>

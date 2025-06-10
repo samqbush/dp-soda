@@ -7,7 +7,7 @@ import {
     getCachedEcowittData,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
-import { analyzeWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
+import { analyzeRecentWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface UseSodaLakeWindReturn {
@@ -68,7 +68,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
             alarmTime: "05:00" // Earlier start time for Soda Lake dawn patrol
           };
           
-          const windAnalysis = analyzeWindData(converted, defaultCriteria);
+          const windAnalysis = analyzeRecentWindData(converted, defaultCriteria);
           setAnalysis(windAnalysis);
         }
         
@@ -124,7 +124,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
           alarmTime: "05:00"
         };
         
-        const windAnalysis = analyzeWindData(converted, defaultCriteria);
+        const windAnalysis = analyzeRecentWindData(converted, defaultCriteria);
         setAnalysis(windAnalysis);
       }
       

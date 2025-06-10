@@ -185,7 +185,9 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   
   const labels = recentData.map((point, index) => {
     try {
-      if (index % Math.ceil(recentData.length / 4) === 0) {
+      // Show labels more frequently, but ensure we have at least a few
+      const labelInterval = Math.max(1, Math.ceil(recentData.length / 6)); // Show 6 labels max
+      if (index % labelInterval === 0 || index === recentData.length - 1) {
         const time = new Date(point.time);
         if (isNaN(time.getTime())) {
           return '';
@@ -198,6 +200,23 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       return '';
     }
   });
+
+  // Ensure we have at least some labels for the chart
+  const hasValidLabels = labels.some(label => label !== '');
+  if (!hasValidLabels && recentData.length > 0) {
+    console.warn('⚠️ No valid labels generated, creating fallback labels');
+    // Create simple index-based labels as fallback
+    for (let i = 0; i < labels.length; i++) {
+      if (i % Math.max(1, Math.ceil(labels.length / 4)) === 0) {
+        try {
+          const time = new Date(recentData[i].time);
+          labels[i] = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch {
+          labels[i] = `T${i}`;
+        }
+      }
+    }
+  }
 
   const chartData = {
     labels,
@@ -262,10 +281,14 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       strokeWidth: 1,
       stroke: (textColor || '#000000') + '20',
     },
+    propsForLabels: {
+      fontSize: 12,
+      fontFamily: 'System',
+    },
   };
 
   const screenWidth = Dimensions.get('window').width;
-  const chartHeight = 200;
+  const chartHeight = 220; // Increased height to accommodate x-axis labels
   // Calculate chart width based on data points for scrollable experience
   // Minimum width of screen, but expand based on data points for better readability
   const minChartWidth = screenWidth - 40;
@@ -327,91 +350,77 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
       
-      {/* Chart area with fixed y-axis and scrollable content */}
-      <View style={styles.chartAreaContainer}>
-        {/* Fixed Y-axis */}
-        <View style={styles.yAxisContainer}>
-          <YAxisLabels 
-            maxSpeed={maxSpeed} 
-            height={chartHeight} 
-            textColor={textColor}
-          />
-        </View>
-        
-        {/* Scrollable chart content (without y-axis) */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={true}
-          style={styles.chartScrollContainer}
-          contentContainerStyle={styles.chartScrollContent}
-        >
-          <View style={styles.chartContainer}>
-            {/* Render chart with error handling */}
-            {(() => {
-              try {
-                return (
-                  <View>
-                    <View style={styles.chartWithOverlay}>
-                      <LineChart
-                        data={chartData}
-                        width={chartWidth}
-                        height={chartHeight}
-                        chartConfig={chartConfig}
-                        bezier
-                        style={styles.chart}
-                        withInnerLines={true}
-                        withOuterLines={true}
-                        withVerticalLabels={false} // Disable y-axis labels since we have our own
-                        withHorizontalLabels={true}
-                        fromZero={true}
-                      />
-                      
-                      {/* Overlay for wind direction arrows and good point highlights */}
-                      <View style={styles.windDirectionOverlay}>
-                        <Svg width={chartWidth} height={chartHeight}>
-                          {/* Render good point highlights */}
-                          {goodPointPositions.map((pos, i) => (
-                            <Circle 
-                              key={`good-${i}`}
-                              cx={pos.x}
-                              cy={pos.y}
-                              r={6}
-                              fill="rgba(76, 175, 80, 0.3)"
-                              stroke="#4CAF50"
-                              strokeWidth={2}
-                            />
-                          ))}
-                          
-                          {/* Render direction arrows */}
-                          {arrowPositions.map((pos, i) => (
-                            <DirectionArrow 
-                              key={`dir-${i}`}
-                              x={pos.x}
-                              y={pos.y}
-                              direction={pos.direction}
-                              color={directionColor}
-                              size={16}
-                            />
-                          ))}
-                        </Svg>
-                      </View>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={true}
+        style={styles.chartScrollContainer}
+        contentContainerStyle={styles.chartScrollContent}
+      >
+        <View style={styles.chartContainer}>
+          {(() => {
+            try {
+              return (
+                <View>
+                  <View style={styles.chartWithOverlay}>
+                    <LineChart
+                      data={chartData}
+                      width={chartWidth}
+                      height={chartHeight}
+                      chartConfig={chartConfig}
+                      bezier
+                      style={styles.chart}
+                      withInnerLines={true}
+                      withOuterLines={true}
+                      withVerticalLabels={true}
+                      withHorizontalLabels={true}
+                      fromZero={true}
+                      yAxisInterval={1}
+                      segments={4}
+                      horizontalLabelRotation={0}
+                      verticalLabelRotation={0}
+                    />
+                    <View style={styles.windDirectionOverlay}>
+                      <Svg width={chartWidth} height={chartHeight - 30}>
+                        {goodPointPositions.map((pos, i) => (
+                          <Circle 
+                            key={`good-${i}`}
+                            cx={pos.x}
+                            cy={pos.y}
+                            r={6}
+                            fill="rgba(76, 175, 80, 0.3)"
+                            stroke="#4CAF50"
+                            strokeWidth={2}
+                          />
+                        ))}
+                        {arrowPositions.map((pos, i) => (
+                          <DirectionArrow 
+                            key={`dir-${i}`}
+                            x={pos.x}
+                            y={pos.y}
+                            direction={pos.direction}
+                            color={directionColor}
+                            size={16}
+                          />
+                        ))}
+                      </Svg>
                     </View>
                   </View>
-                );
-              } catch (error) {
-                console.error('🚨 LineChart rendering error:', error);
-                return (
-                  <View style={styles.noDataContainer}>
-                    <ThemedText style={styles.noDataText}>
-                      Chart rendering failed. Please try refreshing.
-                    </ThemedText>
-                  </View>
-                );
-              }
-            })()}
-          </View>
-        </ScrollView>
-      </View>
+                </View>
+              );
+            } catch (error) {
+              console.error('🚨 LineChart rendering error:', error);
+              return (
+                <View style={styles.noDataContainer}>
+                  <ThemedText style={styles.noDataText}>
+                    Chart rendering failed. Please try refreshing.
+                  </ThemedText>
+                </View>
+              );
+            }
+          })()}
+        </View>
+      </ScrollView>
+      
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
           <View style={[styles.legendColor, { backgroundColor: tintColor }]} />
@@ -434,6 +443,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
           </View>
         )}
       </View>
+      
       <View style={styles.statsContainer}>
         <View style={styles.stat}>
           <ThemedText style={styles.statValue}>
@@ -455,7 +465,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         </View>
       </View>
       
-      {/* Add a wind direction rose or compass section */}
       <View style={styles.directionContainer}>
         <ThemedText style={styles.directionTitle}>Wind Direction</ThemedText>
         <View style={styles.directionInfo}>
@@ -466,12 +475,10 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                 <ThemedText style={styles.compassE}>E</ThemedText>
                 <ThemedText style={styles.compassS}>S</ThemedText>
                 <ThemedText style={styles.compassW}>W</ThemedText>
-                {/* Calculate dominant direction */}
                 {(() => {
                   const validDirections = directions.filter(dir => dir !== null) as number[];
                   if (validDirections.length === 0) return null;
                   
-                  // Calculate average direction using circular statistics
                   let sumSin = 0;
                   let sumCos = 0;
                   validDirections.forEach(dir => {
@@ -481,7 +488,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                   });
                   
                   const avgDirection = ((Math.atan2(sumSin, sumCos) * 180 / Math.PI) + 360) % 360;
-                  // In the compass, we don't rotate 180° since we want to show where wind is coming FROM
                   const rotation = avgDirection;
                   
                   return (
@@ -505,7 +511,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                       sumCos += Math.cos(rad);
                     });
                     
-                    // Calculate average direction
                     const avgDirection = ((Math.atan2(sumSin, sumCos) * 180 / Math.PI) + 360) % 360;
                     const directionName = getDirectionName(avgDirection);
                     
@@ -551,9 +556,10 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: 8,
+    marginVertical: 8, // Add vertical margin for label space
   },
   noDataContainer: {
-    height: 200,
+    height: 220, // Match the updated chart height
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -679,7 +685,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 30, // Leave space for x-axis labels
     zIndex: 10,
     pointerEvents: 'none'  // Makes sure this layer doesn't block touch events
   },

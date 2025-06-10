@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, View, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { Platform, StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
 
 import ParallaxScrollView from '@/components/ParallaxScrollView';
@@ -19,7 +19,6 @@ export default function DPAlarmScreen() {
 
   const {
     alarmStatus,
-    isLoading,
     error,
     refreshData,
     testAlarm
