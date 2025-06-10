@@ -4,7 +4,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
 import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
@@ -28,6 +28,33 @@ export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoint
     </DataCrashDetector>
   );
 }
+
+// Component for rendering fixed Y-axis labels
+interface YAxisLabelsProps {
+  maxSpeed: number;
+  height: number;
+  textColor: string;
+}
+
+const YAxisLabels = ({ maxSpeed, height, textColor }: YAxisLabelsProps) => {
+  const numLabels = 5;
+  const labels = [];
+  
+  for (let i = 0; i <= numLabels; i++) {
+    const value = ((numLabels - i) / numLabels) * maxSpeed;
+    const yPosition = (i / numLabels) * (height - 50) + 20; // Match chart positioning
+    
+    labels.push(
+      <View key={i} style={[styles.yAxisLabel, { position: 'absolute', top: yPosition - 6 }]}>
+        <ThemedText style={[styles.yAxisLabelText, { color: textColor }]}>
+          {value.toFixed(0)}
+        </ThemedText>
+      </View>
+    );
+  }
+  
+  return <View style={styles.yAxisLabels}>{labels}</View>;
+};
 
 // Helper function to render wind direction arrow
 interface DirectionArrowProps {
@@ -101,7 +128,8 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       const hours = date.getHours();
       return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
     })
-    .slice(-20); // Limit to 20 points for better chart readability
+    // Show more data points for scrollable chart (last 4 hours by default, or all filtered data)
+    .slice(-48); // 48 points = 4 hours of 5-minute intervals
 
   if (recentData.length < 2) {
     return (
@@ -238,7 +266,12 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
 
   const screenWidth = Dimensions.get('window').width;
   const chartHeight = 200;
-  const chartWidth = screenWidth - 40;
+  // Calculate chart width based on data points for scrollable experience
+  // Minimum width of screen, but expand based on data points for better readability
+  const minChartWidth = screenWidth - 40;
+  const pointWidth = 20; // Width per data point for comfortable spacing
+  const calculatedWidth = Math.max(minChartWidth, recentData.length * pointWidth);
+  const chartWidth = calculatedWidth;
 
   // Calculate where the direction arrows should be placed
   const chartInnerWidth = chartWidth - 60; // Adjusted for better positioning
@@ -293,70 +326,91 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
-      <View style={styles.chartContainer}>
-        {/* Render chart with error handling */}
-        {(() => {
-          try {
-            return (
-              <View>
-                <View style={styles.chartWithOverlay}>
-                  <LineChart
-                    data={chartData}
-                    width={chartWidth}
-                    height={chartHeight}
-                    chartConfig={chartConfig}
-                    bezier
-                    style={styles.chart}
-                    withInnerLines={true}
-                    withOuterLines={true}
-                    withVerticalLabels={true}
-                    withHorizontalLabels={true}
-                    fromZero={true}
-                  />
-                  
-                  {/* Overlay for wind direction arrows and good point highlights */}
-                  <View style={styles.windDirectionOverlay}>
-                    <Svg width={chartWidth} height={chartHeight}>
-                      {/* Render good point highlights */}
-                      {goodPointPositions.map((pos, i) => (
-                        <Circle 
-                          key={`good-${i}`}
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={6}
-                          fill="rgba(76, 175, 80, 0.3)"
-                          stroke="#4CAF50"
-                          strokeWidth={2}
-                        />
-                      ))}
+      
+      {/* Chart area with fixed y-axis and scrollable content */}
+      <View style={styles.chartAreaContainer}>
+        {/* Fixed Y-axis */}
+        <View style={styles.yAxisContainer}>
+          <YAxisLabels 
+            maxSpeed={maxSpeed} 
+            height={chartHeight} 
+            textColor={textColor}
+          />
+        </View>
+        
+        {/* Scrollable chart content (without y-axis) */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={true}
+          style={styles.chartScrollContainer}
+          contentContainerStyle={styles.chartScrollContent}
+        >
+          <View style={styles.chartContainer}>
+            {/* Render chart with error handling */}
+            {(() => {
+              try {
+                return (
+                  <View>
+                    <View style={styles.chartWithOverlay}>
+                      <LineChart
+                        data={chartData}
+                        width={chartWidth}
+                        height={chartHeight}
+                        chartConfig={chartConfig}
+                        bezier
+                        style={styles.chart}
+                        withInnerLines={true}
+                        withOuterLines={true}
+                        withVerticalLabels={false} // Disable y-axis labels since we have our own
+                        withHorizontalLabels={true}
+                        fromZero={true}
+                      />
                       
-                      {/* Render direction arrows */}
-                      {arrowPositions.map((pos, i) => (
-                        <DirectionArrow 
-                          key={`dir-${i}`}
-                          x={pos.x}
-                          y={pos.y}
-                          direction={pos.direction}
-                          color={directionColor}
-                          size={16}
-                        />
-                      ))}
-                    </Svg>
+                      {/* Overlay for wind direction arrows and good point highlights */}
+                      <View style={styles.windDirectionOverlay}>
+                        <Svg width={chartWidth} height={chartHeight}>
+                          {/* Render good point highlights */}
+                          {goodPointPositions.map((pos, i) => (
+                            <Circle 
+                              key={`good-${i}`}
+                              cx={pos.x}
+                              cy={pos.y}
+                              r={6}
+                              fill="rgba(76, 175, 80, 0.3)"
+                              stroke="#4CAF50"
+                              strokeWidth={2}
+                            />
+                          ))}
+                          
+                          {/* Render direction arrows */}
+                          {arrowPositions.map((pos, i) => (
+                            <DirectionArrow 
+                              key={`dir-${i}`}
+                              x={pos.x}
+                              y={pos.y}
+                              direction={pos.direction}
+                              color={directionColor}
+                              size={16}
+                            />
+                          ))}
+                        </Svg>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
-            );
-          } catch (error) {
-            console.error('🚨 LineChart rendering error:', error);
-            return (
-              <View style={styles.noDataContainer}>
-                <ThemedText style={styles.noDataText}>
-                  Chart rendering failed. Please try refreshing.
-                </ThemedText>
-              </View>
-            );
-          }
-        })()}
+                );
+              } catch (error) {
+                console.error('🚨 LineChart rendering error:', error);
+                return (
+                  <View style={styles.noDataContainer}>
+                    <ThemedText style={styles.noDataText}>
+                      Chart rendering failed. Please try refreshing.
+                    </ThemedText>
+                  </View>
+                );
+              }
+            })()}
+          </View>
+        </ScrollView>
       </View>
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
@@ -628,5 +682,47 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 10,
     pointerEvents: 'none'  // Makes sure this layer doesn't block touch events
-  }
+  },
+  chartScrollContainer: {
+    flex: 1,
+  },
+  chartScrollContent: {
+    alignItems: 'center',
+  },
+  yAxisContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 50,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 8,
+    zIndex: 5,
+  },
+  yAxisLabel: {
+    fontSize: 10,
+    opacity: 0.7,
+    textAlign: 'right',
+  },
+  yAxisLabels: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 50,
+    justifyContent: 'space-between',
+    paddingRight: 8,
+  },
+  yAxisLabelText: {
+    fontSize: 10,
+    opacity: 0.7,
+    textAlign: 'right',
+  },
+  chartAreaContainer: {
+    flexDirection: 'row',
+    position: 'relative',
+    height: 220, // Accommodate chart height + padding
+    backgroundColor: 'transparent',
+  },
 });

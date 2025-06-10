@@ -533,23 +533,37 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
   try {
     const config = await getAutoEcowittConfigForDevice(deviceName);
     
+    // Format dates as YYYY-MM-DD HH:MM:SS (Ecowitt API format)
+    const formatEcowittDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+    
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startTime = Math.floor(today.getTime() / 1000);
-    const endTime = Math.floor(now.getTime() / 1000);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     
     const params = {
       application_key: config.applicationKey,
       api_key: config.apiKey,
       mac: config.macAddress,
-      start_date: startTime,
-      end_date: endTime,
-      call_back: 'current', // Request current day data
+      start_date: formatEcowittDate(startOfDay),
+      end_date: formatEcowittDate(endOfDay),
+      cycle_type: '5min', // 5-minute intervals for detailed data
+      temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
+      pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
+      wind_unit: '6', // m/s (6 = m/s, 7 = mph)
+      call_back: 'wind', // Request wind data
     };
 
     console.log(`📡 Making Ecowitt history API request for ${deviceName}`);
 
-    const response = await axios.get(`${BASE_URL}/device/history`, {
+    const response = await axios.get<EcowittHistoricResponse>(`${BASE_URL}/device/history`, {
       params,
       timeout: 15000, // Longer timeout for history data
       headers: {
@@ -565,43 +579,59 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       throw new Error(`Ecowitt history API error: ${response.data.msg}`);
     }
 
-    if (!response.data.data || !response.data.data.list) {
-      console.warn(`⚠️ No wind data available for ${deviceName} today`);
-      return [];
+    // Validate response structure before accessing data
+    if (!response.data.data || !response.data.data.wind) {
+      console.error(`❌ Invalid Ecowitt API response structure for ${deviceName}:`, JSON.stringify(response.data, null, 2));
+      throw new Error('Invalid response structure from Ecowitt API - missing wind data');
     }
 
-    const rawData = response.data.data.list;
-    console.log(`📊 Received ${rawData.length} data points for ${deviceName}`);
+    const windData = response.data.data.wind;
+    if (!windData.wind_speed?.list || !windData.wind_direction?.list) {
+      console.error(`❌ Missing wind speed or direction data in response for ${deviceName}`);
+      throw new Error('Invalid response structure from Ecowitt API - missing wind measurements');
+    }
 
-    // Convert raw data to our format
-    const windData: EcowittWindDataPoint[] = rawData.map((point: any) => {
-      const timestamp = point.date || point.time || Date.now();
-      const windSpeedMs = parseFloat(point.wind_speed) || 0;
-      const windGustMs = parseFloat(point.wind_gust) || 0;
-      const windDirection = parseFloat(point.wind_direction) || 0;
+    // Get timestamps from wind speed data (they should be consistent across all measurements)
+    const timestamps = Object.keys(windData.wind_speed.list);
+    console.log(`📊 Received ${timestamps.length} data points for ${deviceName}`);
 
-      return {
-        time: new Date(timestamp * 1000).toISOString(),
-        timestamp: timestamp * 1000,
-        windSpeed: windSpeedMs,
-        windSpeedMph: windSpeedMs * 2.237, // m/s to mph
-        windGust: windGustMs,
-        windGustMph: windGustMs * 2.237, // m/s to mph
-        windDirection: windDirection,
-        temperature: point.temperature ? parseFloat(point.temperature) : undefined,
-        humidity: point.humidity ? parseFloat(point.humidity) : undefined
-      };
-    });
+    // Transform API response to our format
+    const windDataPoints: EcowittWindDataPoint[] = timestamps
+      .map(timestamp => {
+        // Convert timestamp to Date object and ISO string
+        const timestampMs = parseInt(timestamp) * 1000;
+        const date = new Date(timestampMs);
+        const timeString = date.toISOString();
+        
+        // Extract wind data from the response structure
+        const windSpeedMph = parseFloat(windData.wind_speed.list[timestamp] || '0');
+        const windGustMph = parseFloat(windData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
+        const windDirection = parseFloat(windData.wind_direction.list[timestamp] || '0');
+        
+        // Convert to m/s for internal consistency (API provides mph but we want m/s internally)
+        const windSpeedMs = windSpeedMph / 2.237;
+        const windGustMs = windGustMph / 2.237;
+        
+        return {
+          time: timeString,
+          timestamp: timestampMs,
+          windSpeed: windSpeedMs,
+          windSpeedMph,
+          windGust: windGustMs,
+          windGustMph,
+          windDirection,
+          temperature: undefined, // Not available in wind-only response
+          humidity: undefined // Not available in wind-only response
+        };
+      })
+      .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
+      .sort((a, b) => a.timestamp - b.timestamp);
 
     // Cache the data
-    try {
-      await AsyncStorage.setItem(ECOWITT_CACHE_KEY, JSON.stringify(windData));
-      console.log(`💾 Cached ${windData.length} wind data points for ${deviceName}`);
-    } catch (cacheError) {
-      console.warn('⚠️ Failed to cache wind data:', cacheError);
-    }
-
-    return windData;
+    await cacheEcowittData(windDataPoints);
+    console.log(`✅ Successfully fetched and cached ${windDataPoints.length} wind data points for ${deviceName}`);
+    
+    return windDataPoints;
 
   } catch (error) {
     console.error(`❌ Error fetching Ecowitt wind data for ${deviceName}:`, error);

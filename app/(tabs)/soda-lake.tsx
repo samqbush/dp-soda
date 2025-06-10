@@ -1,12 +1,14 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
@@ -27,6 +29,14 @@ export default function SodaLakeScreen() {
 
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+
+  // Auto-refresh data when tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🏔️ Soda Lake tab focused - refreshing data...');
+      refreshData();
+    }, [refreshData])
+  );
 
   const handleRefresh = async () => {
     await refreshData();
@@ -185,6 +195,22 @@ export default function SodaLakeScreen() {
           </View>
         )}
 
+        {/* Detailed Weather Data Link */}
+        <View style={[styles.linkCard, { backgroundColor: cardColor }]}>
+          <ThemedText type="subtitle" style={styles.cardTitle}>Detailed Weather Data</ThemedText>
+          <ThemedText style={styles.linkDescription}>
+            For more detailed wind analysis and historical data, visit the Ecowitt weather station page:
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.linkButton, { borderColor: tintColor }]}
+            onPress={() => Linking.openURL('https://www.ecowitt.net/home/share?authorize=9S85P3')}
+          >
+            <ThemedText style={[styles.linkButtonText, { color: tintColor }]}>
+              📊 View Detailed Weather Data
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
         {/* Debug Actions */}
         {__DEV__ && (
           <View style={styles.debugContainer}>
@@ -315,6 +341,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
     lineHeight: 22,
+  },
+  linkCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  linkDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  linkButton: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  linkButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   debugContainer: {
     margin: 16,

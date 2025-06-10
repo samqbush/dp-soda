@@ -186,8 +186,8 @@ function WindDataDisplayContent() {
             🔍 Verification (6am-8am)
           </ThemedText>
           <ThemedText style={styles.verificationText}>
-            Speed: {verification.averageSpeed.toFixed(1)} mph | 
-            Consistency: {verification.directionConsistency.toFixed(1)}% | 
+            Speed: {verification.averageSpeed.toFixed(1)} mph{' | '}
+            Consistency: {verification.directionConsistency.toFixed(1)}%{' | '}
             Good Points: {verification.consecutiveGoodPoints}
           </ThemedText>
           <ThemedText style={styles.verificationAnalysis}>

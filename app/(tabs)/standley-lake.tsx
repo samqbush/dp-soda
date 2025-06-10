@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function StandleyLakeScreen() {
   const {
@@ -29,6 +30,14 @@ export default function StandleyLakeScreen() {
   // const backgroundColor = useThemeColor({}, 'background'); // Currently unused
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+
+  // Auto-refresh data when tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🏔️ Standley Lake tab focused - refreshing data...');
+      refreshData();
+    }, [refreshData])
+  );
 
   const handleRefresh = async () => {
     await refreshData();

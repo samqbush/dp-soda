@@ -2,8 +2,8 @@ import {
     clearEcowittDataCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
-    fetchEcowittWindData,
-    getAutoEcowittConfig,
+    fetchEcowittWindDataForDevice,
+    getAutoEcowittConfigForDevice,
     getCachedEcowittData,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
@@ -96,15 +96,15 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       
       // First test the auto-configuration
       try {
-        await getAutoEcowittConfig();
-        console.log('✅ Auto-configuration successful');
+        await getAutoEcowittConfigForDevice('DP Standley West');
+        console.log('✅ Auto-configuration successful for Standley Lake');
       } catch (configError) {
-        console.error('❌ Auto-configuration failed:', configError);
+        console.error('❌ Auto-configuration failed for Standley Lake:', configError);
         setError(`Configuration failed: ${configError instanceof Error ? configError.message : 'Unknown error'}`);
         return;
       }
 
-      const freshData = await fetchEcowittWindData();
+      const freshData = await fetchEcowittWindDataForDevice('DP Standley West');
       
       setWindData(freshData);
       setLastUpdated(new Date());
