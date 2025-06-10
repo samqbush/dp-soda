@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useStandleyLakeWind } from './useStandleyLakeWind';
+import { useSodaLakeWind } from './useSodaLakeWind';
 import { getAlarmCriteria, setAlarmCriteria } from '@/services/windService';
+import { unifiedAlarmManager } from '@/services/unifiedAlarmManager';
 
 export interface SimplifiedAlarmCriteria {
   minimumAverageSpeed: number;
@@ -50,7 +51,7 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
   const [criteria, setCriteriaState] = useState<SimplifiedAlarmCriteria>(DEFAULT_SIMPLIFIED_CRITERIA);
   const [error, setError] = useState<string | null>(null);
   
-  // Use Standley Lake wind data (Ecowitt source)
+  // Use Soda Lake wind data (Ecowitt source) - matches actual alarm system
   const {
     windData,
     analysis,
@@ -58,25 +59,73 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
     error: windError,
     lastUpdated,
     refreshData: refreshWindData
-  } = useStandleyLakeWind();
+  } = useSodaLakeWind();
 
-  // Load stored criteria on mount
+  // Subscribe to unified alarm manager and load initial state from it
   useEffect(() => {
-    const loadCriteria = async () => {
+    let isSubscribed = true;
+
+    const initializeFromUnifiedManager = async () => {
       try {
+        console.log('📱 useDPAlarm initializing from unified alarm manager...');
+        
+        // Wait a brief moment to ensure unified alarm manager has initialized
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Get current state from unified alarm manager (which loads from storage)
+        const alarmState = unifiedAlarmManager.getState();
+        console.log('📱 useDPAlarm got unified alarm manager state:', alarmState);
+        
+        // Load minimum speed from storage (this is not in unified alarm manager yet)
         const stored = await getAlarmCriteria();
-        setCriteriaState({
-          minimumAverageSpeed: stored.minimumAverageSpeed,
-          alarmEnabled: stored.alarmEnabled,
-          alarmTime: stored.alarmTime,
-        });
+        
+        if (isSubscribed) {
+          setCriteriaState({
+            minimumAverageSpeed: stored.minimumAverageSpeed,
+            alarmEnabled: alarmState.isEnabled,
+            alarmTime: alarmState.alarmTime,
+          });
+          console.log('📱 useDPAlarm initial state set:', {
+            minimumAverageSpeed: stored.minimumAverageSpeed,
+            alarmEnabled: alarmState.isEnabled,
+            alarmTime: alarmState.alarmTime,
+          });
+        }
       } catch (err) {
-        console.error('Failed to load alarm criteria:', err);
+        console.error('Failed to initialize from unified alarm manager:', err);
         setError('Failed to load alarm settings');
       }
     };
     
-    loadCriteria();
+    initializeFromUnifiedManager();
+
+    // Subscribe to unified alarm manager state changes to keep criteria in sync
+    const unsubscribe = unifiedAlarmManager.onStateChange((alarmState) => {
+      if (!isSubscribed) return;
+      
+      setCriteriaState(prev => {
+        // Only update if values have actually changed to avoid unnecessary re-renders
+        if (prev.alarmEnabled !== alarmState.isEnabled || prev.alarmTime !== alarmState.alarmTime) {
+          console.log('📱 useDPAlarm syncing with unified alarm manager:', {
+            enabled: `${prev.alarmEnabled} → ${alarmState.isEnabled}`,
+            time: `${prev.alarmTime} → ${alarmState.alarmTime}`,
+            source: 'unified_alarm_manager'
+          });
+          return {
+            ...prev,
+            alarmEnabled: alarmState.isEnabled,
+            alarmTime: alarmState.alarmTime,
+          };
+        }
+        return prev;
+      });
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
   }, []);
 
   /**
@@ -120,7 +169,7 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
     const targetTimeMs = targetTime.getTime();
     const fiveMinutesMs = 5 * 60 * 1000;
     
-    const alarmTimeData = windData.filter(point => {
+    const alarmTimeData = windData.filter((point) => {
       const pointTime = new Date(point.timestamp).getTime();
       return Math.abs(pointTime - targetTimeMs) <= fiveMinutesMs;
     });
@@ -176,6 +225,14 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
   const setCriteria = useCallback(async (newCriteria: Partial<SimplifiedAlarmCriteria>) => {
     try {
       const updated = { ...criteria, ...newCriteria };
+      console.log('📱 useDPAlarm setCriteria called:', {
+        current: criteria,
+        newCriteria,
+        updated,
+        source: 'user_interface'
+      });
+      
+      // Update local state immediately for responsive UI
       setCriteriaState(updated);
       
       // Convert to full criteria format for storage compatibility
@@ -184,8 +241,22 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
         alarmEnabled: updated.alarmEnabled,
         alarmTime: updated.alarmTime,
       });
+
+      // Update the unified alarm manager to keep everything in sync
+      // Only update if the values actually changed to avoid unnecessary calls
+      const currentUnifiedState = unifiedAlarmManager.getState();
       
-      console.log('✅ Alarm criteria updated:', updated);
+      if (newCriteria.alarmEnabled !== undefined && currentUnifiedState.isEnabled !== updated.alarmEnabled) {
+        console.log('📱 useDPAlarm updating unified alarm manager enabled:', `${currentUnifiedState.isEnabled} → ${updated.alarmEnabled}`);
+        await unifiedAlarmManager.setEnabled(updated.alarmEnabled);
+      }
+      
+      if (newCriteria.alarmTime !== undefined && currentUnifiedState.alarmTime !== updated.alarmTime) {
+        console.log('📱 useDPAlarm updating unified alarm manager time:', `${currentUnifiedState.alarmTime} → ${updated.alarmTime}`);
+        await unifiedAlarmManager.setAlarmTime(updated.alarmTime);
+      }
+      
+      console.log('✅ Alarm criteria updated successfully:', updated);
     } catch (err) {
       console.error('❌ Failed to update alarm criteria:', err);
       setError('Failed to save alarm settings');

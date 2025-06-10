@@ -164,6 +164,10 @@ export default function SettingsScreen() {
             we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 12 mph, you get woken up for great conditions!
           </ThemedText>
 
+          {/* Unified Alarm Testing Panel */}
+          <SimpleAlarmTester />
+        </View>
+
           <ThemedText type="subtitle" style={styles.subsectionTitle}>Wind Analysis on Lake Tabs</ThemedText>
           <ThemedText style={styles.infoText}>
             The Soda Lake and Standley Lake tabs show detailed wind analysis for monitoring current conditions (separate from the alarm system).
@@ -179,10 +183,6 @@ export default function SettingsScreen() {
             <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>3. Consecutive Good Points</ThemedText> - Counts the maximum number of consecutive data points that meet speed criteria. Ensures sustained favorable conditions rather than brief gusts.{'\n'}
           </ThemedText>
           
-
-          {/* Unified Alarm Testing Panel */}
-          <SimpleAlarmTester />
-        </View>
           
         {/* Version display with secret gesture detection */}
         <View style={styles.versionContainer}>

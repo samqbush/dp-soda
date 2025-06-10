@@ -37,6 +37,9 @@ class UnifiedAlarmManager {
   private foregroundTimer: NodeJS.Timeout | null = null;
   private scheduledNotificationId: string | null = null;
   private isAppInForeground: boolean = true;
+  private settingsLoaded: boolean = false;
+  private isInitialized: boolean = false;
+  private isUpdatingAlarmTime: boolean = false; // Lock to prevent concurrent modifications
   private alarmState: AlarmState = {
     isEnabled: false,
     isActive: false,
@@ -52,6 +55,12 @@ class UnifiedAlarmManager {
    */
   async initialize(): Promise<void> {
     try {
+      // Prevent multiple initializations
+      if (this.isInitialized) {
+        AlarmLogger.info('Unified Alarm Manager already initialized, skipping');
+        return;
+      }
+      
       AlarmLogger.info('Initializing Unified Alarm Manager...');
       
       // Request notification permissions for background support
@@ -68,6 +77,7 @@ class UnifiedAlarmManager {
       // Load saved alarm settings
       await this.loadAlarmSettings();
       
+      this.isInitialized = true;
       AlarmLogger.success('Unified Alarm Manager initialized');
       this.notifyStateChange();
     } catch (error) {
@@ -97,6 +107,7 @@ class UnifiedAlarmManager {
   async setEnabled(enabled: boolean): Promise<void> {
     try {
       this.alarmState.isEnabled = enabled;
+      this.settingsLoaded = true; // Mark as loaded to prevent initialization overwrites
       
       if (enabled) {
         await this.scheduleNextAlarmCheck();
@@ -121,19 +132,38 @@ class UnifiedAlarmManager {
    */
   async setAlarmTime(time: string): Promise<void> {
     try {
+      // Prevent concurrent modifications
+      if (this.isUpdatingAlarmTime) {
+        AlarmLogger.warning(`Alarm time update already in progress, ignoring duplicate request to set ${time}`);
+        return;
+      }
+      
+      this.isUpdatingAlarmTime = true;
+      const previousTime = this.alarmState.alarmTime;
+      
+      AlarmLogger.info(`🔒 Starting alarm time update: ${previousTime} → ${time}`);
+      
+      // Update state immediately
       this.alarmState.alarmTime = time;
+      this.settingsLoaded = true; // Mark as loaded to prevent initialization overwrites
+      
+      // Save to storage immediately to prevent race conditions
+      await this.saveAlarmSettings();
       
       // If alarm is enabled, reschedule with new time
       if (this.alarmState.isEnabled) {
         await this.scheduleNextAlarmCheck();
       }
       
-      await this.saveAlarmSettings();
+      // Notify state change after everything is saved and scheduled
       this.notifyStateChange();
-      AlarmLogger.info(`Alarm time set to ${time}`);
+      
+      AlarmLogger.success(`🔓 Alarm time successfully updated to ${time} and saved`);
     } catch (error) {
       AlarmLogger.error('Error setting alarm time:', error);
       throw error;
+    } finally {
+      this.isUpdatingAlarmTime = false;
     }
   }
 
@@ -460,19 +490,27 @@ class UnifiedAlarmManager {
    */
   private async cancelAllAlarms(): Promise<void> {
     try {
+      AlarmLogger.info('Cancelling all alarms and timers...');
+      
       // Cancel foreground timer
       if (this.foregroundTimer) {
         clearTimeout(this.foregroundTimer);
         this.foregroundTimer = null;
+        AlarmLogger.info('Cancelled foreground timer');
       }
       
-      // Cancel background notification
+      // Cancel specific background notification if we have the ID
       if (this.scheduledNotificationId) {
         await alarmNotificationService.cancelAlarmNotification(this.scheduledNotificationId);
         this.scheduledNotificationId = null;
+        AlarmLogger.info('Cancelled specific scheduled notification');
       }
       
-      AlarmLogger.info('All alarms cancelled');
+      // Also cancel ALL notifications as a safety measure to prevent conflicts
+      await alarmNotificationService.cancelAllAlarmNotifications();
+      AlarmLogger.info('Cancelled all alarm notifications as safety measure');
+      
+      AlarmLogger.success('All alarms and timers cancelled');
     } catch (error) {
       AlarmLogger.error('Error cancelling alarms:', error);
     }
@@ -483,9 +521,31 @@ class UnifiedAlarmManager {
    */
   private async loadAlarmSettings(): Promise<void> {
     try {
+      // Prevent race condition: only load settings once during initialization
+      if (this.settingsLoaded) {
+        AlarmLogger.info(`Alarm settings already loaded, skipping to prevent race condition. Current state: enabled=${this.alarmState.isEnabled}, time=${this.alarmState.alarmTime}`);
+        return;
+      }
+      
+      // Don't load if an alarm time update is in progress
+      if (this.isUpdatingAlarmTime) {
+        AlarmLogger.warning('Alarm time update in progress, skipping settings load to prevent overwrite');
+        return;
+      }
+      
+      AlarmLogger.info('Loading alarm settings from storage...');
       const criteria = await getAlarmCriteria();
+      
+      const previousState = { ...this.alarmState };
       this.alarmState.isEnabled = criteria.alarmEnabled;
       this.alarmState.alarmTime = criteria.alarmTime;
+      this.settingsLoaded = true;
+      
+      AlarmLogger.info('Alarm settings loaded from storage', { 
+        enabled: `${previousState.isEnabled} → ${this.alarmState.isEnabled}`,
+        time: `${previousState.alarmTime} → ${this.alarmState.alarmTime}`,
+        settingsLoaded: this.settingsLoaded
+      });
       
       // Only schedule if alarm was previously enabled by user
       // Use silent mode to avoid notification popup during initialization
@@ -493,10 +553,6 @@ class UnifiedAlarmManager {
         await this.scheduleNextAlarmCheck(true);
       }
       
-      AlarmLogger.info('Alarm settings loaded', { 
-        enabled: this.alarmState.isEnabled, 
-        time: this.alarmState.alarmTime 
-      });
     } catch (error) {
       AlarmLogger.error('Error loading alarm settings:', error);
     }
@@ -507,14 +563,20 @@ class UnifiedAlarmManager {
    */
   private async saveAlarmSettings(): Promise<void> {
     try {
-      const { setAlarmCriteria } = await import('./windService');
-      await setAlarmCriteria({
+      // Use direct import instead of dynamic import for reliability
+      const { setAlarmCriteria } = require('./windService');
+      
+      const settingsToSave = {
         alarmEnabled: this.alarmState.isEnabled,
         alarmTime: this.alarmState.alarmTime
-      });
-      AlarmLogger.info('Alarm settings saved');
+      };
+      
+      AlarmLogger.info('Saving alarm settings to storage:', settingsToSave);
+      await setAlarmCriteria(settingsToSave);
+      AlarmLogger.success('Alarm settings saved successfully to storage');
     } catch (error) {
-      AlarmLogger.error('Error saving alarm settings:', error);
+      AlarmLogger.error('Error saving alarm settings to storage:', error);
+      // Don't throw error to avoid breaking the flow, but log it clearly
     }
   }
 
