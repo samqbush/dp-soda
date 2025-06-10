@@ -121,12 +121,12 @@ export default function SettingsScreen() {
           onPress: () => {
             const defaultCriteria: AlarmCriteria = {
               minimumAverageSpeed: 10,
-              directionConsistencyThreshold: 70,
-              minimumConsecutivePoints: 4,
-              directionDeviationThreshold: 45,
-              preferredDirection: 315,
-              preferredDirectionRange: 45,
-              useWindDirection: true,
+              directionConsistencyThreshold: 70, // Keep for compatibility but not exposed in UI
+              minimumConsecutivePoints: 4, // Keep for compatibility but not exposed in UI
+              directionDeviationThreshold: 45, // Keep for compatibility but not exposed in UI
+              preferredDirection: 315, // Keep for compatibility but not exposed in UI
+              preferredDirectionRange: 45, // Keep for compatibility but not exposed in UI
+              useWindDirection: false, // Disabled by default for simplified mode
               alarmEnabled: localCriteria.alarmEnabled, // Keep current alarm state
               alarmTime: localCriteria.alarmTime // Keep current alarm time
             };
@@ -158,14 +158,14 @@ export default function SettingsScreen() {
         </ThemedText>
 
         <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Wind Speed</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Criteria</ThemedText>
           
           <View style={styles.settingItem}>
             <ThemedText style={styles.settingLabel}>
               Minimum Average Speed (mph)
             </ThemedText>
             <ThemedText style={styles.settingDescription}>
-              Minimum wind speed required during the 3am-5am window
+              Minimum wind speed required to trigger the dawn patrol alarm. Uses reliable Ecowitt weather data.
             </ThemedText>
             <TextInput
               style={[styles.input, { color: textColor, borderColor: tintColor }]}
@@ -177,139 +177,13 @@ export default function SettingsScreen() {
             />
           </View>
 
-
-        </View>
-
-        <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Wind Direction</ThemedText>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.switchContainer}>
-              <View style={styles.switchLabelContainer}>
-                <ThemedText style={styles.settingLabel}>
-                  Use Wind Direction in Alarm
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  When disabled, the alarm will only consider wind speed and consistency, ignoring direction. 
-                  Use this if the wind direction data is unreliable.
-                </ThemedText>
-              </View>
-              <Switch
-                value={localCriteria.useWindDirection}
-                onValueChange={(value) => updateCriteria('useWindDirection', value)}
-                trackColor={{ false: '#767577', true: tintColor }}
-                thumbColor={localCriteria.useWindDirection ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-          </View>
-          
-          {localCriteria.useWindDirection && (
-            <>
-              <View style={styles.directionInfoBox}>
-                <ThemedText style={styles.infoBoxTitle}>Wind Direction Guide</ThemedText>
-                <ThemedText style={styles.infoBoxText}>
-                  Wind directions are measured in degrees (0-359°) where:{'\n'}
-                  • 0° or 360° = wind from North{'\n'}
-                  • 90° = wind from East{'\n'}
-                  • 180° = wind from South{'\n'}
-                  • 270° = wind from West
-                </ThemedText>
-                <ThemedText style={styles.infoBoxText}>
-                  For optimal conditions at Soda Lake, winds coming from the northwest (around 315°) 
-                  are typically best. This direction creates the cleanest wind across the water
-                  with minimal obstruction and provides the most consistent conditions.
-                </ThemedText>
-              </View>
-              
-              <View style={styles.settingItem}>
-                <ThemedText style={styles.settingLabel}>
-                  Direction Consistency (%)
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Minimum percentage of consistent wind direction
-                </ThemedText>
-                <TextInput
-                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
-                  value={localCriteria.directionConsistencyThreshold.toString()}
-                  onChangeText={(text) => updateCriteria('directionConsistencyThreshold', parseFloat(text) || 0)}
-                  keyboardType="numeric"
-                  placeholder="70"
-                  placeholderTextColor={textColor + '80'}
-                />
-              </View>
-
-              <View style={styles.settingItem}>
-                <ThemedText style={styles.settingLabel}>
-                  Direction Deviation Threshold (degrees)
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Maximum allowed variation in wind direction
-                </ThemedText>
-                <TextInput
-                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
-                  value={localCriteria.directionDeviationThreshold.toString()}
-                  onChangeText={(text) => updateCriteria('directionDeviationThreshold', parseFloat(text) || 0)}
-                  keyboardType="numeric"
-                  placeholder="45"
-                  placeholderTextColor={textColor + '80'}
-                />
-              </View>
-              
-              <View style={styles.settingItem}>
-                <ThemedText style={styles.settingLabel}>
-                  Preferred Wind Direction (degrees)
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  The optimal wind direction for Soda Lake (315° for Northwest)
-                </ThemedText>
-                <TextInput
-                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
-                  value={localCriteria.preferredDirection.toString()}
-                  onChangeText={(text) => updateCriteria('preferredDirection', parseFloat(text) || 0)}
-                  keyboardType="numeric"
-                  placeholder="315"
-                  placeholderTextColor={textColor + '80'}
-                />
-              </View>
-              
-              <View style={styles.settingItem}>
-                <ThemedText style={styles.settingLabel}>
-                  Preferred Direction Range (degrees)
-                </ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  The acceptable range around preferred direction (±degrees)
-                </ThemedText>
-                <TextInput
-                  style={[styles.input, { color: textColor, borderColor: tintColor }]}
-                  value={localCriteria.preferredDirectionRange.toString()}
-                  onChangeText={(text) => updateCriteria('preferredDirectionRange', parseFloat(text) || 0)}
-                  keyboardType="numeric"
-                  placeholder="45"
-                  placeholderTextColor={textColor + '80'}
-                />
-              </View>
-            </>
-          )}
-        </View>
-
-        <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Data Quality</ThemedText>
-          
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Minimum Consecutive Good Points
+          <View style={styles.infoBox}>
+            <ThemedText style={styles.infoBoxTitle}>Simplified Alarm Logic</ThemedText>
+            <ThemedText style={styles.infoBoxText}>
+              The Dawn Patrol Alarm now uses a simplified approach that trusts Ecowitt weather station data. 
+              It only checks if the average wind speed meets your threshold - no complex direction analysis needed.
+              This provides more reliable and consistent alarm decisions.
             </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              Number of consecutive data points that must meet criteria
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: tintColor }]}
-              value={localCriteria.minimumConsecutivePoints.toString()}
-              onChangeText={(text) => updateCriteria('minimumConsecutivePoints', parseInt(text) || 0)}
-              keyboardType="numeric"
-              placeholder="4"
-              placeholderTextColor={textColor + '80'}
-            />
           </View>
         </View>
 
@@ -337,26 +211,25 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.infoSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>About Soda Lake Wind Monitoring</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>About Dawn Patrol Alarm</ThemedText>
           <ThemedText style={styles.infoText}>
-            This app monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado.
-            It analyzes early morning wind trends (3am-5am) to determine if conditions are favorable
-            for beach activities. The alarm logic considers wind speed, direction consistency, and
-            data quality to make wake-up decisions.
+            The Dawn Patrol Alarm now uses a simplified, reliable approach for wake-up decisions.
+            It monitors wind conditions using high-quality Ecowitt weather station data and 
+            triggers alarms based on simple wind speed thresholds.
           </ThemedText>
           
           <ThemedText type="subtitle" style={styles.subsectionTitle}>How It Works</ThemedText>
           <ThemedText style={styles.infoText}>
-            • Fetches real-time wind data from WindAlert API{'\n'}
-            • Analyzes 3am-5am window for alarm decisions{'\n'}
-            • Verifies conditions in 6am-8am window{'\n'}
-            • Caches data for offline access{'\n'}
-            • Configurable thresholds and criteria
+            • Uses reliable Ecowitt weather station data{'\n'}
+            • Simple wind speed threshold checking{'\n'}
+            • Trusts weather station wind direction quality{'\n'}
+            • No complex analysis - just effective results{'\n'}
+            • Background notifications when app is closed
           </ThemedText>
           
           <ThemedText style={styles.infoText}>
-            The verification window (6am-8am) checks if the predicted conditions actually occurred.
-            Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
+            The alarm checks recent wind conditions and triggers if the average speed meets your threshold.
+            Wind data is automatically refreshed, and you can test alarm functionality below.
           </ThemedText>
 
           {/* Unified Alarm Testing Panel */}
@@ -406,6 +279,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderLeftWidth: 3,
     borderLeftColor: '#0078FF',
+  },
+  infoBox: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
   },
   infoBoxTitle: {
     fontSize: 16,

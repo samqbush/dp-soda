@@ -35,6 +35,13 @@ export interface AlarmCriteria {
   alarmTime: string; // Time in 24-hour format (e.g., "05:00")
 }
 
+// Simplified criteria for the new DP Alarm system
+export interface SimplifiedAlarmCriteria {
+  minimumAverageSpeed: number;
+  alarmEnabled: boolean;
+  alarmTime: string;
+}
+
 const DEFAULT_CRITERIA: AlarmCriteria = {
   minimumAverageSpeed: 10,
   directionConsistencyThreshold: 70,
@@ -691,5 +698,95 @@ export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
   } catch (error: any) {
     console.error('❌ Error fetching REAL wind data:', error);
     throw new Error(`Failed to fetch real wind data: ${error.message || 'Unknown error'}`);
+  }
+};
+
+/**
+ * Simplified alarm checking using Ecowitt data
+ * This function can be used by the unified alarm manager without React hooks
+ */
+export const checkSimplifiedAlarmConditions = async (): Promise<{
+  shouldTrigger: boolean;
+  currentSpeed: number | null;
+  averageSpeed: number | null;
+  threshold: number;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}> => {
+  try {
+    // Import Ecowitt service functions
+    const { fetchEcowittWindDataForDevice } = await import('./ecowittService');
+    
+    // Get alarm criteria
+    const criteria = await getAlarmCriteria();
+    const threshold = criteria.minimumAverageSpeed;
+    
+    // Use the Standley Lake device (as per the app's current configuration)
+    const deviceName = 'Standley Lake';
+    
+    // Fetch recent wind data
+    const windData = await fetchEcowittWindDataForDevice(deviceName);
+    
+    if (!windData || windData.length === 0) {
+      return {
+        shouldTrigger: false,
+        currentSpeed: null,
+        averageSpeed: null,
+        threshold,
+        confidence: 'low',
+        reason: 'No recent wind data available from Standley Lake'
+      };
+    }
+    
+    // Calculate average speed from recent data
+    const speeds = windData.map(d => d.windSpeed).filter(speed => speed !== null && speed !== undefined);
+    if (speeds.length === 0) {
+      return {
+        shouldTrigger: false,
+        currentSpeed: null,
+        averageSpeed: null,
+        threshold,
+        confidence: 'low',
+        reason: 'No valid wind speed data'
+      };
+    }
+    
+    const averageSpeed = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
+    const currentSpeed = windData[windData.length - 1]?.windSpeed || null;
+    
+    // Determine confidence based on data availability
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (windData.length >= 20) {
+      confidence = 'high';
+    } else if (windData.length >= 10) {
+      confidence = 'medium';
+    }
+    
+    // Simple threshold check
+    const shouldTrigger = averageSpeed >= threshold;
+    
+    const reason = shouldTrigger 
+      ? `Average wind speed (${averageSpeed.toFixed(1)} mph) meets threshold (${threshold} mph)`
+      : `Average wind speed (${averageSpeed.toFixed(1)} mph) below threshold (${threshold} mph)`;
+    
+    return {
+      shouldTrigger,
+      currentSpeed,
+      averageSpeed,
+      threshold,
+      confidence,
+      reason
+    };
+    
+  } catch (error) {
+    console.error('Error checking simplified alarm conditions:', error);
+    return {
+      shouldTrigger: false,
+      currentSpeed: null,
+      averageSpeed: null,
+      threshold: 10,
+      confidence: 'low',
+      reason: `Error checking conditions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
   }
 };

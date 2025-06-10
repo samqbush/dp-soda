@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { AlarmLogger } from './alarmDebugLogger';
 import { alarmNotificationService } from './alarmNotificationService';
 import { alarmAudio } from './alarmAudioService';
-import { fetchWindData, analyzeWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis } from './windService';
+import { fetchWindData, analyzeWindData, getAlarmCriteria, checkSimplifiedAlarmConditions, type AlarmCriteria, type WindAnalysis } from './windService';
 
 export interface AlarmState {
   isEnabled: boolean;
@@ -140,20 +140,23 @@ class UnifiedAlarmManager {
   /**
    * Test the alarm with current wind conditions
    */
-  async testAlarmWithCurrentConditions(): Promise<{ triggered: boolean; analysis: WindAnalysis }> {
+  async testAlarmWithCurrentConditions(): Promise<{ triggered: boolean; analysis: any }> {
     try {
-      AlarmLogger.info('Testing alarm with current wind conditions...');
+      AlarmLogger.info('Testing alarm with current simplified conditions...');
       
-      const windData = await fetchWindData();
-      const criteria = await getAlarmCriteria();
-      const analysis = analyzeWindData(windData, criteria);
+      const result = await checkSimplifiedAlarmConditions();
       
-      if (analysis.isAlarmWorthy) {
-        await this.triggerAlarm('Test with current conditions - conditions are favorable!');
-        return { triggered: true, analysis };
+      if (result.shouldTrigger) {
+        const message = `🧪 Test alarm - current conditions are favorable!\n` +
+          `Current: ${result.currentSpeed?.toFixed(1) || 'N/A'} mph, ` +
+          `Average: ${result.averageSpeed?.toFixed(1) || 'N/A'} mph ` +
+          `(threshold: ${result.threshold} mph)`;
+        
+        await this.triggerAlarm(message);
+        return { triggered: true, analysis: result };
       } else {
         AlarmLogger.info('Test completed - current conditions do not meet alarm criteria');
-        return { triggered: false, analysis };
+        return { triggered: false, analysis: result };
       }
     } catch (error) {
       AlarmLogger.error('Error testing alarm with current conditions:', error);
@@ -164,21 +167,27 @@ class UnifiedAlarmManager {
   /**
    * Test the alarm with ideal wind conditions
    */
-  async testAlarmWithIdealConditions(): Promise<{ triggered: boolean; analysis: WindAnalysis }> {
+  async testAlarmWithIdealConditions(): Promise<{ triggered: boolean; analysis: any }> {
     try {
       AlarmLogger.info('Testing alarm with ideal wind conditions...');
       
-      // Create mock ideal conditions
-      const idealAnalysis: WindAnalysis = {
-        isAlarmWorthy: true,
-        averageSpeed: 15.5,
-        directionConsistency: 85.0,
-        consecutiveGoodPoints: 8,
-        analysis: 'Test conditions: Ideal wind conditions simulated - perfect for dawn patrol!'
+      // Create mock ideal conditions for simplified system
+      const idealResult = {
+        shouldTrigger: true,
+        currentSpeed: 15.5,
+        averageSpeed: 14.2,
+        threshold: 10,
+        confidence: 'high' as const,
+        reason: 'Test conditions: Ideal wind conditions simulated - perfect for dawn patrol!'
       };
       
-      await this.triggerAlarm('Test with ideal conditions - wake up for great wind!');
-      return { triggered: true, analysis: idealAnalysis };
+      const message = `🧪 Test alarm - ideal conditions simulated!\n` +
+        `Current: ${idealResult.currentSpeed} mph, ` +
+        `Average: ${idealResult.averageSpeed} mph ` +
+        `(threshold: ${idealResult.threshold} mph)`;
+      
+      await this.triggerAlarm(message);
+      return { triggered: true, analysis: idealResult };
     } catch (error) {
       AlarmLogger.error('Error testing alarm with ideal conditions:', error);
       throw error;
@@ -372,32 +381,33 @@ class UnifiedAlarmManager {
    */
   private async performAlarmCheck(): Promise<void> {
     try {
-      AlarmLogger.info('Performing scheduled alarm check...');
+      AlarmLogger.info('Performing scheduled alarm check using simplified Ecowitt data...');
       
-      // Fetch fresh wind data
-      const windData = await fetchWindData();
-      const criteria = await getAlarmCriteria();
-      const analysis = analyzeWindData(windData, criteria);
+      // Use simplified alarm checking with Ecowitt data
+      const result = await checkSimplifiedAlarmConditions();
       
-      if (analysis.isAlarmWorthy) {
+      if (result.shouldTrigger) {
         const message = `🌊 Wake up! Wind conditions are favorable!\n` +
-          `Speed: ${analysis.averageSpeed.toFixed(1)} mph, ` +
-          `Consistency: ${analysis.directionConsistency.toFixed(1)}%, ` +
-          `Good points: ${analysis.consecutiveGoodPoints}`;
+          `Current: ${result.currentSpeed?.toFixed(1) || 'N/A'} mph, ` +
+          `Average: ${result.averageSpeed?.toFixed(1) || 'N/A'} mph ` +
+          `(threshold: ${result.threshold} mph)`;
         
         await this.triggerAlarm(message);
         
         AlarmLogger.success('Alarm triggered - favorable wind conditions detected', {
-          averageSpeed: analysis.averageSpeed,
-          directionConsistency: analysis.directionConsistency,
-          consecutiveGoodPoints: analysis.consecutiveGoodPoints
+          currentSpeed: result.currentSpeed,
+          averageSpeed: result.averageSpeed,
+          threshold: result.threshold,
+          confidence: result.confidence,
+          reason: result.reason
         });
       } else {
         AlarmLogger.info('Alarm check completed - conditions not favorable', {
-          averageSpeed: analysis.averageSpeed,
-          directionConsistency: analysis.directionConsistency,
-          consecutiveGoodPoints: analysis.consecutiveGoodPoints,
-          analysis: analysis.analysis
+          currentSpeed: result.currentSpeed,
+          averageSpeed: result.averageSpeed,
+          threshold: result.threshold,
+          confidence: result.confidence,
+          reason: result.reason
         });
       }
       
