@@ -721,8 +721,8 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     const criteria = await getAlarmCriteria();
     const threshold = criteria.minimumAverageSpeed;
     
-    // Use the Standley Lake device (as per the app's current configuration)
-    const deviceName = 'Standley Lake';
+    // Use the DP Soda Lakes device for Dawn Patrol alarm
+    const deviceName = 'DP Soda Lakes';
     
     // Fetch recent wind data
     const windData = await fetchEcowittWindDataForDevice(deviceName);
@@ -734,7 +734,7 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
         averageSpeed: null,
         threshold,
         confidence: 'low',
-        reason: 'No recent wind data available from Standley Lake'
+        reason: 'No recent wind data available from DP Soda Lakes'
       };
     }
     

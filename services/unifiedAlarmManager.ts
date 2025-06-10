@@ -323,7 +323,7 @@ class UnifiedAlarmManager {
   /**
    * Schedule the next alarm check
    */
-  private async scheduleNextAlarmCheck(): Promise<void> {
+  private async scheduleNextAlarmCheck(silent: boolean = false): Promise<void> {
     try {
       // Cancel any existing alarms
       await this.cancelAllAlarms();
@@ -342,8 +342,8 @@ class UnifiedAlarmManager {
         await this.performAlarmCheck();
       }, msUntilAlarm);
       
-      // Schedule background notification as backup
-      if (this.alarmState.hasBackgroundSupport && msUntilAlarm > 60000) {
+      // Schedule background notification as backup (only if not silent mode)
+      if (!silent && this.alarmState.hasBackgroundSupport && msUntilAlarm > 60000) {
         this.scheduledNotificationId = await alarmNotificationService.scheduleAlarmNotification(
           nextCheckTime,
           '🌊 Dawn Patrol Alert!',
@@ -487,9 +487,10 @@ class UnifiedAlarmManager {
       this.alarmState.isEnabled = criteria.alarmEnabled;
       this.alarmState.alarmTime = criteria.alarmTime;
       
-      // If alarm is enabled, schedule it
+      // Only schedule if alarm was previously enabled by user
+      // Use silent mode to avoid notification popup during initialization
       if (this.alarmState.isEnabled) {
-        await this.scheduleNextAlarmCheck();
+        await this.scheduleNextAlarmCheck(true);
       }
       
       AlarmLogger.info('Alarm settings loaded', { 

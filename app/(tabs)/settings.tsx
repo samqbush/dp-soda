@@ -3,6 +3,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
+import { useDPAlarm } from '@/hooks/useDPAlarm';
 import { useWindData } from '@/hooks/useWindData';
 import type { AlarmCriteria } from '@/services/windService';
 import React, { useEffect, useState } from 'react';
@@ -11,21 +12,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Simple inline alarm testing component
 function SimpleAlarmTester() {
-  const { testWithCurrentConditions, testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
+  const { testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
+  const { testAlarm } = useDPAlarm();
   const [testing, setTesting] = React.useState(false);
   const tintColor = useThemeColor({}, 'tint');
 
   const handleTestCurrent = async () => {
     setTesting(true);
     try {
-      const result = await testWithCurrentConditions();
+      const result = await testAlarm();
       Alert.alert(
-        result.triggered ? '🚨 Test Alarm Triggered!' : '❌ No Alarm',
-        result.triggered ? 'Current conditions are favorable!' : 'Current conditions don\'t meet criteria',
+        result.triggered ? '🚨 Test Alarm Would Trigger!' : '❌ No Alarm',
+        result.reason,
         [{ text: 'OK' }]
       );
     } catch {
-      Alert.alert('Test Failed', 'Unable to test current conditions');
+      Alert.alert('Test Failed', 'Unable to test alarm with current conditions');
     } finally {
       setTesting(false);
     }
@@ -83,7 +85,6 @@ function SimpleAlarmTester() {
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useWindData();
   const [localCriteria, setLocalCriteria] = useState<AlarmCriteria>(criteria);
-  const [hasChanges, setHasChanges] = useState(false);
   const insets = useSafeAreaInsets();
 
   const textColor = useThemeColor({}, 'text');
@@ -93,49 +94,6 @@ export default function SettingsScreen() {
   useEffect(() => {
     setLocalCriteria(criteria);
   }, [criteria]);
-
-  useEffect(() => {
-    const hasChanges = JSON.stringify(localCriteria) !== JSON.stringify(criteria);
-    setHasChanges(hasChanges);
-  }, [localCriteria, criteria]);
-
-  const handleSave = async () => {
-    try {
-      await setCriteria(localCriteria);
-      Alert.alert('Success', 'Settings saved successfully!');
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      Alert.alert('Error', 'Failed to save settings. Please try again.');
-    }
-  };
-
-  const handleReset = () => {
-    Alert.alert(
-      'Reset Settings',
-      'Are you sure you want to reset all settings to defaults?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            const defaultCriteria: AlarmCriteria = {
-              minimumAverageSpeed: 10,
-              directionConsistencyThreshold: 70, // Keep for compatibility but not exposed in UI
-              minimumConsecutivePoints: 4, // Keep for compatibility but not exposed in UI
-              directionDeviationThreshold: 45, // Keep for compatibility but not exposed in UI
-              preferredDirection: 315, // Keep for compatibility but not exposed in UI
-              preferredDirectionRange: 45, // Keep for compatibility but not exposed in UI
-              useWindDirection: false, // Disabled by default for simplified mode
-              alarmEnabled: localCriteria.alarmEnabled, // Keep current alarm state
-              alarmTime: localCriteria.alarmTime // Keep current alarm time
-            };
-            setLocalCriteria(defaultCriteria);
-          }
-        }
-      ]
-    );
-  };
 
   const updateCriteria = (key: keyof AlarmCriteria, value: any) => {
     setLocalCriteria(prev => ({ ...prev, [key]: value }));
@@ -176,38 +134,6 @@ export default function SettingsScreen() {
               placeholderTextColor={textColor + '80'}
             />
           </View>
-
-          <View style={styles.infoBox}>
-            <ThemedText style={styles.infoBoxTitle}>Simplified Alarm Logic</ThemedText>
-            <ThemedText style={styles.infoBoxText}>
-              The Dawn Patrol Alarm now uses a simplified approach that trusts Ecowitt weather station data. 
-              It only checks if the average wind speed meets your threshold - no complex direction analysis needed.
-              This provides more reliable and consistent alarm decisions.
-            </ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.resetButton]}
-            onPress={handleReset}
-          >
-            <ThemedText style={styles.resetButtonText}>Reset to Defaults</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.saveButton,
-              { backgroundColor: hasChanges ? tintColor : tintColor + '50' }
-            ]}
-            onPress={handleSave}
-            disabled={!hasChanges}
-          >
-            <ThemedText style={styles.saveButtonText}>
-              {hasChanges ? 'Save Changes' : 'No Changes'}
-            </ThemedText>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.infoSection}>
@@ -342,31 +268,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  button: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButton: {
-    // backgroundColor handled dynamically
-  },
-  resetButton: {
-    backgroundColor: '#FF5252',
-  },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  resetButtonText: {
-    color: 'white',
-    fontWeight: '600',
   },
   infoSection: {
     marginTop: 16,

@@ -20,8 +20,7 @@ export default function DPAlarmScreen() {
   const {
     alarmStatus,
     error,
-    refreshData,
-    testAlarm
+    refreshData
   } = useDPAlarm();
 
   const tintColor = useThemeColor({}, 'tint');
@@ -46,19 +45,6 @@ export default function DPAlarmScreen() {
     }
   };
 
-  const handleTestAlarm = async () => {
-    try {
-      const result = await testAlarm();
-      Alert.alert(
-        result.triggered ? '🚨 Test Alarm Would Trigger!' : '❌ No Alarm',
-        result.reason,
-        [{ text: 'OK' }]
-      );
-    } catch {
-      Alert.alert('Test Failed', 'Unable to test alarm with current conditions');
-    }
-  };
-
   const formatLastUpdated = () => {
     if (!alarmStatus.lastUpdated) return 'Never';
     const now = new Date();
@@ -71,24 +57,6 @@ export default function DPAlarmScreen() {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
-  };
-
-  const getConfidenceColor = (confidence: string) => {
-    switch (confidence) {
-      case 'high': return '#34C759';
-      case 'medium': return '#FF9500';
-      case 'low': return '#FF3B30';
-      default: return '#8E8E93';
-    }
-  };
-
-  const getConfidenceText = (confidence: string) => {
-    switch (confidence) {
-      case 'high': return 'High Confidence';
-      case 'medium': return 'Medium Confidence';
-      case 'low': return 'Low Confidence';
-      default: return 'Unknown';
-    }
   };
 
   // Show loading on Android until component is ready
@@ -145,15 +113,6 @@ export default function DPAlarmScreen() {
             {alarmStatus.shouldWakeUp ? 'Wake Up! 🌊' : 'Sleep In 😴'}
           </ThemedText>
           
-          <View style={[
-            styles.confidenceBadge,
-            { backgroundColor: getConfidenceColor(alarmStatus.confidence) }
-          ]}>
-            <ThemedText style={styles.confidenceText}>
-              {getConfidenceText(alarmStatus.confidence)}
-            </ThemedText>
-          </View>
-          
           <ThemedText style={styles.reasonText}>
             {alarmStatus.reason}
           </ThemedText>
@@ -193,33 +152,6 @@ export default function DPAlarmScreen() {
 
       {/* Alarm Control Panel */}
       <AlarmControlPanel />
-
-      {/* Quick Actions */}
-      <View style={[styles.actionsCard, { backgroundColor: cardColor }]}>
-        <ThemedText type="subtitle" style={styles.cardTitle}>Quick Actions</ThemedText>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, { borderColor: tintColor }]}
-            onPress={handleTestAlarm}
-          >
-            <ThemedText style={[styles.actionButtonText, { color: tintColor }]}>
-              🧪 Test Alarm
-            </ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, { borderColor: tintColor }]}
-            onPress={() => {
-              // TODO: Navigate to settings tab - this will be implemented when we update settings
-              Alert.alert('Settings', 'Settings will open when we update the settings tab in the next phase.');
-            }}
-          >
-            <ThemedText style={[styles.actionButtonText, { color: tintColor }]}>
-              ⚙️ Settings
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
 
     </ParallaxScrollView>
   );
@@ -269,18 +201,8 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 12,
-  },
-  confidenceBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  confidenceText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    marginBottom: 20,
+    lineHeight: 40,
   },
   reasonText: {
     fontSize: 16,
@@ -312,27 +234,6 @@ const styles = StyleSheet.create({
   },
   conditionValue: {
     fontSize: 18,
-    fontWeight: '600',
-  },
-  actionsCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    fontSize: 14,
     fontWeight: '600',
   },
 });
