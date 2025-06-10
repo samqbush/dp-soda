@@ -24,7 +24,7 @@ interface BuildConfig {
 
 // Current build configuration
 const config: BuildConfig = {
-  version: '1.0.0',
+  version: '1.0.2',
   buildNumber: '2',
   environment: __DEV__ ? 'development' : 'production',
   apiEndpoint: 'https://api.weatherflow.com/wxengine/rest/graph/getGraph',
@@ -32,7 +32,7 @@ const config: BuildConfig = {
   buildDate: new Date().toISOString().split('T')[0],
   platformSpecific: {
     android: {
-      versionCode: 2,
+      versionCode: 6,
     },
     ios: {
       buildNumber: '2',

@@ -6,7 +6,7 @@ import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useWindData } from '@/hooks/useWindData';
 import type { AlarmCriteria } from '@/services/windService';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Simple inline alarm testing component
@@ -220,16 +220,22 @@ export default function SettingsScreen() {
           
           <ThemedText type="subtitle" style={styles.subsectionTitle}>How It Works</ThemedText>
           <ThemedText style={styles.infoText}>
-            • Uses reliable Ecowitt weather station data{'\n'}
-            • Simple wind speed threshold checking{'\n'}
-            • Trusts weather station wind direction quality{'\n'}
-            • No complex analysis - just effective results{'\n'}
-            • Background notifications when app is closed
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Alarm Logic Explained:{'\n'}</ThemedText>
+            
+            1. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Set Your Alarm Time</ThemedText> - Choose when you want to be woken up (e.g., 5:00 AM){'\n'}
+            
+            2. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Historical Data Check</ThemedText> - At your alarm time, we pull historical Ecowitt weather data from the last 5 minutes around that time{'\n'}
+            
+            3. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Wind Speed Analysis</ThemedText> - We calculate the average wind speed from those data points{'\n'}
+            
+            4. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Threshold Comparison</ThemedText> - If the average wind speed equals or exceeds your minimum threshold (set above), the alarm rings{'\n'}
+            
+            5. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Simple Decision</ThemedText> - No complex analysis needed - just reliable Ecowitt data and your speed preference
           </ThemedText>
           
           <ThemedText style={styles.infoText}>
-            The alarm checks recent wind conditions and triggers if the average speed meets your threshold.
-            Wind data is automatically refreshed, and you can test alarm functionality below.
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Example:</ThemedText> If your alarm is set for 5:00 AM with a 10 mph threshold, 
+            we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 12 mph, you get woken up for great conditions!
           </ThemedText>
 
           {/* Unified Alarm Testing Panel */}

@@ -90,8 +90,8 @@ export default function SodaLakeScreen() {
       >
         <View style={styles.header}>
           <View>
-            <ThemedText type="title">Soda Lake Wind Monitor</ThemedText>
-            <ThemedText style={styles.subtitle}>Real-time wind conditions at Soda Lake Dam 1</ThemedText>
+            <ThemedText type="title">Soda Lake</ThemedText>
+            <ThemedText style={styles.subtitle}>Ecowitt monitor located at the head of the lake</ThemedText>
           </View>
         </View>
 
@@ -171,27 +171,6 @@ export default function SodaLakeScreen() {
               Consecutive Good Points: {analysis.consecutiveGoodPoints}{'\n'}
               {analysis.analysis}
             </ThemedText>
-          </View>
-        )}
-
-        {/* Dawn Patrol Conditions */}
-        {analysis && (
-          <View style={[styles.dawnPatrolCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>Dawn Patrol Forecast</ThemedText>
-            <View style={styles.alarmStatus}>
-              <ThemedText style={[
-                styles.alarmStatusText,
-                { color: analysis.isAlarmWorthy ? '#34C759' : '#FF3B30' }
-              ]}>
-                {analysis.isAlarmWorthy ? '🌊 Wake Up!' : '😴 Sleep In'}
-              </ThemedText>
-              <ThemedText style={styles.alarmDescription}>
-                {analysis.isAlarmWorthy 
-                  ? 'Conditions look favorable for dawn patrol!'
-                  : 'Wind conditions not optimal for early morning session.'
-                }
-              </ThemedText>
-            </View>
           </View>
         )}
 
@@ -322,25 +301,6 @@ const styles = StyleSheet.create({
   analysisText: {
     fontSize: 14,
     lineHeight: 20,
-  },
-  dawnPatrolCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-  },
-  alarmStatus: {
-    alignItems: 'center',
-  },
-  alarmStatusText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  alarmDescription: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.8,
-    lineHeight: 22,
   },
   linkCard: {
     margin: 16,

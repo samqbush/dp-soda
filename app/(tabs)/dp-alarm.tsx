@@ -161,12 +161,12 @@ export default function DPAlarmScreen() {
         </View>
       </View>
 
-      {/* Current Conditions Summary */}
+      {/* Alarm Time Conditions */}
       <View style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
-        <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+        <ThemedText type="subtitle" style={styles.cardTitle}>Alarm Time Conditions</ThemedText>
         <View style={styles.conditionsGrid}>
           <View style={styles.conditionItem}>
-            <ThemedText style={styles.conditionLabel}>Current Speed</ThemedText>
+            <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
             <ThemedText style={styles.conditionValue}>
               {alarmStatus.currentSpeed?.toFixed(1) || '--'} mph
             </ThemedText>
@@ -184,7 +184,7 @@ export default function DPAlarmScreen() {
             </ThemedText>
           </View>
           <View style={styles.conditionItem}>
-            <ThemedText style={styles.conditionLabel}>Last Check</ThemedText>
+            <ThemedText style={styles.conditionLabel}>Alarm Time</ThemedText>
             <ThemedText style={styles.conditionValue}>
               {formatLastUpdated()}
             </ThemedText>
