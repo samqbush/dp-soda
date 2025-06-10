@@ -132,6 +132,7 @@ export class AlarmAudioService {
         playsInSilentModeIOS: true, // Allow playing when device is on silent
         staysActiveInBackground: true, // Keep playing when app is in background
         shouldDuckAndroid: false, // Don't lower volume of other apps
+        allowsRecordingIOS: false, // We don't need recording
       });
       
       // Double-check all flags once more before creating the sound

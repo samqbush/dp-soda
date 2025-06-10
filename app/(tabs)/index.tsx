@@ -8,6 +8,7 @@ import { SafeImage } from '@/components/SafeImage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindDataDisplay } from '@/components/WindDataDisplay';
+import { AlarmControlPanel } from '@/components/AlarmControlPanel';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 
 export default function HomeScreen() {
@@ -59,6 +60,10 @@ export default function HomeScreen() {
         <ThemedText type="title">Dawn Patrol Alarm</ThemedText>
       </ThemedView>
       
+      {/* Unified Alarm Control Panel */}
+      <AlarmControlPanel />
+      
+      {/* Wind Data Display */}
       <WindDataDisplay />
     </ParallaxScrollView>
   );

@@ -2,13 +2,91 @@ import { VersionDisplay } from '@/components/SecretGestureActivator';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useWindData } from '@/hooks/useWindData';
-import { testBackgroundAlarms, cancelTestNotifications } from '@/services/backgroundAlarmTester';
 import type { AlarmCriteria } from '@/services/windService';
-import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Simple inline alarm testing component
+function SimpleAlarmTester() {
+  const { testWithCurrentConditions, testWithDelayedIdealConditions, stopAlarm, isInitialized } = useUnifiedAlarm();
+  const [testing, setTesting] = React.useState(false);
+  const tintColor = useThemeColor({}, 'tint');
+
+  const handleTestCurrent = async () => {
+    setTesting(true);
+    try {
+      const result = await testWithCurrentConditions();
+      Alert.alert(
+        result.triggered ? '🚨 Test Alarm Triggered!' : '❌ No Alarm',
+        result.triggered ? 'Current conditions are favorable!' : 'Current conditions don\'t meet criteria',
+        [{ text: 'OK' }]
+      );
+    } catch {
+      Alert.alert('Test Failed', 'Unable to test current conditions');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleTestIdeal = async () => {
+    setTesting(true);
+    try {
+      const result = await testWithDelayedIdealConditions(30); // 30 second delay
+      Alert.alert(
+        '⏰ Delayed Ideal Test Scheduled!',
+        `A test alarm with ideal conditions has been scheduled for 30 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🔔 This will test:\n• Background notifications\n• Alarm audio playback\n• App state handling\n\nPut the app in the background to test notifications!`,
+        [{ text: 'Got it!' }]
+      );
+    } catch {
+      Alert.alert('Test Failed', 'Unable to schedule delayed ideal test');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (!isInitialized) {
+    return (
+      <View style={{ padding: 16, alignItems: 'center' }}>
+        <ThemedText>Initializing alarm system...</ThemedText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ padding: 16, gap: 12 }}>
+      <ThemedText type="subtitle">🧪 Alarm Testing</ThemedText>
+      <TouchableOpacity
+        style={{ padding: 12, borderWidth: 1, borderColor: tintColor, borderRadius: 8 }}
+        onPress={handleTestCurrent}
+        disabled={testing}
+      >
+        <ThemedText style={{ textAlign: 'center', color: tintColor }}>
+          {testing ? 'Testing...' : '🌊 Test Current Conditions'}
+        </ThemedText>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ padding: 12, borderWidth: 1, borderColor: '#28a745', borderRadius: 8 }}
+        onPress={handleTestIdeal}
+        disabled={testing}
+      >
+        <ThemedText style={{ textAlign: 'center', color: '#28a745' }}>
+          {testing ? 'Scheduling...' : '⭐ Schedule Ideal Test (30s)'}
+        </ThemedText>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ padding: 12, backgroundColor: '#dc3545', borderRadius: 8 }}
+        onPress={stopAlarm}
+      >
+        <ThemedText style={{ textAlign: 'center', color: 'white' }}>
+          Stop Test Alarm
+        </ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useWindData();
@@ -395,11 +473,8 @@ export default function SettingsScreen() {
             Wind speeds are displayed in mph and directions in degrees. To refresh wind data, use the refresh button on the home screen.
           </ThemedText>
 
-          {/* Wind Alarm Tester - Always visible */}
-          <WindAlarmTesterLink />
-          
-          {/* Background Alarm Testing - Only shown in dev mode */}
-          {__DEV__ && <BackgroundAlarmTester />}
+          {/* Unified Alarm Testing Panel */}
+          <SimpleAlarmTester />
         </View>
           
         {/* Version display with secret gesture detection */}
@@ -693,120 +768,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Component for Wind Alarm Test link - Always visible
-function WindAlarmTesterLink() {
-  return (
-    <View style={styles.testLinkContainer}>
-      <ThemedText style={styles.testLinkHeader}>Testing Tools</ThemedText>
-      <Link href="/test-alarm" asChild>
-        <TouchableOpacity 
-          style={[
-            styles.testButton, 
-            { 
-              backgroundColor: '#E3F2FD', // Light blue background
-              borderWidth: 1,
-              borderColor: '#2196F3', // Blue border
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center'
-            }
-          ]}
-          activeOpacity={0.7}
-        >
-          <ThemedText style={styles.testButtonText}>🔧 Wind Alarm Tester</ThemedText>
-        </TouchableOpacity>
-      </Link>
-      <ThemedText style={styles.testLinkDescription}>
-        Test different wind scenarios to verify alarm trigger behavior
-      </ThemedText>
-    </View>
-  );
-}
-
-// Background Alarm Tester Component
-function BackgroundAlarmTester() {
-  const [testResult, setTestResult] = useState<string>('');
-  const [isTestRunning, setIsTestRunning] = useState(false);
-
-  const runBackgroundAlarmTest = async () => {
-    setIsTestRunning(true);
-    setTestResult('Running test...');
-    
-    try {
-      const result = await testBackgroundAlarms();
-      setTestResult(result.success 
-        ? `✅ ${result.message}` 
-        : `❌ ${result.message}`
-      );
-      
-      if (result.success) {
-        Alert.alert(
-          '🧪 Test Scheduled', 
-          result.message + '\n\nClose the app to test background notifications!',
-          [{ text: 'OK', style: 'default' }]
-        );
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      setTestResult(`❌ Test failed: ${errorMsg}`);
-    } finally {
-      setIsTestRunning(false);
-    }
-  };
-
-  const cancelTests = async () => {
-    setIsTestRunning(true);
-    setTestResult('Cancelling tests...');
-    
-    try {
-      const result = await cancelTestNotifications();
-      setTestResult(result.success 
-        ? `✅ ${result.message}` 
-        : `❌ ${result.message}`
-      );
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      setTestResult(`❌ Cancel failed: ${errorMsg}`);
-    } finally {
-      setIsTestRunning(false);
-    }
-  };
-
-  return (
-    <View style={styles.backgroundAlarmTester}>
-      <ThemedText type="subtitle" style={styles.testerTitle}>🔔 Background Alarm Testing</ThemedText>
-      
-      <View style={styles.testerButtons}>
-        <TouchableOpacity 
-          onPress={runBackgroundAlarmTest} 
-          style={[styles.testerButton, { backgroundColor: '#4CAF50' }]}
-          disabled={isTestRunning}
-        >
-          <ThemedText style={styles.testerButtonText}>
-            {isTestRunning ? 'Testing...' : '🧪 Test (1 min)'}
-          </ThemedText>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          onPress={cancelTests} 
-          style={[styles.testerButton, { backgroundColor: '#FF5722' }]}
-          disabled={isTestRunning}
-        >
-          <ThemedText style={styles.testerButtonText}>
-            🗑️ Cancel All
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
-      
-      {testResult ? (
-        <View style={styles.testResult}>
-          <ThemedText style={styles.testResultText}>{testResult}</ThemedText>
-        </View>
-      ) : null}
-      
-      <ThemedText style={styles.testerInfo}>
-        Test creates a notification 1 minute from now. Close the app to verify background notifications work.
-      </ThemedText>
-    </View>
-  );
-}
+// Testing components removed - replaced with unified AlarmTestingPanel

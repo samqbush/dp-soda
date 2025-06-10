@@ -15,7 +15,11 @@ export default {
       buildNumber: "2",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
-      }
+      },
+      backgroundModes: [
+        "audio",
+        "background-processing"
+      ]
     },
     android: {
       package: "com.samqbush.dpsoda",
@@ -29,6 +33,7 @@ export default {
         "READ_EXTERNAL_STORAGE",
         "VIBRATE",
         "AUDIO_SETTINGS",
+        "MODIFY_AUDIO_SETTINGS",
         "POST_NOTIFICATIONS",
         "WAKE_LOCK"
       ],
