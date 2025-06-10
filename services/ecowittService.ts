@@ -286,10 +286,88 @@ export async function getDeviceMacAddress(): Promise<string> {
 }
 
 /**
- * Get the complete Ecowitt configuration with auto-fetched MAC address
+ * Select device by name from device list
+ */
+export function selectDeviceByName(devices: EcowittDevice[], deviceName: string): EcowittDevice | null {
+  if (!devices || devices.length === 0) {
+    return null;
+  }
+
+  // Look for exact device name match
+  let selectedDevice = devices.find(device => 
+    device && device.name && device.name === deviceName
+  );
+  
+  // If no exact match, try partial match (case insensitive)
+  if (!selectedDevice) {
+    const searchName = deviceName.toLowerCase();
+    selectedDevice = devices.find(device => 
+      device && device.name && device.name.toLowerCase().includes(searchName)
+    );
+  }
+  
+  if (selectedDevice) {
+    console.log(`✅ Found device "${deviceName}":`, selectedDevice.name, `(${selectedDevice.mac})`);
+    return selectedDevice;
+  }
+  
+  console.warn(`❌ Device "${deviceName}" not found in device list`);
+  return null;
+}
+
+/**
+ * Get device MAC address for specific device name
+ */
+export async function getDeviceMacAddressForDevice(deviceName: string): Promise<string> {
+  try {
+    // For device-specific requests, we need fresh device list (no caching)
+    console.log(`🔍 Fetching device MAC address for: ${deviceName}...`);
+    const devices = await fetchEcowittDeviceList();
+    
+    if (!devices || devices.length === 0) {
+      throw new Error('No devices found in your Ecowitt account. Please check your API credentials and ensure you have registered devices.');
+    }
+
+    // Select the specific device
+    const selectedDevice = selectDeviceByName(devices, deviceName);
+    
+    if (!selectedDevice) {
+      const availableDevices = devices.map(d => d.name).join(', ');
+      throw new Error(`Device "${deviceName}" not found. Available devices: ${availableDevices}`);
+    }
+
+    // Validate device has required fields
+    if (!selectedDevice.mac) {
+      throw new Error(`Selected device "${deviceName}" does not have a MAC address.`);
+    }
+
+    console.log(`✅ Using device "${deviceName}":`, selectedDevice.name || 'Unknown');
+    return selectedDevice.mac;
+
+  } catch (error) {
+    console.error(`❌ Error getting device MAC address for ${deviceName}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get the complete Ecowitt configuration with auto-fetched MAC address (for Standley Lake)
  */
 export async function getAutoEcowittConfig(): Promise<EcowittApiConfig> {
   const macAddress = await getDeviceMacAddress();
+  
+  return {
+    applicationKey: ECOWITT_CONFIG.applicationKey,
+    apiKey: ECOWITT_CONFIG.apiKey,
+    macAddress
+  };
+}
+
+/**
+ * Get the complete Ecowitt configuration with auto-fetched MAC address for specific device
+ */
+export async function getAutoEcowittConfigForDevice(deviceName: string): Promise<EcowittApiConfig> {
+  const macAddress = await getDeviceMacAddressForDevice(deviceName);
   
   return {
     applicationKey: ECOWITT_CONFIG.applicationKey,
@@ -435,6 +513,104 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
         throw new Error('Network connection failed. Please check your internet connection.');
       } else if (error.response?.status === 401) {
         throw new Error('Invalid API credentials. Please check your Ecowitt API keys.');
+      } else if (error.response?.status === 429) {
+        throw new Error('API rate limit exceeded. Please try again later.');
+      } else if (error.response && error.response.status >= 500) {
+        throw new Error('Ecowitt server error. Please try again later.');
+      }
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Fetch historic wind data from Ecowitt API for specific device
+ */
+export async function fetchEcowittWindDataForDevice(deviceName: string): Promise<EcowittWindDataPoint[]> {
+  console.log(`🌬️ Fetching Ecowitt wind data for ${deviceName}...`);
+  
+  try {
+    const config = await getAutoEcowittConfigForDevice(deviceName);
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startTime = Math.floor(today.getTime() / 1000);
+    const endTime = Math.floor(now.getTime() / 1000);
+    
+    const params = {
+      application_key: config.applicationKey,
+      api_key: config.apiKey,
+      mac: config.macAddress,
+      start_date: startTime,
+      end_date: endTime,
+      call_back: 'current', // Request current day data
+    };
+
+    console.log(`📡 Making Ecowitt history API request for ${deviceName}`);
+
+    const response = await axios.get(`${BASE_URL}/device/history`, {
+      params,
+      timeout: 15000, // Longer timeout for history data
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    if (response.data.code !== 0) {
+      throw new Error(`Ecowitt history API error: ${response.data.msg}`);
+    }
+
+    if (!response.data.data || !response.data.data.list) {
+      console.warn(`⚠️ No wind data available for ${deviceName} today`);
+      return [];
+    }
+
+    const rawData = response.data.data.list;
+    console.log(`📊 Received ${rawData.length} data points for ${deviceName}`);
+
+    // Convert raw data to our format
+    const windData: EcowittWindDataPoint[] = rawData.map((point: any) => {
+      const timestamp = point.date || point.time || Date.now();
+      const windSpeedMs = parseFloat(point.wind_speed) || 0;
+      const windGustMs = parseFloat(point.wind_gust) || 0;
+      const windDirection = parseFloat(point.wind_direction) || 0;
+
+      return {
+        time: new Date(timestamp * 1000).toISOString(),
+        timestamp: timestamp * 1000,
+        windSpeed: windSpeedMs,
+        windSpeedMph: windSpeedMs * 2.237, // m/s to mph
+        windGust: windGustMs,
+        windGustMph: windGustMs * 2.237, // m/s to mph
+        windDirection: windDirection,
+        temperature: point.temperature ? parseFloat(point.temperature) : undefined,
+        humidity: point.humidity ? parseFloat(point.humidity) : undefined
+      };
+    });
+
+    // Cache the data
+    try {
+      await AsyncStorage.setItem(ECOWITT_CACHE_KEY, JSON.stringify(windData));
+      console.log(`💾 Cached ${windData.length} wind data points for ${deviceName}`);
+    } catch (cacheError) {
+      console.warn('⚠️ Failed to cache wind data:', cacheError);
+    }
+
+    return windData;
+
+  } catch (error) {
+    console.error(`❌ Error fetching Ecowitt wind data for ${deviceName}:`, error);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        throw new Error('Network connection failed. Please check your internet connection.');
+      } else if (error.response?.status === 401) {
+        throw new Error(`Invalid API credentials for ${deviceName} data.`);
       } else if (error.response?.status === 429) {
         throw new Error('API rate limit exceeded. Please try again later.');
       } else if (error.response && error.response.status >= 500) {

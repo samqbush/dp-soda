@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Simple inline alarm testing component
 function SimpleAlarmTester() {
-  const { testWithCurrentConditions, testWithDelayedIdealConditions, stopAlarm, isInitialized } = useUnifiedAlarm();
+  const { testWithCurrentConditions, testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
   const [testing, setTesting] = React.useState(false);
   const tintColor = useThemeColor({}, 'tint');
 
@@ -34,10 +34,10 @@ function SimpleAlarmTester() {
   const handleTestIdeal = async () => {
     setTesting(true);
     try {
-      const result = await testWithDelayedIdealConditions(30); // 30 second delay
+      const result = await testWithDelayedIdealConditions(15); // 15 second delay
       Alert.alert(
         '⏰ Delayed Ideal Test Scheduled!',
-        `A test alarm with ideal conditions has been scheduled for 30 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🔔 This will test:\n• Background notifications\n• Alarm audio playback\n• App state handling\n\nPut the app in the background to test notifications!`,
+        `A test alarm with ideal conditions has been scheduled for 15 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🔔 This will test:\n• Background notifications\n• Alarm audio playback\n• App state handling\n\nPut the app in the background to test notifications!`,
         [{ text: 'Got it!' }]
       );
     } catch {
@@ -73,15 +73,7 @@ function SimpleAlarmTester() {
         disabled={testing}
       >
         <ThemedText style={{ textAlign: 'center', color: '#28a745' }}>
-          {testing ? 'Scheduling...' : '⭐ Schedule Ideal Test (30s)'}
-        </ThemedText>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={{ padding: 12, backgroundColor: '#dc3545', borderRadius: 8 }}
-        onPress={stopAlarm}
-      >
-        <ThemedText style={{ textAlign: 'center', color: 'white' }}>
-          Stop Test Alarm
+          {testing ? 'Scheduling...' : '⭐ Schedule Ideal Test (15s)'}
         </ThemedText>
       </TouchableOpacity>
     </View>
@@ -135,8 +127,8 @@ export default function SettingsScreen() {
               preferredDirection: 315,
               preferredDirectionRange: 45,
               useWindDirection: true,
-              alarmEnabled: false,
-              alarmTime: "05:00"
+              alarmEnabled: localCriteria.alarmEnabled, // Keep current alarm state
+              alarmTime: localCriteria.alarmTime // Keep current alarm time
             };
             setLocalCriteria(defaultCriteria);
           }
@@ -321,112 +313,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Configuration</ThemedText>
-          
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Enable Alarm
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              Turn on/off the automatic morning alarm based on wind conditions
-            </ThemedText>
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  { backgroundColor: localCriteria.alarmEnabled ? tintColor : '#ccc' }
-                ]}
-                onPress={() => updateCriteria('alarmEnabled', !localCriteria.alarmEnabled)}
-              >
-                <ThemedText style={styles.toggleText}>
-                  {localCriteria.alarmEnabled ? 'ON' : 'OFF'}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          <View style={styles.settingItem}>
-            <ThemedText style={styles.settingLabel}>
-              Alarm Time
-            </ThemedText>
-            <ThemedText style={styles.settingDescription}>
-              Set the time when alarm will trigger if conditions are favorable (wind data is checked 5 minutes prior)
-            </ThemedText>
-            <View style={styles.timePickerContainer}>
-              <TextInput
-                style={[styles.timePicker, { color: textColor, borderColor: tintColor, textAlign: 'center' }]}
-                value={localCriteria.alarmTime}
-                onChangeText={(time) => {
-                  // Allow any input during typing, validate only on completion
-                  updateCriteria('alarmTime', time);
-                }}
-                onBlur={() => {
-                  // Only validate and auto-correct if the field is not empty
-                  if (localCriteria.alarmTime.trim() === '') {
-                    updateCriteria('alarmTime', '05:00');
-                    return;
-                  }
-                  
-                  // More flexible validation - handle various input formats
-                  const input = localCriteria.alarmTime.trim();
-                  let formattedTime = '';
-                  
-                  // Try to parse various time formats
-                  if (/^\d{1,2}:\d{2}$/.test(input)) {
-                    // Already in HH:MM format, validate ranges
-                    const [hours, minutes] = input.split(':').map(Number);
-                    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-                      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-                    }
-                  } else if (/^\d{3,4}$/.test(input)) {
-                    // Format like "500" or "0500" -> "05:00"
-                    const padded = input.padStart(4, '0');
-                    const hours = parseInt(padded.substring(0, 2));
-                    const minutes = parseInt(padded.substring(2, 4));
-                    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-                      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-                    }
-                  } else if (/^\d{1,2}$/.test(input)) {
-                    // Just hours like "5" -> "05:00"
-                    const hours = parseInt(input);
-                    if (hours >= 0 && hours <= 23) {
-                      formattedTime = `${hours.toString().padStart(2, '0')}:00`;
-                    }
-                  }
-                  
-                  // If we couldn't parse it, show an alert but don't auto-reset
-                  if (!formattedTime) {
-                    Alert.alert(
-                      'Invalid Time Format', 
-                      'Please enter time in 24-hour format (e.g., 05:00, 1730, or 5). Current value has been kept.',
-                      [{ text: 'OK' }]
-                    );
-                  } else {
-                    updateCriteria('alarmTime', formattedTime);
-                  }
-                }}
-                placeholder="05:00"
-                placeholderTextColor={textColor + '80'}
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-              />
-              <ThemedText style={styles.timePickerHint}>
-                Format: 24-hour (e.g., 05:00, 1730, or just 5 for 5:00)
-              </ThemedText>
-            </View>
-          </View>
-          
-          <View style={styles.alarmInfoContainer}>
-            <ThemedText style={styles.alarmInfo}>
-              When enabled, the alarm will check wind conditions at {localCriteria.alarmTime} if the 3am-5am window analysis indicates favorable conditions.
-            </ThemedText>
-            <ThemedText style={[styles.alarmInfo, { marginTop: 8, fontStyle: 'italic', color: '#4CAF50' }]}>
-              ✅ Background alarms are now supported! You&apos;ll receive notifications even when the app is closed.
-            </ThemedText>
-          </View>
-        </View>
-
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, styles.resetButton]}
@@ -588,126 +474,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     opacity: 0.8,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  toggleButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  toggleText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  timePickerContainer: {
-    marginTop: 8,
-  },
-  timePicker: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    alignSelf: 'flex-start',
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  timePickerHint: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 4,
-  },
-  alarmInfoContainer: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 8,
-  },
-  alarmInfo: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.8,
-  },
-  versionContainer: {
-    marginTop: 32,
-    marginBottom: 20,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Subtle background to make it more visible
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)', // Light border for definition
-    minHeight: 60, // Ensure minimum tappable area
-  },
-  testLinkContainer: {
-    marginTop: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.15)', // Slightly darker border for better visibility
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Slightly darker background
-  },
-  testLinkHeader: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  testButton: {
-    padding: 14, // Increased padding for a larger touch target
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#000', // Add shadow for better visibility
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4, // Android shadow
-  },
-  testButtonText: {
-    color: '#000000', // Black text
-    fontWeight: '700', 
-    fontSize: 15,
-    letterSpacing: 0.5, // Slightly increase letter spacing
-  },
-  buttonIconContainer: {
-    marginRight: 8,
-    width: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gearIcon: {
-    width: 16,
-    height: 16,
-    position: 'relative',
-  },
-  gearCenter: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'white',
-    top: 5,
-    left: 5,
-  },
-  gearTooth: {
-    position: 'absolute',
-    width: 4,
-    height: 4,
-    backgroundColor: 'white',
-    top: -2,
-    left: 6,
-  },
-  testLinkDescription: {
-    fontSize: 13,
-    opacity: 0.7,
-    fontStyle: 'italic',
-  },
   toggleContainer: {
     marginTop: 8,
   },
@@ -720,6 +486,18 @@ const styles = StyleSheet.create({
   switchLabelContainer: {
     flex: 1,
     marginRight: 16,
+  },
+  versionContainer: {
+    marginTop: 32,
+    marginBottom: 20,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Subtle background to make it more visible
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)', // Light border for definition
+    minHeight: 60, // Ensure minimum tappable area
   },
   backgroundAlarmTester: {
     marginTop: 24,

@@ -25,13 +25,7 @@ You are a specialized documentation assistant for the Dawn Patrol Alarm reposito
 - Avoid duplicate documentation across multiple files
 
 ### Current Documentation Files
-Review these existing files when updating documentation:
-- ${workspaceFolder}/docs/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md
-- ${workspaceFolder}/docs/DEVELOPMENT.md
-- ${workspaceFolder}/docs/ARCHITECTURE_AND_IMPLEMENTATION.md
-- ${workspaceFolder}/docs/IMPLEMENTATION_SUMMARY.md
-- ${workspaceFolder}/docs/LOCAL_BUILD_INSTRUCTIONS.md
-- ${workspaceFolder}/docs/REACT_NAVIGATION_V7_FIXES.md
+Review these existing files in ${workspaceFolder}/docs when updating documentation
 
 ### Writing Guidelines
 
