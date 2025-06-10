@@ -9,7 +9,7 @@ import { crashMonitor } from '@/services/crashMonitor';
 import { showDiagnosticInfo } from '@/services/diagnosticService';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export function WindDataDisplay() {

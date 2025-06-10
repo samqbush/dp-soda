@@ -31,7 +31,6 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
 
   const tintColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
   const cardBackgroundColor = useThemeColor({ light: '#f8f9fa', dark: '#2c2c2e' }, 'background');
 
   const handleToggleAlarm = async () => {
@@ -51,7 +50,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
           [{ text: 'Awesome!', style: 'default' }]
         );
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to update alarm settings. Please try again.');
     }
   };
@@ -59,7 +58,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
   const handleStopAlarm = async () => {
     try {
       await stopAlarm();
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to stop alarm. Please try again.');
     }
   };
@@ -77,7 +76,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
             try {
               await emergencyStop();
               Alert.alert('Emergency Stop', 'All alarm functions have been stopped.');
-            } catch (error) {
+            } catch {
               Alert.alert('Error', 'Failed to stop all alarms. Please restart the app.');
             }
           }
@@ -108,7 +107,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
           [{ text: 'OK', style: 'default' }]
         );
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to update alarm time. Please try again.');
     }
   };

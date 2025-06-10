@@ -23,6 +23,11 @@ export default function DPAlarmScreen() {
     refreshData
   } = useDPAlarm();
 
+  // Debug logging for threshold changes
+  useEffect(() => {
+    console.log('🎯 DP Alarm threshold updated:', alarmStatus.threshold);
+  }, [alarmStatus.threshold]);
+
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 

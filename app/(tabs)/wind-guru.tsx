@@ -357,7 +357,6 @@ export default function WindGuruScreen() {
                 {(() => {
                   const now = new Date();
                   const currentHour = now.getHours();
-                  const analysisMode = katabaticAnalysis.analysisMode;
                   
                   if (currentHour >= 6 && currentHour <= 8) {
                     return '🔴 Active Dawn Patrol Window - Real-time verification mode';
@@ -370,11 +369,10 @@ export default function WindGuruScreen() {
                 })()}
               </ThemedText>
               {(() => {
-                const analysisMode = katabaticAnalysis.analysisMode;
-                if (analysisMode === 'post-dawn') {
+                if (katabaticAnalysis.analysisMode === 'post-dawn') {
                   return (
                     <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
-                      💡 Today's prediction is preserved for verification. Tomorrow's forecast available below.
+                      💡 Today&apos;s prediction is preserved for verification. Tomorrow&apos;s forecast available below.
                     </ThemedText>
                   );
                 }

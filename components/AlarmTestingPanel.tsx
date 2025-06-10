@@ -10,7 +10,6 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
   const {
     testWithCurrentConditions,
     testWithIdealConditions,
-    testWithDelay,
     stopAlarm,
     isInitialized,
     hasBackgroundSupport
@@ -18,7 +17,6 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
 
   const [testingCurrent, setTestingCurrent] = useState(false);
   const [testingIdeal, setTestingIdeal] = useState(false);
-  const [testingDelayed, setTestingDelayed] = useState(false);
 
   const tintColor = useThemeColor({}, 'tint');
   const cardBackgroundColor = useThemeColor({ light: '#f8f9fa', dark: '#2c2c2e' }, 'background');
@@ -37,7 +35,7 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
         message,
         [{ text: 'OK', style: 'default' }]
       );
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Test Failed',
         'Failed to test with current conditions. Please check your internet connection and try again.',
@@ -52,13 +50,13 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
     setTestingIdeal(true);
     
     try {
-      const result = await testWithIdealConditions();
+      await testWithIdealConditions();
       Alert.alert(
         '🚨 Test Alarm Triggered!',
         `🌊 Ideal conditions simulated! This is how the alarm sounds when conditions are perfect for dawn patrol!`,
         [{ text: 'Awesome!', style: 'default' }]
       );
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Test Failed',
         'Failed to test with ideal conditions. Please try again.',
@@ -73,7 +71,7 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
     try {
       await stopAlarm();
       Alert.alert('Test Stopped', 'Test alarm has been stopped.', [{ text: 'OK', style: 'default' }]);
-    } catch (error) {
+    } catch {
       Alert.alert('Stop Failed', 'Failed to stop test alarm.', [{ text: 'OK', style: 'default' }]);
     }
   };
@@ -102,7 +100,7 @@ export function AlarmTestingPanel({ style }: { style?: any }) {
         <TouchableOpacity
           style={[styles.testButton, { borderColor: tintColor }]}
           onPress={handleTestCurrentConditions}
-          disabled={testingCurrent || testingIdeal || testingDelayed}
+          disabled={testingCurrent || testingIdeal}
         >
           {testingCurrent ? (
             <ActivityIndicator size="small" color={tintColor} />

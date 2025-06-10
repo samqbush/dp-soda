@@ -4,8 +4,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useDPAlarm } from '@/hooks/useDPAlarm';
-import { useWindData } from '@/hooks/useWindData';
-import type { AlarmCriteria } from '@/services/windService';
+import type { SimplifiedAlarmCriteria } from '@/hooks/useDPAlarm';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,8 +82,11 @@ function SimpleAlarmTester() {
 }
 
 export default function SettingsScreen() {
-  const { criteria, setCriteria } = useWindData();
-  const [localCriteria, setLocalCriteria] = useState<AlarmCriteria>(criteria);
+  const { criteria, setCriteria } = useDPAlarm();
+  const [localCriteria, setLocalCriteria] = useState<SimplifiedAlarmCriteria>(criteria);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   const insets = useSafeAreaInsets();
 
   const textColor = useThemeColor({}, 'text');
@@ -95,9 +97,52 @@ export default function SettingsScreen() {
     setLocalCriteria(criteria);
   }, [criteria]);
 
-  const updateCriteria = (key: keyof AlarmCriteria, value: any) => {
-    setLocalCriteria(prev => ({ ...prev, [key]: value }));
+  const updateCriteria = async (key: keyof SimplifiedAlarmCriteria, value: any) => {
+    // Update local state immediately for responsive UI
+    setLocalCriteria((prev: SimplifiedAlarmCriteria) => ({ ...prev, [key]: value }));
+    
+    // Clear existing timeout to debounce saves
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    
+    // Hide previous "saved" indicator
+    setShowSaved(false);
+    
+    // Debounce the save operation (wait for user to stop typing)
+    const newTimeout = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        await setCriteria({ [key]: value });
+        console.log(`✅ Auto-saved ${String(key)} = ${value}`);
+        
+        // Show "saved" confirmation
+        setShowSaved(true);
+        
+        // Hide "saved" indicator after 2 seconds
+        setTimeout(() => setShowSaved(false), 2000);
+        
+      } catch (error) {
+        console.error(`❌ Failed to save ${String(key)}:`, error);
+        Alert.alert('Save Failed', `Could not save ${String(key)} setting. Please try again.`);
+        // Revert local state on error
+        setLocalCriteria(criteria);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000); // Wait 1 second after user stops typing
+    
+    setSaveTimeout(newTimeout);
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+    };
+  }, [saveTimeout]);
 
   return (
     <ScrollView 
@@ -133,7 +178,31 @@ export default function SettingsScreen() {
               placeholder="15"
               placeholderTextColor={textColor + '80'}
             />
+            {/* Save status indicators */}
+            {isSaving && (
+              <ThemedText style={[styles.savingIndicator, { color: '#FF9500' }]}>
+                💾 Saving...
+              </ThemedText>
+            )}
+            {showSaved && !isSaving && (
+              <ThemedText style={[styles.savingIndicator, { color: '#34C759' }]}>
+                ✅ Saved!
+              </ThemedText>
+            )}
+            {/* Help text for auto-save */}
+            <ThemedText style={styles.autoSaveHint}>
+              Changes are automatically saved
+            </ThemedText>
           </View>
+        </View>
+
+        {/* Auto-save information box */}
+        <View style={styles.autoSaveInfoBox}>
+          <ThemedText style={styles.autoSaveInfoTitle}>💾 Auto-Save Enabled</ThemedText>
+          <ThemedText style={styles.autoSaveInfoText}>
+            Your settings are automatically saved as you type. No need to press a save button! 
+            You&apos;ll see a &quot;💾 Saving...&quot; indicator when changes are being saved, followed by &quot;✅ Saved!&quot; when complete.
+          </ThemedText>
         </View>
 
         <View style={styles.infoSection}>
@@ -268,6 +337,38 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+  },
+  savingIndicator: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  autoSaveHint: {
+    fontSize: 11,
+    opacity: 0.5,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  autoSaveInfoBox: {
+    backgroundColor: 'rgba(52, 199, 89, 0.08)',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#34C759',
+  },
+  autoSaveInfoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#34C759',
+  },
+  autoSaveInfoText: {
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.8,
   },
   infoSection: {
     marginTop: 16,

@@ -3,6 +3,27 @@ import { useSodaLakeWind } from './useSodaLakeWind';
 import { getAlarmCriteria, setAlarmCriteria } from '@/services/windService';
 import { unifiedAlarmManager } from '@/services/unifiedAlarmManager';
 
+// Simple event emitter for cross-hook synchronization
+class CriteriaSyncManager {
+  private listeners: ((criteria: SimplifiedAlarmCriteria) => void)[] = [];
+
+  subscribe(callback: (criteria: SimplifiedAlarmCriteria) => void) {
+    this.listeners.push(callback);
+    return () => {
+      const index = this.listeners.indexOf(callback);
+      if (index > -1) {
+        this.listeners.splice(index, 1);
+      }
+    };
+  }
+
+  notifyChange(criteria: SimplifiedAlarmCriteria) {
+    this.listeners.forEach(callback => callback(criteria));
+  }
+}
+
+const criteriaSyncManager = new CriteriaSyncManager();
+
 export interface SimplifiedAlarmCriteria {
   minimumAverageSpeed: number;
   alarmEnabled: boolean;
@@ -121,10 +142,31 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
       });
     });
 
+    // Subscribe to criteria changes from other hook instances
+    const unsubscribeCriteriaSync = criteriaSyncManager.subscribe((updatedCriteria) => {
+      if (!isSubscribed) return;
+      
+      setCriteriaState(prev => {
+        // Only update if minimumAverageSpeed actually changed to avoid unnecessary re-renders
+        if (prev.minimumAverageSpeed !== updatedCriteria.minimumAverageSpeed) {
+          console.log('📱 useDPAlarm syncing criteria across instances:', {
+            speed: `${prev.minimumAverageSpeed} → ${updatedCriteria.minimumAverageSpeed}`,
+            source: 'criteria_sync_manager'
+          });
+          return {
+            ...prev,
+            minimumAverageSpeed: updatedCriteria.minimumAverageSpeed,
+          };
+        }
+        return prev;
+      });
+    });
+
     // Cleanup subscription on unmount
     return () => {
       isSubscribed = false;
       unsubscribe();
+      unsubscribeCriteriaSync();
     };
   }, []);
 
@@ -254,6 +296,12 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
       if (newCriteria.alarmTime !== undefined && currentUnifiedState.alarmTime !== updated.alarmTime) {
         console.log('📱 useDPAlarm updating unified alarm manager time:', `${currentUnifiedState.alarmTime} → ${updated.alarmTime}`);
         await unifiedAlarmManager.setAlarmTime(updated.alarmTime);
+      }
+      
+      // Notify other hook instances of criteria changes (especially minimumAverageSpeed)
+      if (newCriteria.minimumAverageSpeed !== undefined) {
+        console.log('📱 useDPAlarm notifying other instances of criteria change');
+        criteriaSyncManager.notifyChange(updated);
       }
       
       console.log('✅ Alarm criteria updated successfully:', updated);
