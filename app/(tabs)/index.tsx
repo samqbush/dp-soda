@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 
 export default function SodaLakeScreen() {
   const {
@@ -150,7 +151,7 @@ export default function SodaLakeScreen() {
             <WindChart
               data={chartData}
               title="Today's Wind Speed"
-              timeWindow={{ startHour: 0, endHour: 23 }} // Show full day
+              timeWindow={getWindChartTimeWindow()} // Use smart time window (4am to current, max 9pm)
             />
           </View>
         ) : (

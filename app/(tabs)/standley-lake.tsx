@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useStandleyLakeWind } from '@/hooks/useStandleyLakeWind';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -151,7 +152,7 @@ export default function StandleyLakeScreen() {
             <WindChart
               data={chartData}
               title="Today's Wind Speed"
-              timeWindow={{ startHour: 0, endHour: 23 }} // Show full day
+              timeWindow={getWindChartTimeWindow()} // Use smart time window (4am to current, max 9pm)
             />
           </View>
         ) : (

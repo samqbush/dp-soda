@@ -3,6 +3,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
+import { filterWindDataByTimeWindow, type TimeWindow } from '@/utils/timeWindowUtils';
 import React from 'react';
 import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
@@ -13,7 +14,7 @@ interface WindChartProps {
   title?: string;
   highlightGoodPoints?: boolean; // New prop to highlight consecutive good points
   criteria?: AlarmCriteria; // Optional criteria for determining good points
-  timeWindow?: { startHour: number; endHour: number }; // Optional time window filter
+  timeWindow?: TimeWindow; // Optional time window filter using new TimeWindow type
 }
 
 export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoints = false, criteria, timeWindow }: WindChartProps) {
@@ -119,17 +120,26 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   }
 
   // Filter data based on provided time window or default to 3am-5am alarm window
-  const defaultWindow = { startHour: 3, endHour: 5 };
+  const defaultWindow: TimeWindow = { startHour: 3, endHour: 5 };
   const activeWindow = timeWindow || defaultWindow;
   
-  const recentData = data
-    .filter(point => {
-      const date = new Date(point.time);
-      const hours = date.getHours();
-      return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
-    })
+  // Use the new filtering logic that handles multi-day scenarios
+  let recentData: WindDataPoint[];
+  if (timeWindow) {
+    // Use smart filtering for time windows (handles day boundaries correctly)
+    recentData = filterWindDataByTimeWindow(data, activeWindow);
+    // Don't slice when using smart time windows - show all filtered data
+  } else {
+    // Keep original simple filtering for default 3am-5am alarm window
+    recentData = data
+      .filter(point => {
+        const date = new Date(point.time);
+        const hours = date.getHours();
+        return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
+      });
     // Show more data points for scrollable chart (last 4 hours by default, or all filtered data)
-    .slice(-48); // 48 points = 4 hours of 5-minute intervals
+    recentData = recentData.slice(-48); // 48 points = 4 hours of 5-minute intervals
+  }
 
   if (recentData.length < 2) {
     return (
@@ -137,7 +147,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
         <View style={styles.noDataContainer}>
           <ThemedText style={styles.noDataText}>
-            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour}am window to display chart
+            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour > 12 ? `${activeWindow.endHour - 12}pm` : `${activeWindow.endHour}am`} window to display chart
           </ThemedText>
         </View>
       </ThemedView>

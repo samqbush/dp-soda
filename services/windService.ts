@@ -285,10 +285,10 @@ export const analyzeWindData = (
   // Calculate direction consistency
   const directions = alarmWindowData
     .map(point => {
-      if (typeof point.windDirection === 'string') {
-        return parseFloat(point.windDirection);
-      }
-      return NaN;
+      const dir = typeof point.windDirection === 'string' 
+        ? parseFloat(point.windDirection) 
+        : point.windDirection;
+      return isNaN(dir) ? NaN : dir;
     })
     .filter(dir => !isNaN(dir));
 
@@ -854,10 +854,10 @@ export const analyzeRecentWindData = (
   // Calculate direction consistency
   const directions = recentData
     .map(point => {
-      if (typeof point.windDirection === 'string') {
-        return parseFloat(point.windDirection);
-      }
-      return NaN;
+      const dir = typeof point.windDirection === 'string' 
+        ? parseFloat(point.windDirection) 
+        : point.windDirection;
+      return isNaN(dir) ? NaN : dir;
     })
     .filter(dir => !isNaN(dir));
 
