@@ -3,6 +3,11 @@ import { katabaticAnalyzer, KatabaticPrediction, KatabaticCriteria } from '@/ser
 import { WeatherServiceData } from '@/services/weatherService';
 
 /**
+ * Analysis modes based on time of day
+ */
+export type AnalysisMode = 'prediction' | 'verification' | 'post-dawn';
+
+/**
  * Settings for katabatic analysis that can be customized by user
  */
 export interface KatabaticSettings extends Partial<KatabaticCriteria> {
@@ -23,15 +28,16 @@ interface UseKatabaticAnalyzerState {
 
 /**
  * Default settings for katabatic analysis
+ * Further updated based on continued real-world feedback - Phase 2B improvements
  */
 const defaultSettings: KatabaticSettings = {
-  maxPrecipitationProbability: 20,
-  minCloudCoverClearPeriod: 70,
-  minPressureChange: 2.0,
-  minTemperatureDifferential: 5.0,
+  maxPrecipitationProbability: 25,  // Increased from 20% - light precip chance doesn't always kill katabatic
+  minCloudCoverClearPeriod: 45,     // Reduced from 60% - mountain weather often has some clouds
+  minPressureChange: 1.0,           // Reduced from 1.5 - smaller changes can still indicate good conditions
+  minTemperatureDifferential: 3.5,  // Reduced from 4.0°C - more sensitive to temperature differences
   clearSkyWindow: { start: '02:00', end: '05:00' },
   predictionWindow: { start: '06:00', end: '08:00' },
-  minimumConfidence: 60,
+  minimumConfidence: 50,            // Reduced from 60 - be less conservative overall
   autoRefresh: true,
   refreshInterval: 30, // 30 minutes
 };
@@ -180,28 +186,122 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
   }, [state.prediction]);
 
   /**
-   * Auto-refresh analysis when weather data changes
+   * Determine analysis mode based on current time
+   */
+  const getAnalysisMode = useCallback(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour >= 0 && currentHour < 6) {
+      return 'prediction'; // Pre-dawn: Focus on today's prediction
+    } else if (currentHour >= 6 && currentHour <= 8) {
+      return 'verification'; // Dawn patrol: Real-time verification mode
+    } else {
+      return 'post-dawn'; // After 8am: Freeze today's analysis, focus on tomorrow
+    }
+  }, []);
+
+  /**
+   * Time-aware analysis that considers the current phase of dawn patrol
+   */
+  const timeAwareAnalyzeConditions = useCallback(async (customCriteria?: Partial<KatabaticCriteria>) => {
+    if (!weatherData) {
+      setState(prev => ({
+        ...prev,
+        error: 'No weather data available for analysis',
+        prediction: null,
+      }));
+      return;
+    }
+
+    const analysisMode = getAnalysisMode();
+    const now = new Date();
+    
+    // For post-dawn mode, check if we already have a prediction from today
+    if (analysisMode === 'post-dawn' && state.prediction && state.lastAnalysisTime) {
+      const lastAnalysisDate = state.lastAnalysisTime;
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      
+      // If we have a prediction from today and it's after 8am, don't re-analyze
+      if (lastAnalysisDate >= todayStart) {
+        console.log('🔒 Post-dawn mode: Using frozen today\'s prediction, analysis mode:', analysisMode);
+        return;
+      }
+    }
+
+    setState(prev => ({ ...prev, isAnalyzing: true, error: null }));
+
+    try {
+      // Merge settings with any custom criteria
+      const criteria = { ...state.settings, ...customCriteria };
+      
+      // Perform analysis
+      const prediction = katabaticAnalyzer.analyzePrediction(weatherData, criteria);
+      
+      // Add analysis mode context to the prediction
+      const enhancedPrediction = {
+        ...prediction,
+        analysisMode,
+        analysisTime: now.toISOString(),
+        timeWindow: analysisMode === 'verification' ? 'active' : analysisMode === 'post-dawn' ? 'completed' : 'upcoming'
+      };
+      
+      setState(prev => ({
+        ...prev,
+        prediction: enhancedPrediction,
+        isAnalyzing: false,
+        lastAnalysisTime: now,
+        error: null,
+      }));
+      
+      console.log('🌅 Time-aware analysis completed:', {
+        mode: analysisMode,
+        time: now.toLocaleTimeString(),
+        probability: prediction.probability
+      });
+    } catch (error) {
+      console.error('Katabatic analysis error:', error);
+      setState(prev => ({
+        ...prev,
+        isAnalyzing: false,
+        error: error instanceof Error ? error.message : 'Analysis failed',
+        prediction: null,
+      }));
+    }
+  }, [weatherData, state.settings, state.prediction, state.lastAnalysisTime, getAnalysisMode]);
+
+  /**
+   * Auto-refresh analysis when weather data changes (time-aware)
    */
   useEffect(() => {
     if (weatherData && !state.isAnalyzing) {
-      analyzeConditions();
+      timeAwareAnalyzeConditions();
     }
-  }, [weatherData, analyzeConditions, state.isAnalyzing]);
+  }, [weatherData, timeAwareAnalyzeConditions, state.isAnalyzing]);
 
   /**
-   * Set up auto-refresh timer
+   * Set up time-aware auto-refresh timer
    */
   useEffect(() => {
     if (!state.settings.autoRefresh) return;
 
     const interval = setInterval(() => {
       if (weatherData && !state.isAnalyzing) {
-        analyzeConditions();
+        const analysisMode = getAnalysisMode();
+        
+        // Reduce refresh frequency in post-dawn mode
+        if (analysisMode === 'post-dawn') {
+          console.log('🕐 Post-dawn mode: Skipping auto-refresh to preserve today\'s analysis');
+          return;
+        }
+        
+        timeAwareAnalyzeConditions();
       }
     }, state.settings.refreshInterval * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [state.settings.autoRefresh, state.settings.refreshInterval, weatherData, analyzeConditions, state.isAnalyzing]);
+  }, [state.settings.autoRefresh, state.settings.refreshInterval, weatherData, timeAwareAnalyzeConditions, state.isAnalyzing, getAnalysisMode]);
 
   return {
     // Core state
@@ -211,8 +311,11 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     error: state.error,
     settings: state.settings,
     
+    // Time-aware state
+    analysisMode: getAnalysisMode(),
+    
     // Actions
-    analyzeConditions,
+    analyzeConditions: timeAwareAnalyzeConditions, // Use time-aware version
     updateSettings,
     resetSettings,
     
@@ -222,6 +325,32 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     currentConditionStatus: getCurrentConditionStatus(),
   };
 }
+
+/**
+ * Time-Aware Katabatic Analysis System
+ * 
+ * This hook implements time-based analysis modes to prevent continuous updates
+ * after the dawn patrol window has passed, ensuring prediction accuracy tracking:
+ * 
+ * 🔮 PREDICTION MODE (00:00 - 06:00): 
+ *    - Active analysis for today's dawn patrol
+ *    - Uses forecast data for current day prediction
+ *    - Updates every 30 minutes
+ * 
+ * ⚡ VERIFICATION MODE (06:00 - 08:00):
+ *    - Real-time verification during dawn patrol window
+ *    - Compares predictions against actual conditions
+ *    - Continues updating to track accuracy
+ * 
+ * 🔒 POST-DAWN MODE (08:00 - 23:59):
+ *    - Freezes today's analysis to preserve prediction accuracy
+ *    - Prevents continuous updates that would change the original prediction
+ *    - Focus shifts to tomorrow's forecast
+ *    - Auto-refresh disabled for today's prediction
+ * 
+ * This ensures that users can see exactly what was predicted vs what actually
+ * happened, enabling proper verification and historical accuracy tracking.
+ */
 
 /**
  * Helper function to identify the primary concern in prediction

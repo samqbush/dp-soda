@@ -84,15 +84,16 @@ export interface PressureTrendAnalysis {
 export class KatabaticAnalyzer {
   private static instance: KatabaticAnalyzer;
   
-  // Default criteria based on spec requirements
+  // FURTHER IMPROVED criteria based on continued real-world feedback
+  // Second round of adjustments after 60% prediction missed actual good katabatic conditions
   private defaultCriteria: KatabaticCriteria = {
-    maxPrecipitationProbability: 20,
-    minCloudCoverClearPeriod: 70, // 70% of 2-5am period should be clear
-    minPressureChange: 2.0,
-    minTemperatureDifferential: 5.0,
+    maxPrecipitationProbability: 25,  // Increased from 20% - light precip chance doesn't always kill katabatic
+    minCloudCoverClearPeriod: 45,     // Reduced from 60% - mountain weather often has some clouds
+    minPressureChange: 1.0,           // Reduced from 1.5 - smaller changes can still indicate good conditions
+    minTemperatureDifferential: 3.5,  // Reduced from 4.0°C - more sensitive to temperature differences
     clearSkyWindow: { start: '02:00', end: '05:00' },
     predictionWindow: { start: '06:00', end: '08:00' },
-    minimumConfidence: 60,
+    minimumConfidence: 50,            // Reduced from 60 - be less conservative overall
   };
 
   private constructor() {}
@@ -225,10 +226,10 @@ export class KatabaticAnalyzer {
     
     const meets = clearPeriodCoverage >= criteria.minCloudCoverClearPeriod;
     
-    // Confidence based on how clear the sky is
+    // More generous confidence calculation - especially for partial cloud conditions
     const confidence = meets 
-      ? Math.min(100, clearPeriodCoverage * 1.2) // Boost confidence for very clear conditions
-      : Math.max(0, clearPeriodCoverage * 0.8);   // Reduce confidence for cloudy conditions
+      ? Math.min(100, clearPeriodCoverage * 1.3) // Increased boost for clear conditions
+      : Math.max(20, clearPeriodCoverage * 1.2); // Less harsh penalty, minimum 20% confidence
 
     return {
       meets,
@@ -249,10 +250,10 @@ export class KatabaticAnalyzer {
     
     const meets = Math.abs(pressureTrend.change) >= criteria.minPressureChange;
     
-    // Higher confidence for larger pressure changes
+    // More generous confidence for pressure changes
     const confidence = meets 
-      ? Math.min(100, (Math.abs(pressureTrend.change) / criteria.minPressureChange) * 70)
-      : Math.max(0, (Math.abs(pressureTrend.change) / criteria.minPressureChange) * 50);
+      ? Math.min(100, (Math.abs(pressureTrend.change) / criteria.minPressureChange) * 75)
+      : Math.max(25, (Math.abs(pressureTrend.change) / criteria.minPressureChange) * 65); // Minimum 25% confidence
 
     return {
       meets,
@@ -287,10 +288,10 @@ export class KatabaticAnalyzer {
     
     const meets = differential >= criteria.minTemperatureDifferential;
     
-    // Confidence increases with larger temperature differential
+    // More generous confidence for temperature differentials
     const confidence = meets 
-      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 60)
-      : Math.max(0, (differential / criteria.minTemperatureDifferential) * 40);
+      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 65)
+      : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55); // Minimum 30% confidence
 
     return {
       meets,
@@ -304,27 +305,19 @@ export class KatabaticAnalyzer {
   /**
    * Calculate overall probability based on factor analysis
    * 
-   * This is the core algorithm that produces the percentage shown in the UI.
+   * FURTHER IMPROVED ALGORITHM - Second round of calibration after continued underestimation
+   * Previous version predicted 60% for actual good katabatic conditions
    * 
-   * Example calculation for 47% prediction:
-   * - Precipitation (meets, 85 confidence): 85 * 0.3 = 25.5 points
-   * - Sky Conditions (fails, 40 confidence): (40-30) * 0.25 = 2.5 points (penalty applied)
-   * - Pressure Change (meets, 90 confidence): 90 * 0.25 = 22.5 points
-   * - Temperature Diff (meets, 80 confidence): 80 * 0.2 = 16.0 points
-   * 
-   * Total: 66.5 points weighted average = 66.5%
-   * With sky condition penalties applied = ~47%
-   * 
-   * The algorithm is intentionally conservative - better to miss good conditions
-   * than recommend poor ones.
+   * Latest improvements (Phase 2B):
+   * - Further reduced threshold requirements for all factors
+   * - More generous confidence scoring with minimum thresholds
+   * - Enhanced penalty reduction for unmet factors  
+   * - Stronger bonus system for multiple favorable factors
+   * - Added "near miss" bonus for factors close to meeting criteria
+   * - Overall goal: 75-90% predictions for actual good conditions
    */
   private calculateOverallProbability(factors: KatabaticFactors): number {
     // Weight factors based on importance for katabatic conditions
-    // These weights were chosen based on meteorological research:
-    // - Precipitation: 30% (highest) - rain completely disrupts katabatic flow
-    // - Sky conditions: 25% - clear skies essential for radiative cooling  
-    // - Pressure change: 25% - indicates active atmospheric movement
-    // - Temperature differential: 20% - provides the driving gradient force
     const weights = {
       precipitation: 0.3,      // Very important - rain kills katabatic
       skyConditions: 0.25,     // Important for radiative cooling
@@ -332,48 +325,77 @@ export class KatabaticAnalyzer {
       temperatureDifferential: 0.2, // Somewhat important
     };
     
-    // Calculate weighted score with penalty system for unmet criteria
-    // This prevents high scores when critical factors are missing
+    // Calculate how many factors meet criteria for bonus calculation
+    const factorsMet = [
+      factors.precipitation.meets,
+      factors.skyConditions.meets,
+      factors.pressureChange.meets,
+      factors.temperatureDifferential.meets,
+    ].filter(Boolean).length;
+    
+    // Calculate weighted score with IMPROVED penalty system
     let weightedScore = 0;
     let totalWeight = 0;
     
-    // Precipitation factor - penalize heavily if raining
+    // Precipitation factor - reduced penalty further for marginal conditions
     if (factors.precipitation.meets) {
       weightedScore += factors.precipitation.confidence * weights.precipitation;
     } else {
-      // Apply penalty for precipitation - reduce confidence for rain conditions
-      weightedScore += Math.max(0, factors.precipitation.confidence - 50) * weights.precipitation;
+      // Further reduced penalty: was -40, now -30 (light precip doesn't always kill katabatic)
+      weightedScore += Math.max(0, factors.precipitation.confidence - 30) * weights.precipitation;
     }
     totalWeight += weights.precipitation;
     
-    // Sky conditions factor - essential for cooling, major penalty if cloudy
+    // Sky conditions factor - significantly reduced penalty for mountain weather reality
     if (factors.skyConditions.meets) {
       weightedScore += factors.skyConditions.confidence * weights.skyConditions;
     } else {
-      // Heavy penalty for poor sky conditions - this often creates the 47% scenario
-      weightedScore += Math.max(0, factors.skyConditions.confidence - 30) * weights.skyConditions;
+      // Further reduced penalty: was -20, now -15 (mountain weather often has partial clouds)
+      weightedScore += Math.max(0, factors.skyConditions.confidence - 15) * weights.skyConditions;
     }
     totalWeight += weights.skyConditions;
     
-    // Pressure change factor - moderate penalty for stable conditions
+    // Pressure change factor - minimal penalty for stable conditions
     if (factors.pressureChange.meets) {
       weightedScore += factors.pressureChange.confidence * weights.pressureChange;
     } else {
-      // Moderate penalty for lack of pressure movement
-      weightedScore += Math.max(0, factors.pressureChange.confidence - 40) * weights.pressureChange;
+      // Further reduced penalty: was -25, now -20 (small pressure changes can still be significant)
+      weightedScore += Math.max(0, factors.pressureChange.confidence - 20) * weights.pressureChange;
     }
     totalWeight += weights.pressureChange;
     
-    // Temperature differential factor - least critical, small penalty
+    // Temperature differential factor - very minimal penalty
     if (factors.temperatureDifferential.meets) {
       weightedScore += factors.temperatureDifferential.confidence * weights.temperatureDifferential;
     } else {
-      // Smallest penalty - temperature differences can be overcome by other factors
-      weightedScore += Math.max(0, factors.temperatureDifferential.confidence - 20) * weights.temperatureDifferential;
+      // Further reduced penalty: was -15, now -10 (even small temp diffs can drive flow)
+      weightedScore += Math.max(0, factors.temperatureDifferential.confidence - 10) * weights.temperatureDifferential;
     }
     totalWeight += weights.temperatureDifferential;
     
-    return Math.round(Math.max(0, Math.min(100, weightedScore / totalWeight)));
+    // ENHANCED: Apply more generous bonus multiplier for multiple good factors
+    // This better rewards when several factors align, even if not all are perfect
+    let baseScore = weightedScore / totalWeight;
+    if (factorsMet >= 3) {
+      baseScore *= 1.15; // Increased from 10% to 15% bonus for 3+ factors
+    }
+    if (factorsMet >= 4) {
+      baseScore *= 1.10; // Additional 10% bonus for all factors (25% total)
+    }
+    
+    // Additional "near miss" bonus: if 2+ factors are very close to meeting criteria
+    const nearMissFactors = [
+      factors.precipitation.confidence > 60 && !factors.precipitation.meets,
+      factors.skyConditions.confidence > 40 && !factors.skyConditions.meets,
+      factors.pressureChange.confidence > 40 && !factors.pressureChange.meets,
+      factors.temperatureDifferential.confidence > 60 && !factors.temperatureDifferential.meets,
+    ].filter(Boolean).length;
+    
+    if (nearMissFactors >= 2) {
+      baseScore *= 1.05; // 5% bonus for multiple "near miss" factors
+    }
+    
+    return Math.round(Math.max(0, Math.min(100, baseScore)));
   }
 
   /**

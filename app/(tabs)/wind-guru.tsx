@@ -357,17 +357,29 @@ export default function WindGuruScreen() {
                 {(() => {
                   const now = new Date();
                   const currentHour = now.getHours();
+                  const analysisMode = katabaticAnalysis.analysisMode;
                   
                   if (currentHour >= 6 && currentHour <= 8) {
-                    return '🔴 Active Dawn Patrol Window - Check conditions now!';
+                    return '🔴 Active Dawn Patrol Window - Real-time verification mode';
                   } else if (currentHour < 6) {
                     const hoursUntil = 6 - currentHour;
-                    return `⏰ Dawn patrol starts in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`;
+                    return `⏰ Dawn patrol starts in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''} - Prediction mode`;
                   } else {
-                    return '✅ Today&apos;s dawn patrol window has passed - verify accuracy';
+                    return '🔒 Dawn patrol complete - Analysis frozen for accuracy tracking';
                   }
                 })()}
               </ThemedText>
+              {(() => {
+                const analysisMode = katabaticAnalysis.analysisMode;
+                if (analysisMode === 'post-dawn') {
+                  return (
+                    <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
+                      💡 Today's prediction is preserved for verification. Tomorrow's forecast available below.
+                    </ThemedText>
+                  );
+                }
+                return null;
+              })()}
             </ThemedView>
             
             {katabaticAnalysis.prediction ? (
@@ -540,7 +552,43 @@ export default function WindGuruScreen() {
 
         {/* Enhanced Key Conditions Section - Today's Analysis */}
         <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>📊 Today&apos;s Conditions Analysis</ThemedText>
+          <ThemedView style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <ThemedText style={styles.sectionTitle}>📊 Today&apos;s Conditions Analysis</ThemedText>
+            {katabaticAnalysis.analysisMode && (
+              <ThemedText style={[{
+                fontSize: 11,
+                fontWeight: '500',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 12,
+                backgroundColor: (() => {
+                  switch (katabaticAnalysis.analysisMode) {
+                    case 'prediction': return 'rgba(33, 150, 243, 0.1)';
+                    case 'verification': return 'rgba(255, 152, 0, 0.1)';
+                    case 'post-dawn': return 'rgba(76, 175, 80, 0.1)';
+                    default: return 'rgba(128, 128, 128, 0.1)';
+                  }
+                })(),
+                color: (() => {
+                  switch (katabaticAnalysis.analysisMode) {
+                    case 'prediction': return '#2196F3';
+                    case 'verification': return '#FF9800';
+                    case 'post-dawn': return '#4CAF50';
+                    default: return '#666';
+                  }
+                })()
+              }]}>
+                {(() => {
+                  switch (katabaticAnalysis.analysisMode) {
+                    case 'prediction': return '🔮 PREDICTION';
+                    case 'verification': return '⚡ LIVE';
+                    case 'post-dawn': return '🔒 FROZEN';
+                    default: return 'UNKNOWN';
+                  }
+                })()}
+              </ThemedText>
+            )}
+          </ThemedView>
           
           {katabaticAnalysis.prediction ? (
             <>
@@ -583,15 +631,6 @@ export default function WindGuruScreen() {
                 </ThemedText>
               </ThemedView>
 
-              {/* Detailed Analysis Section */}
-              <ThemedView style={[styles.analysisSummary, { borderTopColor: textColor }]}>
-                <ThemedText style={[styles.summaryText, { color: textColor, opacity: 0.8 }]}>
-                  Detailed Analysis:
-                </ThemedText>
-                <ThemedText style={[styles.summaryText, { color: textColor, opacity: 0.7, fontSize: 11 }]}>
-                  {katabaticAnalysis.prediction.detailedAnalysis}
-                </ThemedText>
-              </ThemedView>
             </>
           ) : (
             <>
@@ -683,16 +722,6 @@ export default function WindGuruScreen() {
                 </ThemedText>
               </ThemedView>
 
-              {/* Detailed Analysis Section */}
-              <ThemedView style={[styles.analysisSummary, { borderTopColor: textColor }]}>
-                <ThemedText style={[styles.summaryText, { color: textColor, opacity: 0.8 }]}>
-                  Tomorrow&apos;s Analysis:
-                </ThemedText>
-                <ThemedText style={[styles.summaryText, { color: textColor, opacity: 0.7, fontSize: 11 }]}>
-                  {tomorrowPrediction.prediction.detailedAnalysis}
-                </ThemedText>
-              </ThemedView>
-              
               {/* Data Quality Note */}
               <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
                 <ThemedText style={{ color: '#2196F3', fontSize: 12, fontWeight: '500', marginBottom: 4 }}>

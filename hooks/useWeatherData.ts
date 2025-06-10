@@ -267,7 +267,25 @@ export const useWeatherData = () => {
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + dayOffset);
       
-      // Filter weather data for the target day's 24-hour period
+      // For today (dayOffset = 0), use time-aware prediction from katabaticAnalysis
+      // to ensure consistency with the main prediction display
+      if (dayOffset === 0 && katabaticAnalysis.prediction) {
+        console.log('📊 Using time-aware today prediction from katabaticAnalysis for daily breakdown');
+        return {
+          prediction: katabaticAnalysis.prediction,
+          dayOffset: 0,
+          targetDate,
+          isPreliminary: false,
+          dataQuality: 'good',
+          lastModelUpdate: weatherData.lastFetch,
+          nextUpdateExpected: 'Real-time updates',
+          disclaimer: katabaticAnalysis.analysisMode === 'post-dawn' 
+            ? 'Frozen prediction for accuracy verification - tomorrow\'s forecast available'
+            : 'Current day analysis based on latest conditions'
+        };
+      }
+      
+      // For other days (tomorrow+), perform fresh analysis
       const dayStart = new Date(targetDate);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(targetDate);
@@ -323,7 +341,7 @@ export const useWeatherData = () => {
       console.error(`Day ${dayOffset} prediction error:`, error);
       return null;
     }
-  }, [weatherData]);
+  }, [weatherData, katabaticAnalysis]);
 
   /**
    * Get predictions for the next 5 days (maximum available from free API)
