@@ -70,7 +70,7 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 
 ### Default Settings (All Customizable)
 
-- **Minimum Wind Speed**: 10 mph (good for most water activities)
+- **Minimum Wind Speed**: 15 mph (good for most water activities)
 - **Direction Consistency**: 70% (ensures reliable wind patterns)
 - **Required Consecutive Points**: 4 (confirms sustained conditions)
 - **Direction Variation Limit**: 45° (ensures consistent direction)

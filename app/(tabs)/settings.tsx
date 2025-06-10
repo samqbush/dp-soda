@@ -130,7 +130,7 @@ export default function SettingsScreen() {
               value={localCriteria.minimumAverageSpeed.toString()}
               onChangeText={(text) => updateCriteria('minimumAverageSpeed', parseFloat(text) || 0)}
               keyboardType="numeric"
-              placeholder="10"
+              placeholder="15"
               placeholderTextColor={textColor + '80'}
             />
           </View>
@@ -160,8 +160,8 @@ export default function SettingsScreen() {
           </ThemedText>
           
           <ThemedText style={styles.infoText}>
-            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Example:</ThemedText> If your alarm is set for 5:00 AM with a 10 mph threshold, 
-            we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 12 mph, you get woken up for great conditions!
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Example:</ThemedText> If your alarm is set for 5:00 AM with a 15 mph threshold, 
+            we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 17 mph, you get woken up for great conditions!
           </ThemedText>
 
           {/* Unified Alarm Testing Panel */}

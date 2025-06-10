@@ -46,7 +46,7 @@ export const useWindData = (): UseWindDataReturn => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [criteria, setCriteriaState] = useState<AlarmCriteria>({
-    minimumAverageSpeed: 10,
+    minimumAverageSpeed: 15,
     directionConsistencyThreshold: 70,
     minimumConsecutivePoints: 4,
     directionDeviationThreshold: 45,

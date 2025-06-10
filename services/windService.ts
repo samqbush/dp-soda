@@ -43,7 +43,7 @@ export interface SimplifiedAlarmCriteria {
 }
 
 const DEFAULT_CRITERIA: AlarmCriteria = {
-  minimumAverageSpeed: 10,
+  minimumAverageSpeed: 15,
   directionConsistencyThreshold: 70,
   minimumConsecutivePoints: 4,
   directionDeviationThreshold: 45,

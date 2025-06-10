@@ -37,7 +37,7 @@ export interface UseDPAlarmReturn {
 }
 
 const DEFAULT_SIMPLIFIED_CRITERIA: SimplifiedAlarmCriteria = {
-  minimumAverageSpeed: 10,
+  minimumAverageSpeed: 15,
   alarmEnabled: false,
   alarmTime: "05:00"
 };

@@ -73,7 +73,7 @@ Transform the current "DP Wind Alert" tab from a complex wind monitoring interfa
 │                             │
 ├─────────────────────────────┤
 │  Current: 12 mph NW         │
-│  Threshold: 10 mph          │
+│  Threshold: 15 mph          │
 │  Last Check: 5:23 AM        │
 ├─────────────────────────────┤
 │   [Alarm Control Panel]     │
