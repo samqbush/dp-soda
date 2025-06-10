@@ -814,19 +814,27 @@ export const analyzeRecentWindData = (
   const now = targetTime || new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-  const recentData = data.filter(point => {
+  let recentData = data.filter(point => {
     const pointTime = new Date(point.time);
     return pointTime >= oneHourAgo;
   });
 
+  // If no data in the last hour, fall back to the most recent data available
+  let analysisTimeframe = 'last hour';
   if (recentData.length === 0) {
-    return {
-      isAlarmWorthy: false,
-      averageSpeed: 0,
-      directionConsistency: 0,
-      consecutiveGoodPoints: 0,
-      analysis: 'No data available for the last hour'
-    };
+    // Use the last 10 data points if available, or all data if less than 10 points
+    recentData = data.slice(-10);
+    analysisTimeframe = `last ${recentData.length} data points`;
+    
+    if (recentData.length === 0) {
+      return {
+        isAlarmWorthy: false,
+        averageSpeed: 0,
+        directionConsistency: 0,
+        consecutiveGoodPoints: 0,
+        analysis: 'No wind data available'
+      };
+    }
   }
 
   // Calculate average wind speed
@@ -877,7 +885,7 @@ export const analyzeRecentWindData = (
   const isCurrentlyFavorable = meetsSpeedCriteria && meetsDirectionCriteria && meetsConsistencyCriteria && isPreferredDirection;
 
   const dataPointsCount = recentData.length;
-  const timeRange = dataPointsCount > 0 ? `${dataPointsCount} data points in last hour` : 'No recent data';
+  const timeRange = dataPointsCount > 0 ? `${dataPointsCount} data points in ${analysisTimeframe}` : 'No recent data';
   
   const analysis = `Recent Conditions (${timeRange}): ` +
     `Avg Speed: ${averageSpeed.toFixed(1)}mph, ` +

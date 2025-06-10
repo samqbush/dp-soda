@@ -92,9 +92,19 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
       setTimeInputVisible(false);
       
       if (alarmState.isEnabled) {
+        // Parse the new time to give the user better feedback
+        const [hours, minutes] = tempTime.split(':').map(Number);
+        const now = new Date();
+        const alarmTime = new Date();
+        alarmTime.setHours(hours, minutes, 0, 0);
+        
+        // Check if this time will be today or tomorrow
+        const isToday = alarmTime > now;
+        const dayText = isToday ? 'today' : 'tomorrow';
+        
         Alert.alert(
           'Alarm Time Updated',
-          `Alarm rescheduled for ${tempTime}`,
+          `Alarm set for ${tempTime} ${dayText}${isToday ? '' : ' (time has passed today)'}`,
           [{ text: 'OK', style: 'default' }]
         );
       }
@@ -116,7 +126,11 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
     if (diffHours === 0) return `in ${diffMinutes}m`;
     if (diffHours < 24) return `in ${diffHours}h ${diffMinutes}m`;
     
-    return `${nextCheck.toLocaleDateString()} at ${nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    // For longer times, show if it's today or tomorrow
+    const isToday = nextCheck.toDateString() === now.toDateString();
+    const dayText = isToday ? 'today' : 'tomorrow';
+    
+    return `${dayText} at ${nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   };
 
   const getAlarmStatusColor = () => {
@@ -156,9 +170,9 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
             <ThemedText type="subtitle" style={styles.statusText}>
               {getAlarmStatusText()}
             </ThemedText>
-            {alarmState.isEnabled && (
+            {alarmState.isEnabled && !alarmState.nextCheckTime && (
               <ThemedText style={styles.statusSubtext}>
-                Next check: {formatNextCheckTime()}
+                Scheduling...
               </ThemedText>
             )}
           </View>
@@ -189,9 +203,14 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
             onPress={() => setTimeInputVisible(!timeInputVisible)}
           >
             <Ionicons name="time-outline" size={20} color={tintColor} />
-            <ThemedText style={styles.timeText}>
-              Alarm Time: {alarmState.alarmTime}
-            </ThemedText>
+            <View style={styles.timeTextContainer}>
+              <ThemedText style={styles.timeText}>
+                Alarm Time: {alarmState.alarmTime}
+              </ThemedText>
+              <ThemedText style={styles.timeSubtext}>
+                {formatNextCheckTime()}
+              </ThemedText>
+            </View>
             <Ionicons 
               name={timeInputVisible ? "chevron-up" : "chevron-down"} 
               size={16} 
@@ -351,10 +370,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  timeText: {
+  timeTextContainer: {
     flex: 1,
+  },
+  timeText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  timeSubtext: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 2,
   },
   timeInputContainer: {
     marginTop: 12,
