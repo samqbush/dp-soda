@@ -48,6 +48,12 @@ Welcome to the Dawn Patrol Alarm documentation! This application analyzes wind c
   - GitHub Actions CI/CD workflow
   - Android APK and iOS TestFlight distribution
   - Environment configuration and secrets management
+
+### 🛠️ Development Tools
+- **[Device Debug Script](device-debug-script.md)** - Ecowitt device discovery and debugging
+  - Identify available weather devices
+  - Test API connectivity
+  - Debug device selection issues
   
 - **[Troubleshooting Guide](troubleshooting.md)** - Comprehensive problem solving
   - Android crash recovery and white screen issues
@@ -108,15 +114,18 @@ docs/                   # Documentation (you are here!)
 
 ## Documentation Maintenance
 
-### Recent Reorganization (June 7, 2025)
+### Recent Reorganization (June 10, 2025)
 
 This documentation was recently reorganized to eliminate sprawl and improve accessibility:
 
-**Before**: 15+ scattered documentation files with overlapping content
-**After**: 8 focused guides with clear purposes and cross-references
+**Before**: 15+ scattered .md files throughout the repository with overlapping content
+**After**: Consolidated structure with clear organization:
+- Core documentation in `docs/` directory
+- Historical development notes in `docs/archive/` directory
+- GitHub/CI documentation remains in appropriate locations
 
-**Archived Files**: Old documentation moved to `archive/` directory for reference
-**New Structure**: Logical organization by user type (users, developers, operations)
+**Moved to Archive**: Algorithm development history, bug fix summaries, and cleanup logs
+**Improved Structure**: Logical organization by user type and purpose with clear cross-references
 
 ### Keeping Documentation Current
 
@@ -134,14 +143,14 @@ This documentation was recently reorganized to eliminate sprawl and improve acce
 
 ## Archive
 
-Historical documentation is preserved in the `archive/` directory:
-- Previous architecture documents
-- Legacy setup guides  
-- Feature-specific documentation
-- Build and deployment archives
+Historical development documentation is preserved in the `archive/` directory:
+- Algorithm calibration and improvement history
+- Bug fix summaries and test plans
+- Development process documentation
+- Cleanup and maintenance logs
 
-These files remain available for reference but are no longer actively maintained.
+These files provide valuable context for understanding development decisions but are not part of active documentation. See [archive/README.md](archive/README.md) for details.
 
 ---
 
-*Last updated: June 7, 2025 - Documentation reorganization and consolidation*
+*Last updated: June 10, 2025 - Documentation consolidation and organization cleanup*

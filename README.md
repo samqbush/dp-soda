@@ -159,7 +159,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 - 🚀 **[Deployment Guide](docs/deployment.md)** - Build and release processes
 - 🛠️ **[Troubleshooting Guide](docs/troubleshooting.md)** - Fixing common issues
 
-The documentation has been recently reorganized (June 2025) to eliminate sprawl and improve accessibility. Historical documentation is preserved in `docs/archive/` for reference.
+The documentation has been recently reorganized (June 10, 2025) to eliminate sprawl and improve accessibility. Historical development documentation is preserved in `docs/archive/` for reference.
 
 ## CI/CD with GitHub Actions
 
@@ -170,7 +170,7 @@ This project uses GitHub Actions for continuous integration and delivery:
 - Complete signing and packaging for Google Play Store distribution
 
 For details on setting up the CI/CD environment:
-1. See [CI/CD Secrets Setup Guide](docs/CI_CD_SECRETS_SETUP.md)
+1. See [Deployment Guide](docs/deployment.md) for CI/CD configuration details
 2. Review `.github/workflows/android.yml` for workflow configuration
 
 ## Coming Soon

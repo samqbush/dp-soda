@@ -133,8 +133,40 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   let recentData: WindDataPoint[];
   if (timeWindow) {
     // Use smart filtering for time windows (handles day boundaries correctly)
-    recentData = filterWindDataByTimeWindow(data, activeWindow);
-    // Don't slice when using smart time windows - show all filtered data
+    const timeFilteredData = filterWindDataByTimeWindow(data, activeWindow);
+    
+    // IMPORTANT: To reduce whitespace gaps, only show data from the first actual data point
+    // instead of trying to show the entire time window when there are gaps
+    if (timeFilteredData.length > 0) {
+      // Find the first data point with meaningful wind data to eliminate leading whitespace
+      // We'll consider any data point with wind speed >= 0.1 mph as meaningful (to handle near-zero but valid readings)
+      const firstValidIndex = timeFilteredData.findIndex(point => {
+        const speed = typeof point.windSpeed === 'string' ? parseFloat(point.windSpeed) : point.windSpeed;
+        return !isNaN(speed) && speed >= 0.1;
+      });
+      
+      // If we found valid data, start from there, but ensure we don't cut off too much data
+      // If no meaningful wind data found, or if the first valid point is more than 25% into the data,
+      // just use all the filtered data to avoid cutting off potentially important information
+      if (firstValidIndex >= 0 && firstValidIndex < timeFilteredData.length * 0.25) {
+        recentData = timeFilteredData.slice(firstValidIndex);
+        console.log('🎯 Gap reduction applied:', {
+          originalFiltered: timeFilteredData.length,
+          afterGapReduction: recentData.length,
+          firstValidIndex: firstValidIndex,
+          firstPointTime: new Date(recentData[0].time).toISOString(),
+          firstPointSpeed: typeof recentData[0].windSpeed === 'string' ? parseFloat(recentData[0].windSpeed) : recentData[0].windSpeed
+        });
+      } else {
+        recentData = timeFilteredData;
+        console.log('🎯 Gap reduction skipped - no early valid data found or would cut too much data:', {
+          originalFiltered: timeFilteredData.length,
+          firstValidIndex: firstValidIndex
+        });
+      }
+    } else {
+      recentData = timeFilteredData;
+    }
   } else {
     // Keep original simple filtering for default 3am-5am alarm window
     recentData = data
