@@ -1,7 +1,7 @@
-import { getBuildConfig } from '@/config/buildConfig';
 import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -30,7 +30,10 @@ export function AndroidDebugger({ enabled = false }: AndroidDebuggerProps) {
   const [debugInfo, setDebugInfo] = useState<DebugInfo>({
     timestamp: new Date().toISOString(),
     platform: Platform.OS,
-    buildInfo: getBuildConfig(),
+    buildInfo: {
+      version: Constants.expoConfig?.version || 'Unknown',
+      environment: __DEV__ ? 'development' : 'production'
+    },
     storageTest: 'not run',
     renderCount: 0,
     memoryWarnings: 0,
@@ -53,7 +56,10 @@ export function AndroidDebugger({ enabled = false }: AndroidDebuggerProps) {
       }
       
       // Get build info
-      const buildInfo = getBuildConfig();
+      const buildInfo = {
+        version: Constants.expoConfig?.version || 'Unknown',
+        environment: __DEV__ ? 'development' : 'production'
+      };
       
       // Get last error from global handler
       const lastError = globalCrashHandler.getLastError();

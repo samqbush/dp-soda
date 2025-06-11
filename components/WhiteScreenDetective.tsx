@@ -1,5 +1,5 @@
-import { getBuildConfig } from '@/config/buildConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -25,8 +25,10 @@ export function WhiteScreenDetective() {
 
       // Check 2: Build config
       try {
-        const config = getBuildConfig();
-        results.buildConfig = `v${config.version} (${config.environment})`;
+        const expoConfig = Constants.expoConfig;
+        const version = expoConfig?.version || 'Unknown';
+        const environment = __DEV__ ? 'development' : 'production';
+        results.buildConfig = `v${version} (${environment})`;
         results.buildConfigCheck = true;
       } catch (e) {
         console.log('Build config check failed:', e);

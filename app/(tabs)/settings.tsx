@@ -196,15 +196,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Auto-save information box */}
-        <View style={styles.autoSaveInfoBox}>
-          <ThemedText style={styles.autoSaveInfoTitle}>💾 Auto-Save Enabled</ThemedText>
-          <ThemedText style={styles.autoSaveInfoText}>
-            Your settings are automatically saved as you type. No need to press a save button! 
-            You&apos;ll see a &quot;💾 Saving...&quot; indicator when changes are being saved, followed by &quot;✅ Saved!&quot; when complete.
-          </ThemedText>
-        </View>
-
         <View style={styles.infoSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>About Dawn Patrol Alarm</ThemedText>
           <ThemedText style={styles.infoText}>
@@ -349,26 +340,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginTop: 2,
     fontStyle: 'italic',
-  },
-  autoSaveInfoBox: {
-    backgroundColor: 'rgba(52, 199, 89, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#34C759',
-  },
-  autoSaveInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#34C759',
-  },
-  autoSaveInfoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.8,
   },
   infoSection: {
     marginTop: 16,

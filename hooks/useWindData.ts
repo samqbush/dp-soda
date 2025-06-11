@@ -1,4 +1,3 @@
-import { logBuildIssue } from '@/config/buildConfig';
 import { clearWindDataCache } from '@/services/storageService';
 import {
     analyzeWindData,
@@ -155,8 +154,8 @@ export const useWindData = (): UseWindDataReturn => {
     } catch (err) {
       console.error('❌ Error refreshing wind data:', err);
       
-      // Log as a build issue for better tracking
-      logBuildIssue('Data refresh failed', err);
+      // Log error for better tracking
+      console.warn('Data refresh failed:', err);
       
       // User-friendly error message
       setError(err instanceof Error ? 

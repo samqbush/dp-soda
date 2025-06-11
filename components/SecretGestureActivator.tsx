@@ -1,7 +1,7 @@
 import { DebugSettingsUI } from '@/components/DebugSettingsUI';
-import { getBuildConfig } from '@/config/buildConfig';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { debugSettings } from '@/services/debugSettings';
+import Constants from 'expo-constants';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -79,8 +79,12 @@ export function SecretGestureActivator({ children, text }: SecretGestureActivato
  * Component that shows version info and acts as a secret gesture activator
  */
 export function VersionDisplay() {
-  const buildConfig = getBuildConfig();
-  const versionText = `Version ${buildConfig.version} (${buildConfig.environment})`;
+  // Get version info directly from Expo Constants (reads from app.config.js)
+  const expoConfig = Constants.expoConfig;
+  const version = expoConfig?.version || 'Unknown';
+  const environment = __DEV__ ? 'development' : 'production';
+  
+  const versionText = `Version ${version} (${environment})`;
   const textColor = useThemeColor({}, 'text');
 
   return (
