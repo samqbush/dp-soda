@@ -1,6 +1,7 @@
 # GitHub Copilot Custom Instructions
 ## Development Guidelines
 - Edit files in place, do not create backups or copies of files unless necessary.
+- Never use mock data.  If data is not avaiable, notify the user that we were unable to retrieve data and display a relevant error message.
 ## Build and Test Instructions
 - This app is not built locally, it is built using a GitHub Actions workflow. 
 - Ask me to run `npm start` or to refresh the server and wait.  Do not run this command yourself.

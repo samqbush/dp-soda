@@ -451,8 +451,15 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       throw new Error(`Ecowitt API error: ${response.data.msg}`);
     }
 
+    // Handle empty data response gracefully (station offline or no data available)
+    if (!response.data.data || Array.isArray(response.data.data) && response.data.data.length === 0) {
+      console.warn(`⚠️ No data available from Ecowitt station - station may be offline or not reporting data`);
+      console.log(`🔄 API returned success but empty data array`);
+      return []; // Return empty array instead of crashing
+    }
+
     // Validate response structure before accessing data
-    if (!response.data.data || !response.data.data.wind) {
+    if (!response.data.data.wind) {
       console.error('❌ Invalid Ecowitt API response structure:', JSON.stringify(response.data, null, 2));
       throw new Error('Invalid response structure from Ecowitt API - missing wind data');
     }
@@ -579,8 +586,15 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       throw new Error(`Ecowitt history API error: ${response.data.msg}`);
     }
 
+    // Handle empty data response gracefully (station offline or no data available)
+    if (!response.data.data || Array.isArray(response.data.data) && response.data.data.length === 0) {
+      console.warn(`⚠️ No data available from ${deviceName} - station may be offline or not reporting data`);
+      console.log(`🔄 API returned success but empty data array for ${deviceName}`);
+      return []; // Return empty array instead of crashing
+    }
+
     // Validate response structure before accessing data
-    if (!response.data.data || !response.data.data.wind) {
+    if (!response.data.data.wind) {
       console.error(`❌ Invalid Ecowitt API response structure for ${deviceName}:`, JSON.stringify(response.data, null, 2));
       throw new Error('Invalid response structure from Ecowitt API - missing wind data');
     }

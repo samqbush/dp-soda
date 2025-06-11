@@ -118,7 +118,10 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
         <View style={styles.noDataContainer}>
           <ThemedText style={styles.noDataText}>
-            Not enough data points to display chart
+            📊 No wind data available to display chart
+          </ThemedText>
+          <ThemedText style={[styles.noDataText, { fontSize: 14, marginTop: 8 }]}>
+            This may occur when the weather station is offline or not reporting data. Please try refreshing in a few minutes.
           </ThemedText>
         </View>
       </ThemedView>
@@ -185,7 +188,10 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
         <View style={styles.noDataContainer}>
           <ThemedText style={styles.noDataText}>
-            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour > 12 ? `${activeWindow.endHour - 12}pm` : `${activeWindow.endHour}am`} window to display chart
+            📊 No data available for {activeWindow.startHour}am-{activeWindow.endHour > 12 ? `${activeWindow.endHour - 12}pm` : `${activeWindow.endHour}am`} window
+          </ThemedText>
+          <ThemedText style={[styles.noDataText, { fontSize: 14, marginTop: 8 }]}>
+            Station may be offline or not reporting data during this time period.
           </ThemedText>
         </View>
       </ThemedView>

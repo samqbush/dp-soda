@@ -109,6 +109,17 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       setWindData(freshData);
       setLastUpdated(new Date());
       
+      // Handle empty data response
+      if (freshData.length === 0) {
+        console.warn('⚠️ No wind data received from DP Standley West station');
+        setError('No data available from Standley Lake station. Station may be offline or not reporting data.');
+        setAnalysis(null);
+        
+        // Try to load cached data as fallback
+        await loadCachedData();
+        return;
+      }
+      
       // Analyze the fresh data
       if (freshData.length > 0) {
         const converted = convertToWindDataPoint(freshData);

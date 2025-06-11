@@ -109,6 +109,17 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
       setWindData(freshData);
       setLastUpdated(new Date());
       
+      // Handle empty data response
+      if (freshData.length === 0) {
+        console.warn('⚠️ No wind data received from DP Soda Lakes station');
+        setError('No data available from Soda Lake station. Station may be offline or not reporting data.');
+        setAnalysis(null);
+        
+        // Try to load cached data as fallback
+        await loadCachedData();
+        return;
+      }
+      
       // Analyze the fresh data with Soda Lake specific criteria
       if (freshData.length > 0) {
         const converted = convertToWindDataPoint(freshData);
