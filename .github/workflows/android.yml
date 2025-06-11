@@ -2,7 +2,7 @@ name: Build Dawn Patrol Alarm - Android
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -296,9 +296,9 @@ jobs:
           echo "APK signing information:"
           keytool -printcert -jarfile /tmp/verify_apk/universal.apk
 
-      # Upload the AAB as an artifact (for non-main PRs, pushes, and manual runs)
+      # Upload the AAB as an artifact (for workflow_dispatch runs only)
       - name: 📤 Upload AAB Artifact
-        if: github.event_name != 'pull_request' || github.base_ref != 'main'
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-aab
@@ -327,15 +327,15 @@ jobs:
           mv universal.apk dp-soda${{ env.APP_VERSION }}.apk
 
       - name: 📤 Upload Universal APK Artifact
-        if: github.event_name != 'pull_request' || github.base_ref != 'main'
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-apk
           path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
 
-      # Create draft release with AAB and APK (only on pull request to main)
+      # Create draft release with AAB and APK (for all pull requests)
       - name: 🚀 Create Draft Release
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        if: github.event_name == 'pull_request'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -380,7 +380,7 @@ jobs:
           prerelease: false
 
       - name: 📦 Upload AAB to Release
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        if: github.event_name == 'pull_request'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -391,7 +391,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: 📱 Upload APK to Release
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        if: github.event_name == 'pull_request'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -404,7 +404,7 @@ jobs:
       # Add a brief build summary
       - name: 📋 Build Summary
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "main" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "## 🎉 Android Draft Release Created" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY

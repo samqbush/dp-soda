@@ -8,10 +8,21 @@
 - Always monitor the background terminal output when running `npm run lint` to check for code style issues and compilation errors.
 - Install javascript libraries locally instead of globally with `-g`.
 
-## Documentation
-- All documentation besides the README.md should be stored in the `docs` directory
-- Update existing documentation insead of creating new files when possible, ask me if you are unsure
-  - Refer to the [README.md](../README.md) for documentation structure
+## Documentation - STRICT ANTI-SPRAWL POLICY
+- **ONLY 4 documentation files allowed:**
+  1. `README.md` (root) - User-facing information only
+  2. `docs/developer-setup.md` - ALL developer/deployment/build info
+  3. `docs/architecture.md` - Technical system design
+  4. `docs/wind-prediction-guide.md` - Wind analysis technical details
+- **❌ Do not create new documentation files unless specifically requested**
+- **✅ ALWAYS update existing core files instead**
+- **✅ ALWAYS consolidate content into appropriate core file**
+- **✅ ASK which core file to update if unclear**
+- When documentation is needed, determine which of the 4 core files should be updated
+- Deployment, build, troubleshooting → `docs/developer-setup.md`
+- User features, getting started → `README.md`
+- System design, APIs, services → `docs/architecture.md`
+- Wind prediction details → `docs/wind-prediction-guide.md`
 
 ## Cleanup
 - When creating debuging scripts & logs, clearly label them so they can be easily identified and removed later

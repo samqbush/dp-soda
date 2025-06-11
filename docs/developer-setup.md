@@ -272,13 +272,99 @@ dp-react/
 3. **Implement proper error boundaries** for crash recovery
 4. **Use debugging components** when troubleshooting Android issues
 
-### Build Process
+### Build Process & Deployment
 
-**Local Development**: Use `npm start` for testing
-**Production Builds**: Automated via GitHub Actions workflow
-- No local build setup required
-- Optimized APK generation with Android fixes
-- Automatic version incrementing
+**Dawn Patrol Alarm uses GitHub Actions for all production builds**:
+- ✅ **No local build setup required**
+- ✅ **Consistent build environment**
+- ✅ **Automated Android optimizations**
+- ✅ **Integrated testing and validation**
+- ✅ **Automatic version management**
+
+#### Local Development
+Use `npm start` for testing and development
+
+#### Production Builds
+All production builds are handled automatically via GitHub Actions workflow (`.github/workflows/build.yml`):
+
+**Supported Platforms**:
+- **Android**: APK and AAB (Android App Bundle) builds
+- **iOS**: IPA builds for TestFlight distribution
+
+**Build Triggers**:
+- Push to `main` branch (automatic)
+- Manual trigger via GitHub Actions "Run workflow" button
+
+**Build Process**:
+1. Environment setup (Node.js, Expo CLI, Android SDK)
+2. Dependency installation with caching
+3. Code quality checks (ESLint, TypeScript, tests)
+4. Version increment (patch level)
+5. Platform-specific optimizations
+6. Artifact generation and distribution
+
+#### GitHub Repository Secrets
+
+Required secrets for the build process:
+
+**Android Signing**:
+```
+ANDROID_KEYSTORE_BASE64    # Base64 encoded keystore file
+ANDROID_KEY_ALIAS          # Key alias for signing
+ANDROID_KEY_PASSWORD       # Key password
+ANDROID_KEYSTORE_PASSWORD  # Keystore password
+```
+
+**API Keys**:
+```
+OPENWEATHER_API_KEY        # OpenWeatherMap API key
+ECOWITT_APPLICATION_KEY    # Ecowitt app key (optional)
+ECOWITT_API_KEY           # Ecowitt API key (optional)
+```
+
+**Setting Up Secrets**:
+1. Go to GitHub repository → Settings → Secrets and variables → Actions
+2. Click "New repository secret"
+3. Add each required secret with the exact name and value
+
+#### Release Process
+
+1. **Prepare Release**: Ensure features are complete and tested
+2. **Trigger Build**: Push to main branch or manually trigger workflow
+3. **Monitor Build**: Watch GitHub Actions progress
+4. **Distribute**: Download artifacts and distribute via chosen channels
+
+#### Distribution
+
+**Android APK**:
+- Primary distribution via GitHub Releases
+- Direct APK download links
+- Manual installation requires "Unknown Sources" permission
+
+**iOS TestFlight** (if configured):
+- Automatic upload to TestFlight
+- Beta tester notifications
+- Internal testing (up to 100 testers, no review)
+- External testing (up to 10,000 testers, requires Beta App Review)
+
+#### Build Troubleshooting
+
+**Common Issues**:
+- "Invalid keystore" Error: Verify keystore base64 encoding and secrets
+- "API key missing" Warning: Non-critical, app uses fallback data
+- "Version conflict" Error: Manual version bump may be needed
+
+**Debug Commands**:
+```bash
+# Test locally before pushing
+npm run lint
+npm run test
+
+# Environment debugging
+npm run debug-env          # Check environment variables
+npm run validate-keys      # Validate API keys  
+npm run test-apis          # Test API connectivity
+```
 
 ### Git Workflow
 
@@ -287,6 +373,7 @@ dp-react/
 3. **Run linting** before committing: `npm run lint`
 4. **Create pull requests** for code review
 5. **Merge after review** and CI checks pass
+6. **Production build** triggers automatically on merge to main
 
 ### Debugging
 
@@ -306,10 +393,9 @@ dp-react/
 
 ## Getting Help
 
-- **Documentation**: Check other files in `/docs` directory
 - **Issues**: Create GitHub issues for bugs or feature requests  
 - **Architecture**: See [Architecture Guide](architecture.md) for system design
-- **Deployment**: See [Deployment Guide](deployment.md) for build and release processes
+- **Wind Prediction**: See [Wind Prediction Guide](wind-prediction-guide.md) for technical details
 
 ## Next Steps
 
@@ -320,3 +406,4 @@ Once you have the development environment set up:
 3. **Understand wind prediction** - See [Wind Prediction Guide](wind-prediction-guide.md)
 4. **Make your first change** - Try updating a component or adding a feature
 5. **Test thoroughly** - Ensure changes work on both iOS and Android
+6. **Deploy** - Push to main branch to trigger automated build and release
