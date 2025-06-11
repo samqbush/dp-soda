@@ -9,6 +9,47 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 - **Verification System**: Confirms predictions using 6am-8am window data
 - **Fully Configurable**: Customize all wind criteria to match your preferences
 - **Standley Lake Monitor**: Monitor real-time wind conditions at Standley Lake (via Ecowitt weather stations)
+- **🎯 NEW: Katabatic Wind Prediction**: Advanced meteorological analysis for mountain wind patterns (Phase 2 Complete!)
+
+## Phase 2: Prediction Engine ✅ COMPLETE
+
+**Advanced Katabatic Wind Prediction System**
+
+The Wind Guru tab now features a sophisticated meteorological analysis engine that predicts katabatic wind conditions with scientific accuracy. Unlike simple weather apps, our system analyzes the specific physics of mountain wind formation.
+
+### How It Works
+
+**4-Factor Scientific Analysis:**
+1. **☔ Precipitation Risk** (30% weight): Rain disrupts katabatic flow
+2. **🌙 Sky Conditions** (25% weight): Clear skies needed for radiative cooling (2-5am)  
+3. **📈 Pressure Changes** (25% weight): Indicates active air movement patterns
+4. **🌡️ Temperature Differential** (20% weight): Valley vs mountain temperature drives flow
+
+**Smart Probability Calculation:**
+- Weighted algorithm considers factor importance
+- Penalty system for unmet critical criteria  
+- Confidence scoring validates prediction reliability
+- Results in probability percentage with explanation
+
+**Example: Understanding 47% Prediction**
+```
+✅ Rain: 17.8% (good, below 20% threshold)
+❌ Sky: 56% clear (poor, below 70% requirement)  
+✅ Pressure: -7.3 hPa change (good, above 2.0 threshold)
+✅ Temp Diff: 6.1°C (good, above 5.0 threshold)
+
+Result: 47% probability, Low confidence → SKIP
+Why: Poor sky conditions prevent reliable cooling
+```
+
+### Katabatic Analysis Features
+
+1. **Real-time Probability Scoring**: Live percentage with visual indicators
+2. **Confidence Assessment**: High/Medium/Low reliability ratings
+3. **Factor-by-Factor Breakdown**: See exactly what's working/not working
+4. **Smart Recommendations**: Clear GO/MAYBE/SKIP guidance with explanations
+5. **Detailed Analysis**: Technical explanations for weather enthusiasts
+6. **Conservative Approach**: Better to miss good conditions than recommend poor ones
 
 ## Getting Started
 
@@ -29,7 +70,7 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 
 ### Default Settings (All Customizable)
 
-- **Minimum Wind Speed**: 10 mph (good for most water activities)
+- **Minimum Wind Speed**: 15 mph (good for most water activities)
 - **Direction Consistency**: 70% (ensures reliable wind patterns)
 - **Required Consecutive Points**: 4 (confirms sustained conditions)
 - **Direction Variation Limit**: 45° (ensures consistent direction)
@@ -63,6 +104,16 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 - Adjust all wind criteria to match your activity needs
 - Changes take effect immediately with real-time analysis update
 - Reset to defaults with a single tap
+
+### Wind Guru Tab
+
+The new **Wind Guru** tab provides advanced katabatic wind prediction:
+
+- **Real-time Prediction**: Live probability scoring with confidence levels
+- **Factor Analysis**: Detailed breakdown of precipitation, sky conditions, pressure, and temperature
+- **Visual Indicators**: Color-coded probability bars and condition status
+- **Smart Recommendations**: Clear GO/MAYBE/SKIP guidance with explanations
+- **Enhanced Insights**: Best time windows and detailed meteorological analysis
 
 ## Customizing Your Experience
 
@@ -98,17 +149,17 @@ Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
 ## Documentation
 
-Comprehensive documentation for this application can be found in the `docs/` directory:
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
-- [Documentation Index](docs/DOCUMENTATION_INDEX.md) - Complete list of all documentation resources
-- [Developer Guide](docs/DEVELOPMENT.md) - For developers contributing to the project
-- [Architecture & Implementation](docs/ARCHITECTURE_AND_IMPLEMENTATION.md) - System design and features
-- [Build & Deployment](docs/BUILD_AND_DEPLOYMENT.md) - Building and deploying the application
+**Quick Links:**
+- 📖 **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
+- 👤 **[User Guide](docs/user-guide.md)** - How to use the app effectively
+- 🔬 **[Wind Prediction Guide](docs/wind-prediction-guide.md)** - Understanding katabatic wind analysis
+- 👨‍💻 **[Developer Setup](docs/developer-setup.md)** - Contributing to the project
+- 🚀 **[Deployment Guide](docs/deployment.md)** - Build and release processes
+- 🛠️ **[Troubleshooting Guide](docs/troubleshooting.md)** - Fixing common issues
 
-### Feature-Specific Documentation
-
-- [Standley Lake Wind Monitor](docs/feature_guides/STANDLEY_LAKE_MONITOR.md) - Using the Standley Lake wind monitoring feature
-- [Android Crash Guide](docs/feature_guides/ANDROID_CRASH_AND_WHITE_SCREEN_GUIDE.md) - Debugging Android-specific issues
+The documentation has been recently reorganized (June 10, 2025) to eliminate sprawl and improve accessibility. Historical development documentation is preserved in `docs/archive/` for reference.
 
 ## CI/CD with GitHub Actions
 
@@ -119,7 +170,7 @@ This project uses GitHub Actions for continuous integration and delivery:
 - Complete signing and packaging for Google Play Store distribution
 
 For details on setting up the CI/CD environment:
-1. See [CI/CD Secrets Setup Guide](docs/CI_CD_SECRETS_SETUP.md)
+1. See [Deployment Guide](docs/deployment.md) for CI/CD configuration details
 2. Review `.github/workflows/android.yml` for workflow configuration
 
 ## Coming Soon

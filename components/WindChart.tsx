@@ -3,20 +3,23 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
+import { filterWindDataByTimeWindow, type TimeWindow } from '@/utils/timeWindowUtils';
 import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import Svg, { Circle, G, Path } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Text } from 'react-native-svg';
 
 interface WindChartProps {
   data: WindDataPoint[];
   title?: string;
   highlightGoodPoints?: boolean; // New prop to highlight consecutive good points
   criteria?: AlarmCriteria; // Optional criteria for determining good points
-  timeWindow?: { startHour: number; endHour: number }; // Optional time window filter
+  timeWindow?: TimeWindow; // Optional time window filter using new TimeWindow type
+  idealWindSpeed?: number; // Optional reference line for ideal wind speed (default: 15 mph)
+  showIdealLine?: boolean; // Whether to show the ideal wind speed reference line (default: true)
 }
 
-export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoints = false, criteria, timeWindow }: WindChartProps) {
+export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoints = false, criteria, timeWindow, idealWindSpeed = 15, showIdealLine = true }: WindChartProps) {
   const handleChartCrash = (error: Error, info: any) => {
     console.error('🚨 WindChart crashed:', error);
     console.error('🚨 Chart data that caused crash:', data);
@@ -24,10 +27,41 @@ export function WindChart({ data, title = 'Wind Speed Trend', highlightGoodPoint
 
   return (
     <DataCrashDetector componentName="WindChart" onCrash={handleChartCrash}>
-      <WindChartContent data={data} title={title} highlightGoodPoints={highlightGoodPoints} criteria={criteria} timeWindow={timeWindow} />
+      <WindChartContent data={data} title={title} highlightGoodPoints={highlightGoodPoints} criteria={criteria} timeWindow={timeWindow} idealWindSpeed={idealWindSpeed} showIdealLine={showIdealLine} />
     </DataCrashDetector>
   );
 }
+
+// Component for rendering fixed Y-axis labels
+interface YAxisLabelsProps {
+  maxSpeed: number;
+  height: number;
+  textColor: string;
+}
+
+const YAxisLabels = ({ maxSpeed, height, textColor }: YAxisLabelsProps) => {
+  // Calculate the maximum Y value in increments of 5
+  const maxYValue = Math.ceil(maxSpeed / 5) * 5;
+  const labels = [];
+  
+  // Create labels from 0 to maxYValue in increments of 5
+  for (let value = 0; value <= maxYValue; value += 5) {
+    // Calculate position to match the chart's internal scaling
+    // The chart scales from 0 to actual maxSpeed, so we need to position based on that
+    const relativePosition = value / maxSpeed; // Use actual maxSpeed, not maxYValue
+    const yPosition = height - 50 - (relativePosition * (height - 70)) - 6; // Align with chart grid
+    
+    labels.push(
+      <View key={value} style={[styles.yAxisLabel, { position: 'absolute', top: yPosition }]}>
+        <ThemedText style={[styles.yAxisLabelText, { color: textColor }]}>
+          {value}
+        </ThemedText>
+      </View>
+    );
+  }
+  
+  return <View style={styles.yAxisLabels}>{labels}</View>;
+};
 
 // Helper function to render wind direction arrow
 interface DirectionArrowProps {
@@ -72,7 +106,7 @@ const DirectionArrow = ({ direction, x, y, size = 14, color = '#000' }: Directio
   );
 };
 
-function WindChartContent({ data, title, highlightGoodPoints = false, criteria, timeWindow }: WindChartProps) {
+function WindChartContent({ data, title, highlightGoodPoints = false, criteria, timeWindow, idealWindSpeed = 15, showIdealLine = true }: WindChartProps) {
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
@@ -92,16 +126,58 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   }
 
   // Filter data based on provided time window or default to 3am-5am alarm window
-  const defaultWindow = { startHour: 3, endHour: 5 };
+  const defaultWindow: TimeWindow = { startHour: 3, endHour: 5 };
   const activeWindow = timeWindow || defaultWindow;
   
-  const recentData = data
-    .filter(point => {
-      const date = new Date(point.time);
-      const hours = date.getHours();
-      return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
-    })
-    .slice(-20); // Limit to 20 points for better chart readability
+  // Use the new filtering logic that handles multi-day scenarios
+  let recentData: WindDataPoint[];
+  if (timeWindow) {
+    // Use smart filtering for time windows (handles day boundaries correctly)
+    const timeFilteredData = filterWindDataByTimeWindow(data, activeWindow);
+    
+    // IMPORTANT: To reduce whitespace gaps, only show data from the first actual data point
+    // instead of trying to show the entire time window when there are gaps
+    if (timeFilteredData.length > 0) {
+      // Find the first data point with meaningful wind data to eliminate leading whitespace
+      // We'll consider any data point with wind speed >= 0.1 mph as meaningful (to handle near-zero but valid readings)
+      const firstValidIndex = timeFilteredData.findIndex(point => {
+        const speed = typeof point.windSpeed === 'string' ? parseFloat(point.windSpeed) : point.windSpeed;
+        return !isNaN(speed) && speed >= 0.1;
+      });
+      
+      // If we found valid data, start from there, but ensure we don't cut off too much data
+      // If no meaningful wind data found, or if the first valid point is more than 25% into the data,
+      // just use all the filtered data to avoid cutting off potentially important information
+      if (firstValidIndex >= 0 && firstValidIndex < timeFilteredData.length * 0.25) {
+        recentData = timeFilteredData.slice(firstValidIndex);
+        console.log('🎯 Gap reduction applied:', {
+          originalFiltered: timeFilteredData.length,
+          afterGapReduction: recentData.length,
+          firstValidIndex: firstValidIndex,
+          firstPointTime: new Date(recentData[0].time).toISOString(),
+          firstPointSpeed: typeof recentData[0].windSpeed === 'string' ? parseFloat(recentData[0].windSpeed) : recentData[0].windSpeed
+        });
+      } else {
+        recentData = timeFilteredData;
+        console.log('🎯 Gap reduction skipped - no early valid data found or would cut too much data:', {
+          originalFiltered: timeFilteredData.length,
+          firstValidIndex: firstValidIndex
+        });
+      }
+    } else {
+      recentData = timeFilteredData;
+    }
+  } else {
+    // Keep original simple filtering for default 3am-5am alarm window
+    recentData = data
+      .filter(point => {
+        const date = new Date(point.time);
+        const hours = date.getHours();
+        return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
+      });
+    // Show more data points for scrollable chart (last 4 hours by default, or all filtered data)
+    recentData = recentData.slice(-48); // 48 points = 4 hours of 5-minute intervals
+  }
 
   if (recentData.length < 2) {
     return (
@@ -109,7 +185,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
         <View style={styles.noDataContainer}>
           <ThemedText style={styles.noDataText}>
-            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour}am window to display chart
+            Not enough data points in {activeWindow.startHour}am-{activeWindow.endHour > 12 ? `${activeWindow.endHour - 12}pm` : `${activeWindow.endHour}am`} window to display chart
           </ThemedText>
         </View>
       </ThemedView>
@@ -157,7 +233,9 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   
   const labels = recentData.map((point, index) => {
     try {
-      if (index % Math.ceil(recentData.length / 4) === 0) {
+      // Show labels more frequently, but ensure we have at least a few
+      const labelInterval = Math.max(1, Math.ceil(recentData.length / 6)); // Show 6 labels max
+      if (index % labelInterval === 0 || index === recentData.length - 1) {
         const time = new Date(point.time);
         if (isNaN(time.getTime())) {
           return '';
@@ -170,6 +248,23 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       return '';
     }
   });
+
+  // Ensure we have at least some labels for the chart
+  const hasValidLabels = labels.some(label => label !== '');
+  if (!hasValidLabels && recentData.length > 0) {
+    console.warn('⚠️ No valid labels generated, creating fallback labels');
+    // Create simple index-based labels as fallback
+    for (let i = 0; i < labels.length; i++) {
+      if (i % Math.max(1, Math.ceil(labels.length / 4)) === 0) {
+        try {
+          const time = new Date(recentData[i].time);
+          labels[i] = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch {
+          labels[i] = `T${i}`;
+        }
+      }
+    }
+  }
 
   const chartData = {
     labels,
@@ -199,8 +294,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         strokeWidth: 1,
         withDots: false,
       }
-    ],
-    legend: ['Wind Speed', 'Gusts']
+    ]
   };
 
   const chartConfig = {
@@ -234,18 +328,29 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       strokeWidth: 1,
       stroke: (textColor || '#000000') + '20',
     },
+    propsForLabels: {
+      fontSize: 12,
+      fontFamily: 'System',
+    },
   };
 
   const screenWidth = Dimensions.get('window').width;
-  const chartHeight = 200;
-  const chartWidth = screenWidth - 40;
+  const chartHeight = 220; // Increased height to accommodate x-axis labels
+  // Calculate chart width based on data points for scrollable experience
+  // Minimum width of screen, but expand based on data points for better readability
+  const minChartWidth = screenWidth - 40;
+  const pointWidth = 20; // Width per data point for comfortable spacing
+  const calculatedWidth = Math.max(minChartWidth, recentData.length * pointWidth);
+  const chartWidth = calculatedWidth;
 
   // Calculate where the direction arrows should be placed
   const chartInnerWidth = chartWidth - 60; // Adjusted for better positioning
   const chartInnerHeight = chartHeight - 50; // Adjusted for better positioning
   const chartLeft = 50; // Left padding of the chart
   const chartTop = 20; // Top padding of the chart
-  const maxSpeed = Math.max(...speeds, ...gusts) || 1;
+  const dataMaxSpeed = Math.max(...speeds, ...gusts) || 1;
+  // Round up to nearest 5 to match Y-axis labels
+  const maxSpeed = Math.ceil(dataMaxSpeed / 5) * 5;
   
   // Calculate positions for direction arrows with proper typing
   const arrowPositions = recentData
@@ -260,7 +365,8 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
       const speedValue = typeof point.windSpeed === 'string' 
         ? parseFloat(point.windSpeed) 
         : point.windSpeed;
-      const y = chartTop + (1 - (speedValue / maxSpeed)) * chartInnerHeight;
+      // Move arrows up by 25 pixels from the data point to make them more visible
+      const y = chartTop + (1 - (speedValue / maxSpeed)) * chartInnerHeight - 25;
       
       return {
         x,
@@ -293,79 +399,116 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
-      <View style={styles.chartContainer}>
-        {/* Render chart with error handling */}
-        {(() => {
-          try {
-            return (
-              <View>
-                <View style={styles.chartWithOverlay}>
-                  <LineChart
-                    data={chartData}
-                    width={chartWidth}
-                    height={chartHeight}
-                    chartConfig={chartConfig}
-                    bezier
-                    style={styles.chart}
-                    withInnerLines={true}
-                    withOuterLines={true}
-                    withVerticalLabels={true}
-                    withHorizontalLabels={true}
-                    fromZero={true}
-                  />
-                  
-                  {/* Overlay for wind direction arrows and good point highlights */}
-                  <View style={styles.windDirectionOverlay}>
-                    <Svg width={chartWidth} height={chartHeight}>
-                      {/* Render good point highlights */}
-                      {goodPointPositions.map((pos, i) => (
-                        <Circle 
-                          key={`good-${i}`}
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={6}
-                          fill="rgba(76, 175, 80, 0.3)"
-                          stroke="#4CAF50"
-                          strokeWidth={2}
-                        />
-                      ))}
-                      
-                      {/* Render direction arrows */}
-                      {arrowPositions.map((pos, i) => (
-                        <DirectionArrow 
-                          key={`dir-${i}`}
-                          x={pos.x}
-                          y={pos.y}
-                          direction={pos.direction}
-                          color={directionColor}
-                          size={16}
-                        />
-                      ))}
-                    </Svg>
+      
+      <View style={styles.chartAreaContainer}>
+        <YAxisLabels 
+          maxSpeed={maxSpeed} 
+          height={chartHeight} 
+          textColor={textColor} 
+        />
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={true}
+          style={styles.chartScrollContainer}
+          contentContainerStyle={styles.chartScrollContent}
+        >
+          <View style={styles.chartContainer}>
+            {(() => {
+              try {
+                return (
+                  <View style={styles.chartWithOverlay}>
+                    <LineChart
+                      data={chartData}
+                      width={chartWidth}
+                      height={chartHeight}
+                      chartConfig={chartConfig}
+                      bezier
+                      style={styles.chart}
+                      withInnerLines={true}
+                      withOuterLines={true}
+                      withVerticalLabels={true}
+                      withHorizontalLabels={false}
+                      fromZero={true}
+                      yAxisInterval={1}
+                      segments={4}
+                      horizontalLabelRotation={0}
+                      verticalLabelRotation={0}
+                    />
+                    <View style={styles.windDirectionOverlay}>
+                      <Svg width={chartWidth} height={chartHeight - 30}>
+                        {/* Ideal wind speed reference line */}
+                        {showIdealLine && idealWindSpeed <= maxSpeed && (
+                          <G>
+                            <Line
+                              x1={chartLeft}
+                              y1={chartTop + (1 - (idealWindSpeed / maxSpeed)) * chartInnerHeight}
+                              x2={chartLeft + chartInnerWidth}
+                              y2={chartTop + (1 - (idealWindSpeed / maxSpeed)) * chartInnerHeight}
+                              stroke="#FF8C00"
+                              strokeWidth={2}
+                              strokeDasharray="8,4"
+                              opacity={0.8}
+                            />
+                            <Text
+                              x={chartLeft + chartInnerWidth - 5}
+                              y={chartTop + (1 - (idealWindSpeed / maxSpeed)) * chartInnerHeight - 5}
+                              fill="#FF8C00"
+                              fontSize="10"
+                              textAnchor="end"
+                              opacity={0.9}
+                            >
+                              {idealWindSpeed}mph
+                            </Text>
+                          </G>
+                        )}
+                        {goodPointPositions.map((pos, i) => (
+                          <Circle 
+                            key={`good-${i}`}
+                            cx={pos.x}
+                            cy={pos.y}
+                            r={6}
+                            fill="rgba(76, 175, 80, 0.3)"
+                            stroke="#4CAF50"
+                            strokeWidth={2}
+                          />
+                        ))}
+                        {arrowPositions.map((pos, i) => (
+                          <DirectionArrow 
+                            key={`dir-${i}`}
+                            x={pos.x}
+                            y={pos.y}
+                            direction={pos.direction}
+                            color={directionColor}
+                            size={16}
+                          />
+                        ))}
+                      </Svg>
+                    </View>
                   </View>
-                </View>
-              </View>
-            );
-          } catch (error) {
-            console.error('🚨 LineChart rendering error:', error);
-            return (
-              <View style={styles.noDataContainer}>
-                <ThemedText style={styles.noDataText}>
-                  Chart rendering failed. Please try refreshing.
-                </ThemedText>
-              </View>
-            );
-          }
-        })()}
+                );
+              } catch (error) {
+                console.error('🚨 LineChart rendering error:', error);
+                return (
+                  <View style={styles.noDataContainer}>
+                    <ThemedText style={styles.noDataText}>
+                      Chart rendering failed. Please try refreshing.
+                    </ThemedText>
+                  </View>
+                );
+              }
+            })()}
+          </View>
+        </ScrollView>
       </View>
+      
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
           <View style={[styles.legendColor, { backgroundColor: tintColor }]} />
-          <ThemedText style={styles.legendText}>Wind Speed (mph)</ThemedText>
+          <ThemedText style={styles.legendText}>Wind Speed</ThemedText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendColor, { backgroundColor: '#FF6B6B' }]} />
-          <ThemedText style={styles.legendText}>Gusts (mph)</ThemedText>
+          <ThemedText style={styles.legendText}>Gusts</ThemedText>
         </View>
         <View style={styles.legendItem}>
           <View style={styles.legendArrow}>
@@ -373,6 +516,12 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
           </View>
           <ThemedText style={styles.legendText}>Wind Direction</ThemedText>
         </View>
+        {showIdealLine && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDashedLine]} />
+            <ThemedText style={styles.legendText}>Ideal for Wind Sports ({idealWindSpeed}mph)</ThemedText>
+          </View>
+        )}
         {highlightGoodPoints && (
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, { backgroundColor: 'rgba(76, 175, 80, 0.3)', borderWidth: 1, borderColor: '#4CAF50' }]} />
@@ -380,6 +529,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
           </View>
         )}
       </View>
+      
       <View style={styles.statsContainer}>
         <View style={styles.stat}>
           <ThemedText style={styles.statValue}>
@@ -401,7 +551,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
         </View>
       </View>
       
-      {/* Add a wind direction rose or compass section */}
       <View style={styles.directionContainer}>
         <ThemedText style={styles.directionTitle}>Wind Direction</ThemedText>
         <View style={styles.directionInfo}>
@@ -412,12 +561,10 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                 <ThemedText style={styles.compassE}>E</ThemedText>
                 <ThemedText style={styles.compassS}>S</ThemedText>
                 <ThemedText style={styles.compassW}>W</ThemedText>
-                {/* Calculate dominant direction */}
                 {(() => {
                   const validDirections = directions.filter(dir => dir !== null) as number[];
                   if (validDirections.length === 0) return null;
                   
-                  // Calculate average direction using circular statistics
                   let sumSin = 0;
                   let sumCos = 0;
                   validDirections.forEach(dir => {
@@ -427,7 +574,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                   });
                   
                   const avgDirection = ((Math.atan2(sumSin, sumCos) * 180 / Math.PI) + 360) % 360;
-                  // In the compass, we don't rotate 180° since we want to show where wind is coming FROM
                   const rotation = avgDirection;
                   
                   return (
@@ -451,7 +597,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                       sumCos += Math.cos(rad);
                     });
                     
-                    // Calculate average direction
                     const avgDirection = ((Math.atan2(sumSin, sumCos) * 180 / Math.PI) + 360) % 360;
                     const directionName = getDirectionName(avgDirection);
                     
@@ -497,9 +642,10 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: 8,
+    marginVertical: 8, // Add vertical margin for label space
   },
   noDataContainer: {
-    height: 200,
+    height: 220, // Match the updated chart height
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -532,6 +678,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 'bold',
+  },
+  legendDashedLine: {
+    width: 16,
+    height: 2,
+    backgroundColor: '#FF8C00',
+    opacity: 0.8,
   },
   legendText: {
     fontSize: 12,
@@ -625,8 +777,53 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 30, // Leave space for x-axis labels
     zIndex: 10,
     pointerEvents: 'none'  // Makes sure this layer doesn't block touch events
-  }
+  },
+  chartScrollContainer: {
+    flex: 1,
+    marginLeft: 50, // Leave space for the fixed Y-axis labels
+  },
+  chartScrollContent: {
+    alignItems: 'center',
+  },
+  yAxisContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 50,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 8,
+    zIndex: 5,
+  },
+  yAxisLabel: {
+    fontSize: 10,
+    opacity: 0.7,
+    textAlign: 'right',
+  },
+  yAxisLabels: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 50,
+    justifyContent: 'space-between',
+    paddingRight: 8,
+    zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  yAxisLabelText: {
+    fontSize: 10,
+    opacity: 0.7,
+    textAlign: 'right',
+  },
+  chartAreaContainer: {
+    flexDirection: 'row',
+    position: 'relative',
+    height: 220, // Accommodate chart height + padding
+    backgroundColor: 'transparent',
+  },
 });

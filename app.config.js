@@ -4,7 +4,7 @@ export default {
   expo: {
     name: "Dawn Patrol Alarm",
     slug: "dp-soda",
-    version: "1.0.2",
+    version: "1.0.3",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dpsoda",
@@ -12,10 +12,14 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.samqbush.dpsoda",
-      buildNumber: "2",
+      buildNumber: "3",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
-      }
+      },
+      backgroundModes: [
+        "audio",
+        "background-processing"
+      ]
     },
     android: {
       package: "com.samqbush.dpsoda",
@@ -28,14 +32,17 @@ export default {
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
         "VIBRATE",
-        "AUDIO_SETTINGS"
+        "AUDIO_SETTINGS",
+        "MODIFY_AUDIO_SETTINGS",
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK"
       ],
       blockedPermissions: [
         "android.permission.RECORD_AUDIO"
       ],
       softwareKeyboardLayoutMode: "pan",
       allowBackup: true,
-      versionCode: 6,
+      versionCode: 7,
       theme: "@style/Theme.App.SplashScreen",
       jsEngine: "jsc",
       enableHermes: false,
@@ -49,6 +56,16 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/icon.png",
+          color: "#1E3D58",
+          sounds: ["./assets/sounds/alarm.mp3"],
+          mode: "production"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -90,6 +107,7 @@ export default {
         projectId: "c70a6758-5324-40f2-ae28-646f452607f2"
       },
       // Environment variables for secure API access
+      OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY,
       ECOWITT_APPLICATION_KEY: process.env.ECOWITT_APPLICATION_KEY,
       ECOWITT_API_KEY: process.env.ECOWITT_API_KEY
     },

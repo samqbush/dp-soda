@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useStandleyLakeWind } from '@/hooks/useStandleyLakeWind';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function StandleyLakeScreen() {
   const {
@@ -25,10 +27,18 @@ export default function StandleyLakeScreen() {
     clearCache
   } = useStandleyLakeWind();
 
-  const textColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
+  // const textColor = useThemeColor({}, 'text'); // Currently unused
+  // const backgroundColor = useThemeColor({}, 'background'); // Currently unused
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+
+  // Auto-refresh data when tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🏔️ Standley Lake tab focused - refreshing data...');
+      refreshData();
+    }, [refreshData])
+  );
 
   const handleRefresh = async () => {
     await refreshData();
@@ -142,7 +152,7 @@ export default function StandleyLakeScreen() {
             <WindChart
               data={chartData}
               title="Today's Wind Speed"
-              timeWindow={{ startHour: 0, endHour: 23 }} // Show full day
+              timeWindow={getWindChartTimeWindow()} // Use smart time window (4am to current, max 9pm)
             />
           </View>
         ) : (
@@ -156,7 +166,7 @@ export default function StandleyLakeScreen() {
         {/* Analysis */}
         {analysis && (
           <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>Wind Analysis</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
             <ThemedText style={styles.analysisText}>
               Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
               Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}
