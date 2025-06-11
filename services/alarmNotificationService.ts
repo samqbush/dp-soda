@@ -73,7 +73,8 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
   async scheduleAlarmNotification(
     triggerDate: Date,
     title: string,
-    body: string
+    body: string,
+    data?: any
   ): Promise<string | null> {
     try {
       if (!this.isNotificationSupported()) {
@@ -120,6 +121,7 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
           sound: 'default',
           priority: 'high',
           categoryIdentifier: 'wind-alarm',
+          data: data || {},
         },
         trigger: {
           seconds: secondsUntilTrigger,

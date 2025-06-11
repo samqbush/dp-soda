@@ -403,4 +403,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Testing components removed - replaced with unified AlarmTestingPanel
+// Testing functionality is now handled by SimpleAlarmTester component above

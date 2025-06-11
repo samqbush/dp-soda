@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 import { AlarmLogger } from './alarmDebugLogger';
 
 /**
@@ -121,18 +122,31 @@ class NotificationListeners {
    */
   private async handleNotificationResponse(response: Notifications.NotificationResponse): Promise<void> {
     try {
-      const { categoryIdentifier, title, body } = response.notification.request.content;
+      const { categoryIdentifier, title, body, data } = response.notification.request.content;
       const { actionIdentifier } = response;
       
       AlarmLogger.info('🔔 NOTIFICATION TAPPED (app opened from notification):', {
         categoryIdentifier,
         title,
         body,
-        actionIdentifier
+        actionIdentifier,
+        data
       });
 
       // Check if this is a wind alarm notification
       if (categoryIdentifier === 'wind-alarm' || categoryIdentifier === 'wind-alarm-test') {
+        
+        // Handle deep link navigation if present
+        if (data && data.deepLink && typeof data.deepLink === 'string') {
+          AlarmLogger.info('🔗 Deep link detected in notification:', data.deepLink);
+          try {
+            router.push(data.deepLink as any); // Cast to satisfy Expo Router types
+            AlarmLogger.success('✅ Successfully navigated to deep link:', data.deepLink);
+          } catch (deepLinkError) {
+            AlarmLogger.error('❌ Failed to navigate to deep link:', deepLinkError);
+          }
+        }
+        
         if (actionIdentifier === 'CHECK_CONDITIONS') {
           AlarmLogger.info('⏰ User tapped "Check Conditions" - triggering alarm check');
           await this.triggerAlarmFromNotification(title || 'Dawn Patrol Alarm', body || 'Wind conditions check');

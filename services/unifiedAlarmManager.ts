@@ -267,7 +267,8 @@ class UnifiedAlarmManager {
         await alarmNotificationService.scheduleAlarmNotification(
           triggerTime,
           '🧪 Test Alarm - Background Check!',
-          `This is a test alarm scheduled ${delaySeconds} seconds ago. If you see this, background alarms are working!`
+          `This is a test alarm scheduled ${delaySeconds} seconds ago. If you see this, background alarms are working!`,
+          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
         );
       }
       
@@ -305,7 +306,8 @@ class UnifiedAlarmManager {
         await alarmNotificationService.scheduleAlarmNotification(
           triggerTime,
           '⭐ Ideal Conditions Test!',
-          `Perfect wind conditions detected! This delayed test simulates ideal dawn patrol conditions.`
+          `Perfect wind conditions detected! This delayed test simulates ideal dawn patrol conditions.`,
+          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
         );
       }
       
@@ -534,9 +536,10 @@ class UnifiedAlarmManager {
         await alarmNotificationService.scheduleAlarmNotification(
           new Date(Date.now() + 1000), // Send after 1 second
           '🚨 ALARM RINGING!',
-          `${message}\n\nYour alarm is playing! Tap to open app and stop alarm.`
+          `${message}\n\nYour alarm is playing! Tap to open app and stop alarm.`,
+          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
         );
-        AlarmLogger.info('📱 Convenience notification sent to help user access app');
+        AlarmLogger.info('📱 Convenience notification sent to help user access app with deep link to DP alarm page');
       }
       
     } catch (error) {
