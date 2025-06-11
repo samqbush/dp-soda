@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { weatherService, WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
+import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
+import { hybridWeatherService } from '@/services/hybridWeatherService';
 import { useKatabaticAnalyzer } from '@/hooks/useKatabaticAnalyzer';
 import { katabaticAnalyzer } from '@/services/katabaticAnalyzer';
 
@@ -17,14 +18,14 @@ export const useWeatherData = () => {
   const katabaticAnalysis = useKatabaticAnalyzer(weatherData);
 
   /**
-   * Fetch weather data from the weather service
+   * Fetch weather data from the hybrid weather service
    */
   const fetchWeatherData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const data = await weatherService.fetchWeatherData();
+      const data = await hybridWeatherService.fetchHybridWeatherData();
       
       setWeatherData(data);
       setLastUpdated(new Date(data.lastFetch));
@@ -46,7 +47,7 @@ export const useWeatherData = () => {
    * Refresh weather data (force fetch)
    */
   const refreshData = useCallback(async () => {
-    await weatherService.clearCache();
+    await hybridWeatherService.clearCache();
     await fetchWeatherData();
   }, [fetchWeatherData]);
 
@@ -55,7 +56,7 @@ export const useWeatherData = () => {
    */
   const clearCache = useCallback(async () => {
     try {
-      await weatherService.clearCache();
+      await hybridWeatherService.clearCache();
       setWeatherData(null);
       setLastUpdated(null);
       setError(null);
@@ -393,14 +394,14 @@ export const useWeatherData = () => {
    * Set OpenWeatherMap API key manually
    */
   const setApiKey = useCallback((apiKey: string) => {
-    weatherService.setApiKey(apiKey);
+    hybridWeatherService.setApiKey(apiKey);
   }, []);
 
   /**
    * Check if API key is configured
    */
   const isApiKeyConfigured = useCallback(() => {
-    return weatherService.isApiKeyConfigured();
+    return hybridWeatherService.isApiKeyConfigured();
   }, []);
 
   /**

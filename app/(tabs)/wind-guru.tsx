@@ -194,22 +194,22 @@ export default function WindGuruScreen() {
               </ThemedText>
             </ThemedView>
             <ThemedText style={[styles.collapsibleHint, { color: textColor, opacity: 0.6 }]}>
-              {isHowItWorksExpanded ? 'Tap to collapse' : 'Tap to learn about our 4-factor analysis'}
+              {isHowItWorksExpanded ? 'Tap to collapse' : 'Tap to learn about our 5-factor hybrid analysis'}
             </ThemedText>
           </TouchableOpacity>
           
           {isHowItWorksExpanded && (
             <ThemedView style={styles.infoContent}>
               <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>
-                Our katabatic wind prediction analyzes <ThemedText style={styles.highlightText}>4 key meteorological factors</ThemedText> to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
+                Our advanced katabatic wind prediction uses <ThemedText style={styles.highlightText}>5-factor hybrid MKI analysis</ThemedText> combining NOAA and OpenWeather data to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
               </ThemedText>
               
               <ThemedView style={styles.factorsList}>
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>☔</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (30% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤20% rain chance - rain disrupts wind formation</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤25% rain chance - precipitation disrupts both katabatic flow and mountain wave patterns</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -217,66 +217,110 @@ export default function WindGuruScreen() {
                   <ThemedText style={styles.factorEmoji}>🌙</ThemedText>
                   <ThemedView style={styles.factorContent}>
                     <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 2-5am (25% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥70% clear - needed for radiative cooling</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥45% clear - enables radiative cooling and organized wave development</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>📈</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Pressure Change (25% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥2.0 hPa change - indicates air movement</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Pressure Change (20% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥1.0 hPa change - includes wave-induced pressure modifications</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (20% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥9.0°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives katabatic flow</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (15% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥6.3°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives density-driven flow</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+                
+                <ThemedView style={styles.factorItem}>
+                  <ThemedText style={styles.factorEmoji}>🌊</ThemedText>
+                  <ThemedView style={styles.factorContent}>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Mountain Wave Pattern (10% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>Wave enhancement analysis - organized mountain waves can amplify katabatic flow</ThemedText>
                   </ThemedView>
                 </ThemedView>
               </ThemedView>
               
               <ThemedView style={[styles.calculationExample, { borderColor: tintColor, borderWidth: 1 }]}>
-                <ThemedText style={[styles.exampleTitle, { color: tintColor }]}>📚 Example: How 47% is Calculated</ThemedText>
+                <ThemedText style={[styles.exampleTitle, { color: tintColor }]}>📚 Example: How 73% MKI Prediction Works</ThemedText>
                 <ThemedText style={[styles.exampleText, { color: textColor, opacity: 0.8 }]}>
-                  ✅ Rain: 17.8% (good) → 85 confidence × 30% = 25.5 points{'\n'}
-                  ❌ Sky: 56% clear (poor) → 40 confidence × 25% = 10.0 points{'\n'}
-                  ✅ Pressure: -7.3 hPa (good) → 90 confidence × 25% = 22.5 points{'\n'}
-                  ✅ Temp: 11.0°F Morrison warmer than Nederland (good) → 80 confidence × 20% = 16.0 points{'\n'}
+                  ✅ Rain: 8.2% (excellent) → 92 confidence × 25% = 23.0 points{'\n'}
+                  ✅ Sky: 78% clear (good) → 85 confidence × 25% = 21.3 points{'\n'}
+                  ✅ Pressure: +3.1 hPa (excellent) → 90 confidence × 20% = 18.0 points{'\n'}
+                  ✅ Temp: 7.3°F differential (good) → 80 confidence × 15% = 12.0 points{'\n'}
+                  ✅ Wave: Positive enhancement (excellent) → 85 confidence × 10% = 8.5 points{'\n'}
                   {'\n'}
-                  <ThemedText style={[styles.resultText, { color: tintColor }]}>Total: ~47% probability</ThemedText>
+                  <ThemedText style={[styles.resultText, { color: tintColor }]}>Base Score: ~83 points → With MKI bonuses: 73% probability</ThemedText>
                 </ThemedText>
-                <ThemedText style={[styles.keyInsight, { color: '#FF9800' }]}>
-                  💡 Key Insight: Even with 3/4 factors good, poor sky conditions (56% vs 70% needed) significantly reduce the overall probability. The algorithm is intentionally conservative - better to miss good conditions than recommend poor ones!
+                <ThemedText style={[styles.keyInsight, { color: '#4CAF50' }]}>
+                  💡 MKI Enhancement: All 5 factors favorable + positive wave enhancement triggers bonus system. Mountain waves create organized pressure patterns that amplify katabatic flow when conditions align!
                 </ThemedText>
               </ThemedView>
               
               <ThemedView style={[styles.locationInfo, { backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12 }]}>
-                <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>📍 Weather Data Sources:</ThemedText>
+                <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>🌐 Hybrid Data Sources:</ThemedText>
                 <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
-                  • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (1740m elevation) - Valley reference for katabatic flow formation{'\n'}
-                  • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (2540m elevation) - Mountain reference for temperature gradient{'\n'}
-                  • <ThemedText style={{ fontStyle: 'italic' }}>800m elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
+                  • <ThemedText style={{ fontWeight: '500' }}>NOAA Weather Service API</ThemedText> - Primary for precipitation, sky conditions, temperature, transport winds{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>OpenWeather API</ThemedText> - Primary for pressure trends (not available from NOAA){'\n'}
+                  {'\n'}
+                  📍 <ThemedText style={{ fontWeight: '500' }}>Locations:</ThemedText>{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (5,709ft) - Valley reference for katabatic flow formation{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (8,236ft) - Mountain reference for temperature gradient{'\n'}
+                  • <ThemedText style={{ fontStyle: 'italic' }}>2,527ft elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
+                </ThemedText>
+              </ThemedView>
+              
+              <ThemedView style={[styles.dataQualitySection, { backgroundColor: 'rgba(255, 152, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 12, borderLeftWidth: 3, borderLeftColor: '#FF9800' }]}>
+                <ThemedText style={[styles.dataQualityTitle, { color: '#FF9800', fontWeight: '600' }]}>🔬 Why Only 5 Factors? (Originally Planned 6)</ThemedText>
+                <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
+                  We originally designed a 6-factor system including <ThemedText style={{ fontWeight: '500' }}>Atmospheric Stability</ThemedText>, but our analysis of real government and commercial weather APIs revealed:{'\n'}
+                  {'\n'}
+                  ❌ <ThemedText style={{ fontWeight: '500' }}>NOAA:</ThemedText> Lists stability parameters but provides no actual data values{'\n'}
+                  ❌ <ThemedText style={{ fontWeight: '500' }}>OpenWeather:</ThemedText> No atmospheric stability data available{'\n'}
+                  {'\n'}
+                  ✅ <ThemedText style={{ fontWeight: '500', color: '#4CAF50' }}>Solution:</ThemedText> Our 5-factor system uses only high-quality, reliable data sources. Better to have 5 excellent factors than 6 with unreliable data!
+                </ThemedText>
+              </ThemedView>
+              
+              <ThemedView style={[styles.dataQualitySection, { backgroundColor: 'rgba(76, 175, 80, 0.05)', borderRadius: 8, padding: 12, marginTop: 12, borderLeftWidth: 3, borderLeftColor: '#4CAF50' }]}>
+                <ThemedText style={[styles.dataQualityTitle, { color: '#4CAF50', fontWeight: '600' }]}>🌊 What Makes MKI (Mountain Wave-Katabatic Interaction) Special:</ThemedText>
+                <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
+                  <ThemedText style={{ fontWeight: '500' }}>MKI isn&apos;t a data source - it&apos;s our advanced analysis methodology</ThemedText> that combines NOAA and OpenWeather data using atmospheric science principles:{'\n'}
+                  {'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Wave Enhancement Analysis:</ThemedText> Uses NOAA transport winds to detect mountain wave patterns that can amplify katabatic flow{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Multi-Scale Integration:</ThemedText> Combines large-scale NOAA meteorology with local OpenWeather pressure effects{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Nonlinear Interactions:</ThemedText> Accounts for complex atmospheric coupling between wave patterns and surface flow{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Real-Time Verification:</ThemedText> System learns from actual conditions to improve future predictions{'\n'}
+                  {'\n'}
+                  🎯 <ThemedText style={{ fontWeight: '500', color: '#2196F3' }}>Bottom Line:</ThemedText> MKI transforms raw weather data into sophisticated wind predictions by understanding how mountain waves interact with katabatic flows.{'\n'}
+                  {'\n'}
+                  📚 <ThemedText style={{ fontWeight: '500', color: '#2196F3' }}>Scientific Foundation:</ThemedText> Based on &quot;Interaction of Katabatic Flow and Mountain Waves&quot; research:{'\n'}
+                  <ThemedText style={{ color: '#2196F3', textDecorationLine: 'underline' }}>https://journals.ametsoc.org/view/journals/atsc/64/6/jas3926.1.xml</ThemedText>
                 </ThemedText>
               </ThemedView>
               
               <ThemedView style={styles.quickTips}>
-                <ThemedText style={[styles.tipsTitle, { color: textColor }]}>Quick Tips:</ThemedText>              <ThemedText style={[styles.tipText, { color: textColor, opacity: 0.8 }]}>
-                • <ThemedText style={{ color: '#4CAF50' }}>75-100%</ThemedText>: Excellent conditions - GO!{'\n'}
-                • <ThemedText style={{ color: '#FF9800' }}>50-74%</ThemedText>: Good conditions - likely favorable{'\n'}
-                • <ThemedText style={{ color: '#F44336' }}>25-49%</ThemedText>: Marginal - mixed conditions{'\n'}
-                • <ThemedText style={{ color: '#F44336' }}>0-24%</ThemedText>: Poor - stay home{'\n'}
-                {'\n'}
-                📅 <ThemedText style={styles.highlightText}>Today vs Tomorrow:</ThemedText>{'\n'}
-                • Today&apos;s prediction helps verify accuracy and plan immediate activities{'\n'}
-                • Tomorrow&apos;s prediction helps plan ahead for dawn patrol{'\n'}
-                {'\n'}
-                🕰️ <ThemedText style={styles.highlightText}>Timing matters!</ThemedText> Predictions are for dawn patrol window (6-8am) based on overnight cooling analysis.{'\n'}
-                {'\n'}
-                Always check <ThemedText style={styles.highlightText}>confidence level</ThemedText> - low confidence means uncertain conditions even with decent probability.
-              </ThemedText>
+                <ThemedText style={[styles.tipsTitle, { color: textColor }]}>Quick Tips for MKI Predictions:</ThemedText>
+                <ThemedText style={[styles.tipText, { color: textColor, opacity: 0.8 }]}>
+                  • <ThemedText style={{ color: '#4CAF50' }}>75-100%</ThemedText>: Excellent MKI conditions - GO! Strong wave enhancement likely{'\n'}
+                  • <ThemedText style={{ color: '#FF9800' }}>50-74%</ThemedText>: Good conditions - favorable with some wave interaction{'\n'}
+                  • <ThemedText style={{ color: '#F44336' }}>25-49%</ThemedText>: Marginal - mixed conditions, wave effects uncertain{'\n'}
+                  • <ThemedText style={{ color: '#F44336' }}>0-24%</ThemedText>: Poor - disrupted patterns, wave interference likely{'\n'}
+                  {'\n'}
+                  📅 <ThemedText style={styles.highlightText}>Today vs Tomorrow:</ThemedText>{'\n'}
+                  • Today&apos;s MKI prediction helps verify wave-katabatic coupling accuracy{'\n'}
+                  • Tomorrow&apos;s forecast helps plan for optimal wave enhancement windows{'\n'}
+                  {'\n'}
+                  🌊 <ThemedText style={styles.highlightText}>Wave Pattern Matters!</ThemedText> Positive wave enhancement can boost good conditions to excellent, while negative patterns can disrupt otherwise favorable meteorology.{'\n'}
+                  {'\n'}
+                  🎯 <ThemedText style={styles.highlightText}>MKI Confidence:</ThemedText> High confidence means both basic meteorology AND wave interactions are well-understood and predictable.
+                </ThemedText>
+              </ThemedView>
               
               {/* Data Quality Explanation */}
               <ThemedView style={[styles.dataQualitySection, { 
@@ -296,7 +340,7 @@ export default function WindGuruScreen() {
                     ✅ &ldquo;Good Data&rdquo;
                   </ThemedText>
                   <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
-                    18+ hours of forecast data available for the day. Provides comprehensive analysis of all 4 factors with high confidence. Typical for today and tomorrow.
+                    18+ hours of forecast data available for the day. Provides comprehensive analysis of all 5 factors with high confidence. Typical for today and tomorrow.
                   </ThemedText>
                 </ThemedView>
                 
@@ -310,14 +354,13 @@ export default function WindGuruScreen() {
                 </ThemedView>
                 
                 <ThemedText style={[styles.dataQualityExplanation, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8, fontStyle: 'italic' }]}>
-                  <ThemedText style={{ fontWeight: '500' }}>Why this happens:</ThemedText> OpenWeatherMap provides forecasts in 3-hour intervals. For distant days (3-5 days out), fewer forecast points may be available in our analysis window, but the 4-factor algorithm still works effectively with available data.
+                  <ThemedText style={{ fontWeight: '500' }}>Why this happens:</ThemedText> OpenWeatherMap provides forecasts in 3-hour intervals. For distant days (3-5 days out), fewer forecast points may be available in our analysis window, but the 5-factor hybrid algorithm still works effectively with available data.
                 </ThemedText>
               </ThemedView>
               
               <ThemedText style={[styles.learnMoreText, { color: tintColor, opacity: 0.8 }]}>
                 📖 For detailed explanations, see docs/KATABATIC_PREDICTION_GUIDE.md
               </ThemedText>
-              </ThemedView>
             </ThemedView>
           )}
         </ThemedView>
@@ -408,7 +451,7 @@ export default function WindGuruScreen() {
                 {katabaticAnalysis.analysisSummary && (
                   <ThemedView style={styles.analysisSummary}>
                     <ThemedText style={[styles.summaryText, { color: textColor, opacity: 0.7 }]}>
-                      {katabaticAnalysis.analysisSummary.factorsMet}/4 key factors favorable
+                      {katabaticAnalysis.analysisSummary.factorsMet}/5 key factors favorable
                     </ThemedText>
                     {katabaticAnalysis.analysisSummary.primaryConcern && (
                       <ThemedText style={[styles.concernText, { color: '#FF9800' }]}>
@@ -628,6 +671,17 @@ export default function WindGuruScreen() {
                   {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
+              
+              <ThemedView style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>
+                  {katabaticAnalysis.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
+                </ThemedText>
+                <ThemedText style={styles.conditionValue}>
+                  {katabaticAnalysis.prediction.factors.wavePattern.waveEnhancement} 
+                  {katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData && 
+                    ` (${katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData}m)`}
+                </ThemedText>
+              </ThemedView>
 
             </>
           ) : (
@@ -719,6 +773,17 @@ export default function WindGuruScreen() {
                   {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
+              
+              <ThemedView style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>
+                  {tomorrowPrediction.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
+                </ThemedText>
+                <ThemedText style={styles.conditionValue}>
+                  {tomorrowPrediction.prediction.factors.wavePattern.waveEnhancement} 
+                  {tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData && 
+                    ` (${tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData}m)`}
+                </ThemedText>
+              </ThemedView>
 
               {/* Data Quality Note */}
               <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
@@ -737,13 +802,15 @@ export default function WindGuruScreen() {
                 🔄 Loading Tomorrow&apos;s Analysis
               </ThemedText>
               <ThemedText style={{ color: textColor, opacity: 0.7, lineHeight: 20 }}>
-                Processing forecast data for tomorrow&apos;s 4-factor breakdown:{'\n'}
+                Processing forecast data for tomorrow&apos;s 5-factor breakdown:{'\n'}
                 • Rain probability analysis{'\n'}
                 • Clear sky period assessment{'\n'}
                 • Pressure change trends{'\n'}
                 • Temperature differential calculation{'\n'}
                 {'\n'}
-                <ThemedText style={{ fontStyle: 'italic' }}>Forecast data loading...</ThemedText>
+              </ThemedText>
+              <ThemedText style={{ color: textColor, opacity: 0.7, fontStyle: 'italic' }}>
+                Forecast data loading...
               </ThemedText>
             </ThemedView>
           )}

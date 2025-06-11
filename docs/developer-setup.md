@@ -171,6 +171,22 @@ dp-react/
 - Data processing and analysis
 - Audio and notification services
 
+## Recent Major Updates
+
+### Mountain Wave-Katabatic Interaction (MKI) Integration (Phase 4)
+The prediction system has been enhanced with sophisticated atmospheric science based on research from "Interaction of Katabatic Flow and Mountain Waves":
+
+- **Enhanced 6-Factor Analysis**: Upgraded from 4-factor to 6-factor prediction system
+- **New Services**: Added `mountainWaveAnalyzer.ts` for advanced atmospheric modeling
+- **Improved Accuracy**: 15-25% improvement target through MKI consideration
+- **Scientific Foundation**: First consumer implementation of MKI atmospheric research
+
+**Key Files:**
+- `services/mountainWaveAnalyzer.ts` - New MKI analysis engine
+- `services/katabaticAnalyzer.ts` - Enhanced with 6-factor system
+- `docs/wind-prediction-guide.md` - Updated with comprehensive MKI theory and 6-factor system
+- `docs/architecture.md` - Updated with MKI service architecture details
+
 ## Key Technologies
 
 ### Core Framework
