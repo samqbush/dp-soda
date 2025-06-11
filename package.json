@@ -2,16 +2,16 @@
   "name": "dp-soda",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
-    "fetch-wind": "node ./scripts/fetch-wind-data.mjs",
     "debug-devices": "node scripts/debug-ecowitt-devices.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
-    "validate-env": "node scripts/validate-env.js",
+    "increment-version": "node scripts/increment-version.mjs",
     "prepare": "husky"
   },
   "dependencies": {
