@@ -3,6 +3,8 @@ name: Build Dawn Patrol Alarm - iOS
 on:
   pull_request:
     branches: [dev, main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -205,32 +207,107 @@ jobs:
       #     
       #     echo "Successfully uploaded to TestFlight"
 
-      # Upload IPA as GitHub artifact
+      # Upload IPA as GitHub artifact (for PRs and manual runs)
       - name: 📤 Upload IPA Artifact
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-ios-${{ env.APP_VERSION }}
           path: ./dp-soda-${{ env.APP_VERSION }}.ipa
 
+      # Create draft release with IPA (only on push to main)
+      - name: 🚀 Create Draft Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          release_name: Dawn Patrol Alarm v${{ env.APP_VERSION }}
+          body: |
+            ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
+            
+            **Automated iOS Release Build**
+            
+            ### 📱 Available Downloads:
+            - **IPA File**: For TestFlight and App Store distribution
+            
+            ### 🔧 Build Information:
+            - Built from commit: ${{ github.sha }}
+            - Build date: ${{ github.run_id }}
+            - Platform: iOS
+            - Build type: App Store Distribution (signed)
+            - Bundle ID: ${{ env.BUNDLE_ID }}
+            
+            ### 📋 Installation Instructions:
+            
+            **For TestFlight:**
+            1. Download the `.ipa` file
+            2. Upload to App Store Connect
+            3. Add to TestFlight for beta testing
+            
+            **For App Store:**
+            1. Download the `.ipa` file
+            2. Upload to App Store Connect
+            3. Submit for App Store review
+            
+            ---
+            *This is an automated release created by GitHub Actions*
+          draft: true
+          prerelease: false
+
+      - name: 📦 Upload IPA to Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dp-soda-${{ env.APP_VERSION }}.ipa
+          asset_name: dp-soda-${{ env.APP_VERSION }}.ipa
+          asset_content_type: application/octet-stream
+
       # Add build summary
       - name: 📋 Build Summary
         run: |
-          echo "## 🎉 iOS App Store Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📱 Build Information:" >> $GITHUB_STEP_SUMMARY
-          echo "- **App Version**: ${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
-          echo "- **Distribution**: Manual upload to TestFlight" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
-          echo "- **App Store IPA**: \`dp-soda-ios-${{ env.APP_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ready for TestFlight**: Download IPA and upload manually to App Store Connect" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the IPA artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
-          echo "2. Open [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
-          echo "3. Go to your app > TestFlight > iOS builds" >> $GITHUB_STEP_SUMMARY
-          echo "4. Click the '+' button to upload a new build" >> $GITHUB_STEP_SUMMARY
-          echo "5. Upload the downloaded IPA file" >> $GITHUB_STEP_SUMMARY
-          echo "6. Wait for processing and add to TestFlight for beta testing" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "## 🎉 iOS Draft Release Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Release Tag**: v${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle ID**: ${{ env.BUNDLE_ID }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
+            echo "- **IPA**: \`dp-soda-${{ env.APP_VERSION }}.ipa\` (for TestFlight/App Store)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📋 Next Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review the draft release in the [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Download the IPA file from the release" >> $GITHUB_STEP_SUMMARY
+            echo "3. Upload to [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
+            echo "4. Add to TestFlight for beta testing or submit for App Store review" >> $GITHUB_STEP_SUMMARY
+            echo "5. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🎉 iOS App Store Build Complete" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📱 Build Information:" >> $GITHUB_STEP_SUMMARY
+            echo "- **App Version**: ${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Distribution**: Manual upload to TestFlight" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📦 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
+            echo "- **App Store IPA**: \`dp-soda-ios-${{ env.APP_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Ready for TestFlight**: Download IPA and upload manually to App Store Connect" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Download the IPA artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
+            echo "2. Open [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
+            echo "3. Go to your app > TestFlight > iOS builds" >> $GITHUB_STEP_SUMMARY
+            echo "4. Click the '+' button to upload a new build" >> $GITHUB_STEP_SUMMARY
+            echo "5. Upload the downloaded IPA file" >> $GITHUB_STEP_SUMMARY
+            echo "6. Wait for processing and add to TestFlight for beta testing" >> $GITHUB_STEP_SUMMARY
+          fi

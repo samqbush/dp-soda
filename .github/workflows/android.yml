@@ -3,6 +3,8 @@ name: Build Dawn Patrol Alarm - Android
 on:
   pull_request:
     branches: [dev, main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -296,8 +298,9 @@ jobs:
           echo "APK signing information:"
           keytool -printcert -jarfile /tmp/verify_apk/universal.apk
 
-      # Upload the AAB as an artifact
-      - name: 📤 Upload AAB
+      # Upload the AAB as an artifact (for PRs and manual runs)
+      - name: 📤 Upload AAB Artifact
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-aab
@@ -325,27 +328,110 @@ jobs:
           unzip -j app-release.apks universal.apk
           mv universal.apk dp-soda${{ env.APP_VERSION }}.apk
 
-      - name: 📤 Upload Universal APK for device testing
+      - name: 📤 Upload Universal APK Artifact
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-apk
           path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
 
+      # Create draft release with AAB and APK (only on push to main)
+      - name: 🚀 Create Draft Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          release_name: Dawn Patrol Alarm v${{ env.APP_VERSION }}
+          body: |
+            ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
+            
+            **Automated Android Release Build**
+            
+            ### 📱 Available Downloads:
+            - **AAB File**: For Google Play Store submission
+            - **Universal APK**: For direct device installation and testing
+            
+            ### 🔧 Build Information:
+            - Built from commit: ${{ github.sha }}
+            - Build date: ${{ github.run_id }}
+            - Platform: Android
+            - Build type: Release (signed)
+            
+            ### 📋 Installation Instructions:
+            
+            **For Google Play Store:**
+            1. Download the `.aab` file
+            2. Upload to Google Play Console
+            
+            **For Direct Installation:**
+            1. Download the `.apk` file
+            2. Enable "Install from unknown sources" on your Android device
+            3. Install the APK file
+            
+            ---
+            *This is an automated release created by GitHub Actions*
+          draft: true
+          prerelease: false
+
+      - name: 📦 Upload AAB to Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
+          asset_name: dp-soda-${{ env.APP_VERSION }}.aab
+          asset_content_type: application/octet-stream
+
+      - name: 📱 Upload APK to Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
+          asset_name: dp-soda-${{ env.APP_VERSION }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
       # Add a brief build summary
       - name: 📋 Build Summary
         run: |
-          echo "## 🎉 Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📱 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
-          echo "- **AAB**: For Google Play Store submission" >> $GITHUB_STEP_SUMMARY
-          echo "- **Universal APK**: For direct device installation" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "## 🎉 Draft Release Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Release Tag**: v${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: Android" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
+            echo "- **AAB**: \`dp-soda-${{ env.APP_VERSION }}.aab\` (for Google Play Store)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Universal APK**: \`dp-soda-${{ env.APP_VERSION }}.apk\` (for direct installation)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📋 Next Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review the draft release in the [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Test the APK file on your device if needed" >> $GITHUB_STEP_SUMMARY
+            echo "3. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
+            echo "4. Upload the AAB to Google Play Console" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🎉 Build Complete" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📱 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
+            echo "- **AAB**: For Google Play Store submission" >> $GITHUB_STEP_SUMMARY
+            echo "- **Universal APK**: For direct device installation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📋 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Download the \`dp-soda-apk\` artifact" >> $GITHUB_STEP_SUMMARY
+            echo "2. Install on your Android device" >> $GITHUB_STEP_SUMMARY
+            echo "3. Run the app and verify functionality" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔐 App Signing Information:" >> $GITHUB_STEP_SUMMARY
           echo "- This build is signed with your upload key" >> $GITHUB_STEP_SUMMARY
           echo "- Ready for Google Play App Signing enrollment" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Testing Instructions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the \`dp-soda-apk\` artifact" >> $GITHUB_STEP_SUMMARY
-          echo "2. Install on your Android device" >> $GITHUB_STEP_SUMMARY
-          echo "3. Run the app and verify functionality" >> $GITHUB_STEP_SUMMARY
 
