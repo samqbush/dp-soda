@@ -3,8 +3,6 @@ name: Build Dawn Patrol Alarm - iOS
 on:
   pull_request:
     branches: [dev, main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -16,7 +14,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🔧 Set up Node.js
+      - n        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "main" ]; then
+            echo "## 🎉 iOS Draft Release Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Release Tag**: v${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: iOS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build Type**: App Store Distribution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle ID**: ${{ env.BUNDLE_ID }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source**: PR #${{ github.event.number }} - \"${{ github.event.pull_request.title }}\"" >> $GITHUB_STEP_SUMMARYt up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -207,17 +215,17 @@ jobs:
       #     
       #     echo "Successfully uploaded to TestFlight"
 
-      # Upload IPA as GitHub artifact (for PRs and manual runs)
+      # Upload IPA as GitHub artifact (for non-main PRs and manual runs)
       - name: 📤 Upload IPA Artifact
-        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        if: github.event_name != 'pull_request' || github.base_ref != 'main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-ios-${{ env.APP_VERSION }}
           path: ./dp-soda-${{ env.APP_VERSION }}.ipa
 
-      # Create draft release with IPA (only on push to main)
+      # Create draft release with IPA (only on pull request to main)
       - name: 🚀 Create Draft Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -228,14 +236,16 @@ jobs:
           body: |
             ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
             
-            **Automated iOS Release Build**
+            **Pre-Release iOS Build from PR #${{ github.event.number }}**
             
             ### 📱 Available Downloads:
             - **IPA File**: For TestFlight and App Store distribution
             
             ### 🔧 Build Information:
-            - Built from commit: ${{ github.sha }}
-            - Build date: ${{ github.run_id }}
+            - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
+            - Source branch: `${{ github.head_ref }}`
+            - Target branch: `${{ github.base_ref }}`
+            - Commit: ${{ github.event.pull_request.head.sha }}
             - Platform: iOS
             - Build type: App Store Distribution (signed)
             - Bundle ID: ${{ env.BUNDLE_ID }}
@@ -252,13 +262,16 @@ jobs:
             2. Upload to App Store Connect
             3. Submit for App Store review
             
+            ### ⚠️ Pre-Release Notice
+            This is a draft release created from a pull request. Review and test thoroughly before publishing.
+            
             ---
-            *This is an automated release created by GitHub Actions*
+            *This is an automated draft release created by GitHub Actions*
           draft: true
           prerelease: false
 
       - name: 📦 Upload IPA to Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

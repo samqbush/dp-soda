@@ -3,8 +3,6 @@ name: Build Dawn Patrol Alarm - Android
 on:
   pull_request:
     branches: [dev, main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -298,9 +296,9 @@ jobs:
           echo "APK signing information:"
           keytool -printcert -jarfile /tmp/verify_apk/universal.apk
 
-      # Upload the AAB as an artifact (for PRs and manual runs)
+      # Upload the AAB as an artifact (for non-main PRs, pushes, and manual runs)
       - name: 📤 Upload AAB Artifact
-        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        if: github.event_name != 'pull_request' || github.base_ref != 'main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-aab
@@ -329,15 +327,15 @@ jobs:
           mv universal.apk dp-soda${{ env.APP_VERSION }}.apk
 
       - name: 📤 Upload Universal APK Artifact
-        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        if: github.event_name != 'pull_request' || github.base_ref != 'main'
         uses: actions/upload-artifact@v4
         with:
           name: dp-soda-apk
           path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
 
-      # Create draft release with AAB and APK (only on push to main)
+      # Create draft release with AAB and APK (only on pull request to main)
       - name: 🚀 Create Draft Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -348,15 +346,17 @@ jobs:
           body: |
             ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
             
-            **Automated Android Release Build**
+            **Pre-Release Build from PR #${{ github.event.number }}**
             
             ### 📱 Available Downloads:
             - **AAB File**: For Google Play Store submission
             - **Universal APK**: For direct device installation and testing
             
             ### 🔧 Build Information:
-            - Built from commit: ${{ github.sha }}
-            - Build date: ${{ github.run_id }}
+            - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
+            - Source branch: `${{ github.head_ref }}`
+            - Target branch: `${{ github.base_ref }}`
+            - Commit: ${{ github.event.pull_request.head.sha }}
             - Platform: Android
             - Build type: Release (signed)
             
@@ -371,13 +371,16 @@ jobs:
             2. Enable "Install from unknown sources" on your Android device
             3. Install the APK file
             
+            ### ⚠️ Pre-Release Notice
+            This is a draft release created from a pull request. Review and test thoroughly before publishing.
+            
             ---
-            *This is an automated release created by GitHub Actions*
+            *This is an automated draft release created by GitHub Actions*
           draft: true
           prerelease: false
 
       - name: 📦 Upload AAB to Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -388,7 +391,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: 📱 Upload APK to Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -401,13 +404,14 @@ jobs:
       # Add a brief build summary
       - name: 📋 Build Summary
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "## 🎉 Draft Release Created" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "main" ]; then
+            echo "## 🎉 Android Draft Release Created" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
             echo "- **Release Tag**: v${{ env.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
             echo "- **Platform**: Android" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source**: PR #${{ github.event.number }} - \"${{ github.event.pull_request.title }}\"" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
             echo "- **AAB**: \`dp-soda-${{ env.APP_VERSION }}.aab\` (for Google Play Store)" >> $GITHUB_STEP_SUMMARY
