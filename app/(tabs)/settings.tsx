@@ -1,4 +1,3 @@
-import { VersionDisplay } from '@/components/SecretGestureActivator';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -242,12 +241,6 @@ export default function SettingsScreen() {
             
             <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>3. Consecutive Good Points</ThemedText> - Counts the maximum number of consecutive data points that meet speed criteria. Ensures sustained favorable conditions rather than brief gusts.{'\n'}
           </ThemedText>
-          
-          
-        {/* Version display with secret gesture detection */}
-        <View style={styles.versionContainer}>
-          <VersionDisplay />
-        </View>
       </ThemedView>
     </ScrollView>
   );
@@ -362,18 +355,6 @@ const styles = StyleSheet.create({
   switchLabelContainer: {
     flex: 1,
     marginRight: 16,
-  },
-  versionContainer: {
-    marginTop: 32,
-    marginBottom: 20,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Subtle background to make it more visible
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)', // Light border for definition
-    minHeight: 60, // Ensure minimum tappable area
   },
   backgroundAlarmTester: {
     marginTop: 24,

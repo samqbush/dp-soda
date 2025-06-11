@@ -19,27 +19,20 @@ This required manual synchronization every time the version was updated, creatin
 - **Reason**: Expo Constants provides automatic access to `app.config.js` values
 
 ### 2. Updated Components to Use Expo Constants
-Modified all components that were importing from `buildConfig.ts`:
+Modified components that were importing from `buildConfig.ts`:
 
-**VersionDisplay Component** (`components/SecretGestureActivator.tsx`):
+**WhiteScreenDetective Component** (`components/WhiteScreenDetective.tsx`):
 ```typescript
 // BEFORE: Manual buildConfig
 import { getBuildConfig } from '@/config/buildConfig';
-const buildConfig = getBuildConfig();
-const versionText = `Version ${buildConfig.version} (${buildConfig.environment})`;
 
-// AFTER: Expo Constants
+// AFTER: Expo Constants  
 import Constants from 'expo-constants';
-const expoConfig = Constants.expoConfig;
-const version = expoConfig?.version || 'Unknown';
-const environment = __DEV__ ? 'development' : 'production';
-const versionText = `Version ${version} (${environment})`;
 ```
 
 **Other Components Updated**:
 - `hooks/useWindData.ts` - Replaced `logBuildIssue` with `console.warn`
 - `components/WhiteScreenDetective.tsx` - Updated to use Expo Constants
-- `components/AndroidDebugger.tsx` - Updated to use Expo Constants
 
 ### 3. Benefits of New Approach
 

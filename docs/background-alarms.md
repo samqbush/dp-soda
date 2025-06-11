@@ -81,13 +81,12 @@ The app includes comprehensive testing tools accessible in development mode:
 
 ### Manual Testing
 
-1. Enable Developer Mode in the app
-2. Go to Settings tab
-3. Find "Background Alarm Testing" section
-4. Tap "🧪 Test Background Alarm"
-5. Close the app immediately after scheduling
-6. Wait 1 minute for test notification
-7. Verify notification appears in device notification center
+1. Go to Settings tab
+2. Find "Background Alarm Testing" section  
+3. Tap "🧪 Test Background Alarm"
+4. Close the app immediately after scheduling
+5. Wait 1 minute for test notification
+6. Verify notification appears in device notification center
 
 ### Automated Testing
 

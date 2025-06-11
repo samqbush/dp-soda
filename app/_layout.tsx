@@ -11,19 +11,13 @@ import { AppState, LogBox, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { AndroidCrashLogger } from '@/components/AndroidCrashLogger';
-import { AndroidDebugger } from '@/components/AndroidDebugger';
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
-import { ApkCrashDiagnostics } from '@/components/ApkCrashDiagnostics';
 import { AppInitializer } from '@/components/AppInitializer';
-import { EnhancedAndroidDebugger } from '@/components/EnhancedAndroidDebugger';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { GlobalCrashRecovery } from '@/components/GlobalCrashRecovery';
-import { QuickExportButton } from '@/components/QuickExportButton';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
-import { debugSettings } from '@/services/debugSettings';
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
@@ -46,11 +40,6 @@ globalCrashHandler.initialize().catch(error =>
 // Initialize production crash detector for APK debugging
 productionCrashDetector.initialize().catch(error =>
   console.error('Failed to initialize production crash detector:', error)
-);
-
-// Reset debug settings to ensure developer mode is correctly disabled by default
-debugSettings.forceResetToDefaults().catch(error =>
-  console.error('Failed to reset debug settings:', error)
 );
 
 // Keep the splash screen visible while we fetch resources
@@ -247,11 +236,6 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AndroidSafeWrapper>
-        <AndroidDebugger />
-        <AndroidCrashLogger />
-        <ApkCrashDiagnostics />
-        <EnhancedAndroidDebugger />
-        <QuickExportButton />
         <ErrorBoundary>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack>

@@ -70,15 +70,10 @@ The app includes comprehensive crash protection:
 
 ### Android-Specific Features
 
-**Debug Mode Access**:
-- Secret gesture sequence activates debug tools
-- Shows crash logs and system information
-- Provides recovery options and diagnostics
-
 **Export Crash Reports**:
-- Debug mode allows exporting crash logs
-- Helps developers diagnose persistent issues
-- Include when reporting bugs
+- Use system crash reporting tools when available
+- Report persistent issues to app developers
+- Include device model and Android version
 
 ### Memory Issues
 
@@ -307,21 +302,6 @@ CMD+R (iOS) or Shake device + reload (Android)
 
 ## Advanced Debugging
 
-### Debug Mode Features
-
-**Accessing Debug Mode**:
-- Specific gesture sequence activates debug features
-- Shows detailed system information
-- Provides crash logs and diagnostics
-- Enables advanced recovery options
-
-**Debug Information Available**:
-- **API response details** and timing
-- **Cache hit/miss ratios**
-- **Memory usage statistics**
-- **Component render counts**
-- **Error stack traces**
-
 ### Logging and Monitoring
 
 **Developer Tools**:
@@ -343,7 +323,7 @@ adb logcat | grep -i dawn
 - **Device information** (model, Android version)
 - **App version** and build number
 - **Error messages or screenshots**
-- **Crash logs** if available through debug mode
+- **System crash logs** if available through device settings
 
 ### Performance Profiling
 

@@ -247,9 +247,9 @@ interface CachedData {
 - 🔴 **Mock**: Fallback data (API unavailable)
 
 **Debug Information**:
-Enable debug mode to see:
+Use browser developer tools during development to see:
 - API response times
-- Cache hit/miss ratios
+- Cache hit/miss ratios  
 - Error details and stack traces
 - Network request details
 
