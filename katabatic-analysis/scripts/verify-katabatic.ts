@@ -55,7 +55,7 @@ async function main() {
     }
     
   } catch (error) {
-    console.error(chalk.red('❌ Verification failed:'), error.message);
+    console.error(chalk.red('❌ Verification failed:'), (error as Error).message);
     process.exit(1);
   }
 }
