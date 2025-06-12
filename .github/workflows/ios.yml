@@ -46,8 +46,8 @@ jobs:
       - name: 🏷️ Extract app version and bundle ID from app.config.js
         id: get_version
         run: |
-          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
-          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.ios.bundleIdentifier")
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.ios.bundleIdentifier")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT

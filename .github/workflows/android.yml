@@ -236,7 +236,7 @@ jobs:
       - name: 🏷️ Extract app version from app.config.js
         id: get_version
         run: |
-          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).default.expo.version")
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
