@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { katabaticAnalyzer, KatabaticPrediction, KatabaticCriteria } from '@/services/katabaticAnalyzer';
 import { WeatherServiceData } from '@/services/weatherService';
 
@@ -55,6 +55,10 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     settings: defaultSettings,
   });
 
+  // Use a ref to store current state for stable access in callbacks
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   /**
    * Analyze weather data for katabatic conditions
    */
@@ -71,8 +75,8 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     setState(prev => ({ ...prev, isAnalyzing: true, error: null }));
 
     try {
-      // Merge settings with any custom criteria
-      const criteria = { ...state.settings, ...customCriteria };
+      // Merge settings with any custom criteria using ref
+      const criteria = { ...stateRef.current.settings, ...customCriteria };
       
       // Perform analysis
       const prediction = katabaticAnalyzer.analyzePrediction(weatherData, criteria);
@@ -93,7 +97,7 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
         prediction: null,
       }));
     }
-  }, [weatherData, state.settings]);
+  }, [weatherData]);
 
   /**
    * Update analysis settings
@@ -217,9 +221,12 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     const analysisMode = getAnalysisMode();
     const now = new Date();
     
+    // Use ref to access current state without creating dependency
+    const currentState = stateRef.current;
+    
     // For post-dawn mode, check if we already have a prediction from today
-    if (analysisMode === 'post-dawn' && state.prediction && state.lastAnalysisTime) {
-      const lastAnalysisDate = state.lastAnalysisTime;
+    if (analysisMode === 'post-dawn' && currentState.prediction && currentState.lastAnalysisTime) {
+      const lastAnalysisDate = currentState.lastAnalysisTime;
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
       
@@ -233,8 +240,8 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     setState(prev => ({ ...prev, isAnalyzing: true, error: null }));
 
     try {
-      // Merge settings with any custom criteria
-      const criteria = { ...state.settings, ...customCriteria };
+      // Merge settings with any custom criteria using ref
+      const criteria = { ...currentState.settings, ...customCriteria };
       
       // Perform analysis
       const prediction = katabaticAnalyzer.analyzePrediction(weatherData, criteria);
@@ -269,25 +276,26 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
         prediction: null,
       }));
     }
-  }, [weatherData, state.settings, state.prediction, state.lastAnalysisTime, getAnalysisMode]);
+  }, [weatherData, getAnalysisMode]);
 
   /**
    * Auto-refresh analysis when weather data changes (time-aware)
    */
   useEffect(() => {
-    if (weatherData && !state.isAnalyzing) {
+    if (weatherData && !stateRef.current.isAnalyzing) {
       timeAwareAnalyzeConditions();
     }
-  }, [weatherData, timeAwareAnalyzeConditions, state.isAnalyzing]);
+  }, [weatherData, timeAwareAnalyzeConditions]);
 
   /**
    * Set up time-aware auto-refresh timer
    */
   useEffect(() => {
-    if (!state.settings.autoRefresh) return;
+    if (!stateRef.current.settings.autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (weatherData && !state.isAnalyzing) {
+      const currentState = stateRef.current;
+      if (weatherData && !currentState.isAnalyzing) {
         const analysisMode = getAnalysisMode();
         
         // Reduce refresh frequency in post-dawn mode
@@ -298,10 +306,10 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
         
         timeAwareAnalyzeConditions();
       }
-    }, state.settings.refreshInterval * 60 * 1000);
+    }, stateRef.current.settings.refreshInterval * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [state.settings.autoRefresh, state.settings.refreshInterval, weatherData, timeAwareAnalyzeConditions, state.isAnalyzing, getAnalysisMode]);
+  }, [weatherData, timeAwareAnalyzeConditions, getAnalysisMode]);
 
   return {
     // Core state
