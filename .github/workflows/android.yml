@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -336,70 +340,52 @@ jobs:
       # Create draft release with AAB and APK (for all pull requests)
       - name: 🚀 Create Draft Release
         if: github.event_name == 'pull_request'
-        id: create_release
-        uses: actions/create-release@v1
+        run: |
+          # Create release body content
+          cat > release_body.md << 'EOF'
+          ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
+          
+          **Pre-Release Android Build from PR #${{ github.event.number }}**
+          
+          ### 📱 Available Downloads:
+          - **AAB File**: For Google Play Store submission
+          - **Universal APK**: For direct device installation and testing
+          
+          ### 🔧 Build Information:
+          - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
+          - Source branch: `${{ github.head_ref }}`
+          - Target branch: `${{ github.base_ref }}`
+          - Commit: ${{ github.event.pull_request.head.sha }}
+          - Platform: Android
+          - Build type: Release (signed)
+          
+          ### 📋 Installation Instructions:
+          
+          **For Google Play Store:**
+          1. Download the `.aab` file
+          2. Upload to Google Play Console
+          
+          **For Direct Installation:**
+          1. Download the `.apk` file
+          2. Enable "Install from unknown sources" on your Android device
+          3. Install the APK file
+          
+          ### ⚠️ Pre-Release Notice
+          This is a draft release created from a pull request. Review and test thoroughly before publishing.
+          
+          ---
+          *This is an automated draft release created by GitHub Actions*
+          EOF
+          
+          # Create the draft release using GitHub CLI with both AAB and APK
+          gh release create "v${{ env.APP_VERSION }}" \
+            --draft \
+            --title "Dawn Patrol Alarm v${{ env.APP_VERSION }}" \
+            --notes-file "release_body.md" \
+            "android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab#Android App Bundle (AAB)" \
+            "android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk#Universal APK"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.APP_VERSION }}
-          release_name: Dawn Patrol Alarm v${{ env.APP_VERSION }}
-          body: |
-            ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
-            
-            **Pre-Release Build from PR #${{ github.event.number }}**
-            
-            ### 📱 Available Downloads:
-            - **AAB File**: For Google Play Store submission
-            - **Universal APK**: For direct device installation and testing
-            
-            ### 🔧 Build Information:
-            - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
-            - Source branch: `${{ github.head_ref }}`
-            - Target branch: `${{ github.base_ref }}`
-            - Commit: ${{ github.event.pull_request.head.sha }}
-            - Platform: Android
-            - Build type: Release (signed)
-            
-            ### 📋 Installation Instructions:
-            
-            **For Google Play Store:**
-            1. Download the `.aab` file
-            2. Upload to Google Play Console
-            
-            **For Direct Installation:**
-            1. Download the `.apk` file
-            2. Enable "Install from unknown sources" on your Android device
-            3. Install the APK file
-            
-            ### ⚠️ Pre-Release Notice
-            This is a draft release created from a pull request. Review and test thoroughly before publishing.
-            
-            ---
-            *This is an automated draft release created by GitHub Actions*
-          draft: true
-          prerelease: false
-
-      - name: 📦 Upload AAB to Release
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.aab
-          asset_name: dp-soda-${{ env.APP_VERSION }}.aab
-          asset_content_type: application/octet-stream
-
-      - name: 📱 Upload APK to Release
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: android/app/build/outputs/bundle/release/dp-soda${{ env.APP_VERSION }}.apk
-          asset_name: dp-soda-${{ env.APP_VERSION }}.apk
-          asset_content_type: application/vnd.android.package-archive
 
       # Add a brief build summary
       - name: 📋 Build Summary

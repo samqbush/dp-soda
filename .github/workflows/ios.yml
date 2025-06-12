@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   ios:
     runs-on: macos-latest
@@ -216,60 +220,52 @@ jobs:
       # Create draft release with IPA (for all pull requests)
       - name: 🚀 Create Draft Release
         if: github.event_name == 'pull_request'
-        id: create_release
-        uses: actions/create-release@v1
+        run: |
+          # Create release body content
+          cat > release_body.md << 'EOF'
+          ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
+          
+          **Pre-Release iOS Build from PR #${{ github.event.number }}**
+          
+          ### 📱 Available Downloads:
+          - **IPA File**: For TestFlight and App Store distribution
+          
+          ### 🔧 Build Information:
+          - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
+          - Source branch: `${{ github.head_ref }}`
+          - Target branch: `${{ github.base_ref }}`
+          - Commit: ${{ github.event.pull_request.head.sha }}
+          - Platform: iOS
+          - Build type: App Store Distribution (signed)
+          - Bundle ID: ${{ env.BUNDLE_ID }}
+          
+          ### 📋 Installation Instructions:
+          
+          **For TestFlight:**
+          1. Download the `.ipa` file
+          2. Upload to App Store Connect
+          3. Add to TestFlight for beta testing
+          
+          **For App Store:**
+          1. Download the `.ipa` file
+          2. Upload to App Store Connect
+          3. Submit for App Store review
+          
+          ### ⚠️ Pre-Release Notice
+          This is a draft release created from a pull request. Review and test thoroughly before publishing.
+          
+          ---
+          *This is an automated draft release created by GitHub Actions*
+          EOF
+          
+          # Create the draft release using GitHub CLI
+          gh release create "v${{ env.APP_VERSION }}" \
+            --draft \
+            --title "Dawn Patrol Alarm v${{ env.APP_VERSION }}" \
+            --notes-file "release_body.md" \
+            "./dp-soda-${{ env.APP_VERSION }}.ipa#iOS App Store IPA"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.APP_VERSION }}
-          release_name: Dawn Patrol Alarm v${{ env.APP_VERSION }}
-          body: |
-            ## Dawn Patrol Alarm v${{ env.APP_VERSION }}
-            
-            **Pre-Release iOS Build from PR #${{ github.event.number }}**
-            
-            ### 📱 Available Downloads:
-            - **IPA File**: For TestFlight and App Store distribution
-            
-            ### 🔧 Build Information:
-            - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
-            - Source branch: `${{ github.head_ref }}`
-            - Target branch: `${{ github.base_ref }}`
-            - Commit: ${{ github.event.pull_request.head.sha }}
-            - Platform: iOS
-            - Build type: App Store Distribution (signed)
-            - Bundle ID: ${{ env.BUNDLE_ID }}
-            
-            ### 📋 Installation Instructions:
-            
-            **For TestFlight:**
-            1. Download the `.ipa` file
-            2. Upload to App Store Connect
-            3. Add to TestFlight for beta testing
-            
-            **For App Store:**
-            1. Download the `.ipa` file
-            2. Upload to App Store Connect
-            3. Submit for App Store review
-            
-            ### ⚠️ Pre-Release Notice
-            This is a draft release created from a pull request. Review and test thoroughly before publishing.
-            
-            ---
-            *This is an automated draft release created by GitHub Actions*
-          draft: true
-          prerelease: false
-
-      - name: 📦 Upload IPA to Release
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dp-soda-${{ env.APP_VERSION }}.ipa
-          asset_name: dp-soda-${{ env.APP_VERSION }}.ipa
-          asset_content_type: application/octet-stream
 
       # Add build summary
       - name: 📋 Build Summary
