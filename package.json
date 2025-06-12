@@ -14,6 +14,7 @@
     "verify-noaa": "node scripts/verify-noaa-data.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
     "increment-version": "node scripts/increment-version.mjs",
+    "debug-stations": "node scripts/debug-dp-stations.mjs",
     "prepare": "husky"
   },
   "dependencies": {

@@ -3,7 +3,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useStandleyLakeWind } from '@/hooks/useStandleyLakeWind';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -78,6 +77,33 @@ export default function StandleyLakeScreen() {
     return directions[index];
   };
 
+  // Check if data is stale (no data in last 2 hours)
+  const isDataStale = () => {
+    if (windData.length === 0) return true;
+    
+    const latest = windData[windData.length - 1];
+    const latestTime = new Date(latest.time);
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    
+    return latestTime < twoHoursAgo;
+  };
+
+  const getDataFreshnessMessage = () => {
+    if (windData.length === 0) return 'No data available';
+    
+    const latest = windData[windData.length - 1];
+    const latestTime = new Date(latest.time);
+    const now = new Date();
+    const diffMinutes = Math.floor((now.getTime() - latestTime.getTime()) / 60000);
+    
+    if (diffMinutes < 30) return 'Data is current';
+    if (diffMinutes < 120) return `Last reading ${diffMinutes} minutes ago`;
+    
+    const diffHours = Math.floor(diffMinutes / 60);
+    return `⚠️ Station may be offline - last reading ${diffHours} hours ago`;
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView
@@ -111,7 +137,19 @@ export default function StandleyLakeScreen() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={tintColor} />
-            <ThemedText style={styles.loadingText}>Fetching wind data...</ThemedText>
+            <ThemedText style={styles.loadingText}>Updating wind data...</ThemedText>
+          </View>
+        )}
+
+        {/* Data Freshness Alert */}
+        {windData.length > 0 && isDataStale() && (
+          <View style={styles.staleDataContainer}>
+            <ThemedText style={styles.staleDataText}>
+              {getDataFreshnessMessage()}
+            </ThemedText>
+            <ThemedText style={[styles.staleDataSubtext]}>
+              Station may not be reporting. Try refreshing or check back later.
+            </ThemedText>
           </View>
         )}
 
@@ -151,8 +189,7 @@ export default function StandleyLakeScreen() {
           <View style={[styles.chartCard, { backgroundColor: cardColor }]}>
             <WindChart
               data={chartData}
-              title="Today's Wind Speed"
-              timeWindow={getWindChartTimeWindow()} // Use smart time window (4am to current, max 9pm)
+              title="Today's Wind Speed - All Data"
             />
           </View>
         ) : (
@@ -300,5 +337,23 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     fontSize: 14,
+  },
+  staleDataContainer: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  staleDataText: {
+    color: '#FF9500',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  staleDataSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
   },
 });

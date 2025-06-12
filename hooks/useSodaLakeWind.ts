@@ -1,10 +1,11 @@
 import {
-    clearEcowittDataCache,
+    clearEnhancedDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
     fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
-    getCachedEcowittData,
+    getEnhancedCachedData,
+    smartRefreshEcowittData,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
 import { analyzeRecentWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
@@ -46,14 +47,14 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   const loadCachedData = useCallback(async (): Promise<boolean> => {
     try {
       console.log('📱 Loading cached Soda Lake wind data...');
-      const cached = await getCachedEcowittData();
+      const cachedData = await getEnhancedCachedData('DP Soda Lakes');
       
-      if (cached.length > 0) {
-        setWindData(cached);
-        setLastUpdated(new Date());
+      if (cachedData && cachedData.data.length > 0) {
+        setWindData(cachedData.data);
+        setLastUpdated(new Date(cachedData.metadata.lastUpdated));
         
         // Analyze the cached data
-        const converted = convertToWindDataPoint(cached);
+        const converted = convertToWindDataPoint(cachedData.data);
         if (converted.length > 0) {
           // Use Soda Lake specific criteria for analysis
           const defaultCriteria: AlarmCriteria = {
@@ -72,7 +73,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
           setAnalysis(windAnalysis);
         }
         
-        console.log('✅ Loaded cached Soda Lake data:', cached.length, 'points');
+        console.log('✅ Loaded cached Soda Lake data:', cachedData.data.length, 'points');
         return true;
       }
       
@@ -85,14 +86,14 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   }, []);
 
   /**
-   * Refresh wind data from Ecowitt API for Soda Lake device
+   * Refresh wind data from Ecowitt API for Soda Lake device using smart refresh
    */
   const refreshData = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('🔄 Refreshing Soda Lake wind data...');
+      console.log('🔄 Smart refreshing Soda Lake wind data...');
       
       // First test the auto-configuration for Soda Lake device
       try {
@@ -104,7 +105,8 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
         return;
       }
 
-      const freshData = await fetchEcowittWindDataForDevice('DP Soda Lakes');
+      // Use smart refresh (incremental or full based on cache state)
+      const freshData = await smartRefreshEcowittData('DP Soda Lakes');
       
       setWindData(freshData);
       setLastUpdated(new Date());
@@ -139,7 +141,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
         setAnalysis(windAnalysis);
       }
       
-      console.log('✅ Refreshed Soda Lake wind data:', freshData.length, 'points');
+      console.log('✅ Smart refreshed Soda Lake wind data:', freshData.length, 'points');
       
     } catch (error) {
       console.error('❌ Error refreshing Soda Lake wind data:', error);
@@ -157,7 +159,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
    */
   const clearCache = useCallback(async (): Promise<void> => {
     try {
-      await clearEcowittDataCache();
+      await clearEnhancedDeviceCache('DP Soda Lakes');
       setWindData([]);
       setAnalysis(null);
       setLastUpdated(null);

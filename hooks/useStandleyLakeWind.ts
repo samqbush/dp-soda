@@ -1,10 +1,11 @@
 import {
-    clearEcowittDataCache,
+    clearEnhancedDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
     fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
-    getCachedEcowittData,
+    getEnhancedCachedData,
+    smartRefreshEcowittData,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
 import { analyzeRecentWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
@@ -46,14 +47,14 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   const loadCachedData = useCallback(async (): Promise<boolean> => {
     try {
       console.log('📱 Loading cached Standley Lake wind data...');
-      const cached = await getCachedEcowittData();
+      const cachedData = await getEnhancedCachedData('DP Standley West');
       
-      if (cached.length > 0) {
-        setWindData(cached);
-        setLastUpdated(new Date());
+      if (cachedData && cachedData.data.length > 0) {
+        setWindData(cachedData.data);
+        setLastUpdated(new Date(cachedData.metadata.lastUpdated));
         
         // Analyze the cached data
-        const converted = convertToWindDataPoint(cached);
+        const converted = convertToWindDataPoint(cachedData.data);
         if (converted.length > 0) {
           // Use default criteria for analysis - these could be made configurable later
           const defaultCriteria: AlarmCriteria = {
@@ -72,7 +73,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
           setAnalysis(windAnalysis);
         }
         
-        console.log('✅ Loaded cached Standley Lake data:', cached.length, 'points');
+        console.log('✅ Loaded cached Standley Lake data:', cachedData.data.length, 'points');
         return true;
       }
       
@@ -92,7 +93,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     setError(null);
 
     try {
-      console.log('🔄 Refreshing Standley Lake wind data...');
+      console.log('🔄 Smart refreshing Standley Lake wind data...');
       
       // First test the auto-configuration
       try {
@@ -104,7 +105,8 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
         return;
       }
 
-      const freshData = await fetchEcowittWindDataForDevice('DP Standley West');
+      // Use smart refresh (incremental or full based on cache state)
+      const freshData = await smartRefreshEcowittData('DP Standley West');
       
       setWindData(freshData);
       setLastUpdated(new Date());
@@ -139,7 +141,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
         setAnalysis(windAnalysis);
       }
       
-      console.log('✅ Refreshed Standley Lake wind data:', freshData.length, 'points');
+      console.log('✅ Smart refreshed Standley Lake wind data:', freshData.length, 'points');
       
     } catch (error) {
       console.error('❌ Error refreshing Standley Lake wind data:', error);
@@ -157,7 +159,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
    */
   const clearCache = useCallback(async (): Promise<void> => {
     try {
-      await clearEcowittDataCache();
+      await clearEnhancedDeviceCache('DP Standley West');
       setWindData([]);
       setAnalysis(null);
       setLastUpdated(null);

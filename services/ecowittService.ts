@@ -641,8 +641,8 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // Cache the data
-    await cacheEcowittData(windDataPoints);
+    // Cache the data using enhanced caching
+    await cacheEcowittDataEnhanced(deviceName, windDataPoints, false);
     console.log(`✅ Successfully fetched and cached ${windDataPoints.length} wind data points for ${deviceName}`);
     
     return windDataPoints;
@@ -667,6 +667,322 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
 }
 
 /**
+ * Enhanced Cache Types and Interfaces
+ */
+export interface EcowittCacheMetadata {
+  date: string; // YYYY-MM-DD
+  lastUpdated: number; // timestamp
+  firstDataTime?: number; // timestamp of first data point
+  lastDataTime?: number; // timestamp of last data point
+  dataCount: number;
+  cacheVersion: string; // for future cache format changes
+}
+
+export interface EcowittCacheData {
+  data: EcowittWindDataPoint[];
+  metadata: EcowittCacheMetadata;
+}
+
+// Storage keys for device-specific caches
+const ECOWITT_DEVICE_CACHE_KEY = (deviceName: string, date: string) => 
+  `ecowitt_${deviceName.replace(/\s+/g, '_')}_${date}`;
+
+/**
+ * Enhanced incremental fetch function - only fetches new data since last update
+ */
+export async function fetchIncrementalEcowittData(
+  deviceName: string,
+  lastDataTimestamp?: number
+): Promise<EcowittWindDataPoint[]> {
+  console.log(`🔄 Fetching incremental Ecowitt wind data for ${deviceName}...`);
+  
+  try {
+    const config = await getAutoEcowittConfigForDevice(deviceName);
+    
+    // Calculate time range for incremental update
+    const now = new Date();
+    let startTime: Date;
+    
+    if (lastDataTimestamp) {
+      // Start from 5 minutes after the last data point to avoid duplicates
+      startTime = new Date(lastDataTimestamp + 5 * 60 * 1000);
+    } else {
+      // Fallback to start of day if no last timestamp
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    
+    // Don't fetch if start time is in the future or very recent (less than 5 min ago)
+    if (startTime >= now || (now.getTime() - startTime.getTime()) < 5 * 60 * 1000) {
+      console.log('⏭️ No new data to fetch - too recent');
+      return [];
+    }
+    
+    const formatEcowittDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+    
+    const params = {
+      application_key: config.applicationKey,
+      api_key: config.apiKey,
+      mac: config.macAddress,
+      start_date: formatEcowittDate(startTime),
+      end_date: formatEcowittDate(now),
+      cycle_type: '5min',
+      temp_unit: '1',
+      pressure_unit: '3',
+      wind_unit: '6',
+      call_back: 'wind',
+    };
+
+    console.log(`📡 Incremental update: ${formatEcowittDate(startTime)} to ${formatEcowittDate(now)}`);
+
+    const response = await axios.get<EcowittHistoricResponse>(`${BASE_URL}/device/history`, {
+      params,
+      timeout: 15000,
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    if (response.data.code !== 0) {
+      throw new Error(`Ecowitt incremental API error: ${response.data.msg}`);
+    }
+
+    // Handle empty response
+    if (!response.data.data?.wind?.wind_speed?.list) {
+      console.log('📊 No new data available from incremental fetch');
+      return [];
+    }
+
+    const windData = response.data.data.wind;
+    const timestamps = Object.keys(windData.wind_speed.list);
+    
+    console.log(`📊 Incremental fetch returned ${timestamps.length} new data points`);
+
+    // Transform API response to our format
+    const newDataPoints: EcowittWindDataPoint[] = timestamps
+      .map(timestamp => {
+        const timestampMs = parseInt(timestamp) * 1000;
+        const date = new Date(timestampMs);
+        const timeString = date.toISOString();
+        
+        const windSpeedMph = parseFloat(windData.wind_speed.list[timestamp] || '0');
+        const windGustMph = parseFloat(windData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
+        const windDirection = parseFloat(windData.wind_direction.list[timestamp] || '0');
+        
+        const windSpeedMs = windSpeedMph / 2.237;
+        const windGustMs = windGustMph / 2.237;
+        
+        return {
+          time: timeString,
+          timestamp: timestampMs,
+          windSpeed: windSpeedMs,
+          windSpeedMph,
+          windGust: windGustMs,
+          windGustMph,
+          windDirection,
+          temperature: undefined,
+          humidity: undefined
+        };
+      })
+      .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    console.log(`✅ Processed ${newDataPoints.length} new valid data points`);
+    return newDataPoints;
+
+  } catch (error) {
+    console.error(`❌ Error in incremental fetch for ${deviceName}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Enhanced cache function with device-specific storage and metadata
+ */
+export async function cacheEcowittDataEnhanced(
+  deviceName: string, 
+  data: EcowittWindDataPoint[],
+  isIncremental = false
+): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = ECOWITT_DEVICE_CACHE_KEY(deviceName, today);
+    
+    let finalData = data;
+    let metadata: EcowittCacheMetadata;
+    
+    if (isIncremental) {
+      // Merge with existing cache
+      const existingCache = await getEnhancedCachedData(deviceName);
+      if (existingCache) {
+        // Merge and deduplicate data
+        const allData = [...existingCache.data, ...data];
+        finalData = deduplicateWindData(allData);
+        console.log(`🔄 Merged cache: ${existingCache.data.length} existing + ${data.length} new = ${finalData.length} total`);
+      } else {
+        finalData = data;
+      }
+    }
+    
+    // Create metadata
+    if (finalData.length > 0) {
+      const timestamps = finalData.map(d => d.timestamp).sort((a, b) => a - b);
+      metadata = {
+        date: today,
+        lastUpdated: Date.now(),
+        firstDataTime: timestamps[0],
+        lastDataTime: timestamps[timestamps.length - 1],
+        dataCount: finalData.length,
+        cacheVersion: '1.0'
+      };
+    } else {
+      metadata = {
+        date: today,
+        lastUpdated: Date.now(),
+        dataCount: 0,
+        cacheVersion: '1.0'
+      };
+    }
+    
+    const cacheData: EcowittCacheData = {
+      data: finalData,
+      metadata
+    };
+    
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    console.log(`💾 Enhanced cache saved for ${deviceName}: ${finalData.length} points`);
+    
+  } catch (error) {
+    console.error(`Error caching enhanced data for ${deviceName}:`, error);
+  }
+}
+
+/**
+ * Get enhanced cached data with metadata
+ */
+export async function getEnhancedCachedData(deviceName: string): Promise<EcowittCacheData | null> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = ECOWITT_DEVICE_CACHE_KEY(deviceName, today);
+    
+    const cachedJson = await AsyncStorage.getItem(cacheKey);
+    if (!cachedJson) return null;
+    
+    const cached: EcowittCacheData = JSON.parse(cachedJson);
+    
+    // Validate cache structure and date
+    if (!cached.metadata || cached.metadata.date !== today) {
+      console.log(`📱 Cache invalid or from different day for ${deviceName}`);
+      return null;
+    }
+    
+    console.log(`📱 Using enhanced cached data for ${deviceName}: ${cached.data.length} points`);
+    return cached;
+    
+  } catch (error) {
+    console.error(`Error loading enhanced cached data for ${deviceName}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Smart refresh function - determines whether to do full or incremental fetch
+ */
+export async function smartRefreshEcowittData(deviceName: string): Promise<EcowittWindDataPoint[]> {
+  console.log(`🧠 Smart refresh for ${deviceName}...`);
+  
+  try {
+    const cachedData = await getEnhancedCachedData(deviceName);
+    
+    if (!cachedData || cachedData.data.length === 0) {
+      // No cache or empty cache - do full fetch
+      console.log(`📥 No cache found - doing full fetch for ${deviceName}`);
+      const fullData = await fetchEcowittWindDataForDevice(deviceName);
+      await cacheEcowittDataEnhanced(deviceName, fullData, false);
+      return fullData;
+    }
+    
+    // Check if cache is recent enough for incremental update
+    const now = Date.now();
+    const cacheAge = now - cachedData.metadata.lastUpdated;
+    const maxIncrementalAge = 4 * 60 * 60 * 1000; // 4 hours
+    
+    if (cacheAge > maxIncrementalAge) {
+      // Cache is too old - do full refresh
+      console.log(`📥 Cache too old (${Math.round(cacheAge / 60000)} min) - doing full fetch for ${deviceName}`);
+      const fullData = await fetchEcowittWindDataForDevice(deviceName);
+      await cacheEcowittDataEnhanced(deviceName, fullData, false);
+      return fullData;
+    }
+    
+    // Try incremental update
+    try {
+      const newData = await fetchIncrementalEcowittData(deviceName, cachedData.metadata.lastDataTime);
+      
+      if (newData.length > 0) {
+        await cacheEcowittDataEnhanced(deviceName, newData, true);
+        // Return merged data
+        const updatedCache = await getEnhancedCachedData(deviceName);
+        return updatedCache?.data || cachedData.data;
+      } else {
+        // No new data - return cached data
+        console.log(`📱 No new data - using cached data for ${deviceName}`);
+        return cachedData.data;
+      }
+      
+    } catch (incrementalError) {
+      console.warn(`⚠️ Incremental update failed for ${deviceName}, falling back to full fetch:`, incrementalError);
+      const fullData = await fetchEcowittWindDataForDevice(deviceName);
+      await cacheEcowittDataEnhanced(deviceName, fullData, false);
+      return fullData;
+    }
+    
+  } catch (error) {
+    console.error(`❌ Smart refresh failed for ${deviceName}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Deduplicate wind data points based on timestamp
+ */
+function deduplicateWindData(data: EcowittWindDataPoint[]): EcowittWindDataPoint[] {
+  const seen = new Set<number>();
+  return data.filter(point => {
+    if (seen.has(point.timestamp)) {
+      return false;
+    }
+    seen.add(point.timestamp);
+    return true;
+  }).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
+ * Clear enhanced cache for a specific device
+ */
+export async function clearEnhancedDeviceCache(deviceName: string): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = ECOWITT_DEVICE_CACHE_KEY(deviceName, today);
+    await AsyncStorage.removeItem(cacheKey);
+    console.log(`🗑️ Cleared enhanced cache for ${deviceName}`);
+  } catch (error) {
+    console.error(`Error clearing enhanced cache for ${deviceName}:`, error);
+  }
+}
+
+/**
  * Cache Ecowitt wind data
  */
 async function cacheEcowittData(data: EcowittWindDataPoint[]): Promise<void> {
@@ -684,10 +1000,13 @@ async function cacheEcowittData(data: EcowittWindDataPoint[]): Promise<void> {
 }
 
 /**
- * Get cached Ecowitt wind data
+ * Get cached Ecowitt wind data (legacy function - maintained for compatibility)
+ * For new code, use getEnhancedCachedData instead
  */
 export async function getCachedEcowittData(): Promise<EcowittWindDataPoint[]> {
   try {
+    // Try to get enhanced cache data for any device
+    // This is a fallback for legacy compatibility
     const cachedJson = await AsyncStorage.getItem(ECOWITT_CACHE_KEY);
     if (!cachedJson) return [];
     
@@ -696,7 +1015,7 @@ export async function getCachedEcowittData(): Promise<EcowittWindDataPoint[]> {
     
     // Only return cached data if it's from today
     if (cached.date === today && cached.data && Array.isArray(cached.data)) {
-      console.log('📱 Using cached Ecowitt data:', cached.data.length, 'points');
+      console.log('📱 Using legacy cached Ecowitt data:', cached.data.length, 'points');
       return cached.data;
     }
     
