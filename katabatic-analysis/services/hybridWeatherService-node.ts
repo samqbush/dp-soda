@@ -42,11 +42,11 @@ export interface WeatherServiceData {
   reliability: 'high' | 'medium' | 'low';
 }
 
-// Location constants
+// Location constants - Colorado locations for Dawn Patrol analysis
 export const LOCATIONS = {
-  SODA_LAKES: { lat: 39.5181, lon: -118.8739, name: 'Soda Lakes' },
-  YERINGTON: { lat: 38.9874, lon: -119.1637, name: 'Yerington' },
-  RENO: { lat: 39.5296, lon: -119.8138, name: 'Reno' }
+  SODA_LAKE: { lat: 39.6533, lon: -105.1942, name: 'Soda Lake, CO' },
+  MORRISON: { lat: 39.6547, lon: -105.1956, name: 'Morrison, CO' },
+  NEDERLAND: { lat: 40.0142, lon: -105.5108, name: 'Nederland, CO' }
 };
 
 // NOAA API interfaces
@@ -245,16 +245,48 @@ export class HybridWeatherService {
       console.log('⚠️ No OpenWeather API key - skipping OpenWeather data');
       return null;
     }
-
     try {
-      const response = await axios.get(
-        `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${this.openWeatherApiKey}&units=imperial&exclude=minutely,daily,alerts`,
-        { timeout: 10000 }
+      // Use the free current weather API (2.5)
+      const currentResponse = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${this.openWeatherApiKey}&units=imperial`,
+        { timeout: 10000 }  
       );
 
-      return response.data;
+      const current = currentResponse.data;
+      
+      // Convert free API response to match our expected format
+      const mockOneCallResponse: OpenWeatherResponse = {
+        lat: current.coord.lat,
+        lon: current.coord.lon,
+        timezone: 'UTC',
+        timezone_offset: 0,
+        current: {
+          dt: current.dt,
+          sunrise: current.sys?.sunrise || 0,
+          sunset: current.sys?.sunset || 0,
+          temp: current.main.temp,
+          feels_like: current.main.feels_like,
+          pressure: current.main.pressure,
+          humidity: current.main.humidity,
+          dew_point: 0, // Not available in free tier
+          uvi: 0, // Not available in free tier
+          clouds: current.clouds?.all || 0,
+          visibility: current.visibility || 10000,
+          wind_speed: current.wind?.speed || 0,
+          wind_deg: current.wind?.deg || 0,
+          weather: [{
+            id: current.weather[0]?.id || 800,
+            main: current.weather[0]?.main || 'Clear',
+            description: current.weather[0]?.description || 'clear sky',
+            icon: current.weather[0]?.icon || '01d'
+          }]
+        },
+        hourly: [] // Empty array for free tier
+      };
+
+      return mockOneCallResponse;
     } catch (error) {
-      console.error('OpenWeather API error:', error);
+      console.error('OpenWeather free tier API error:', error);
       return null;
     }
   }

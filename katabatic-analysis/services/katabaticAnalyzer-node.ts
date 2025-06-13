@@ -420,14 +420,33 @@ export class KatabaticAnalyzer {
       factors.wavePattern.confidence
     ];
 
-    const avgConfidence = confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length;
+    const avgFactorConfidence = confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length;
     
-    // Adjust confidence based on probability extremes
-    if (probability > 80 || probability < 20) {
-      return Math.min(95, avgConfidence + 10);
+    // Count how many factors are favorable
+    const favorableFactors = [
+      factors.precipitation.meets,
+      factors.skyConditions.meets,
+      factors.pressureChange.meets,
+      factors.temperatureDifferential.meets,
+      factors.wavePattern.meets
+    ].filter(Boolean).length;
+    
+    // Confidence should reflect both data quality AND prediction alignment
+    // High data confidence but no favorable factors = low prediction confidence
+    let predictionConfidence = avgFactorConfidence;
+    
+    // Penalize confidence when factors don't support the prediction
+    if (favorableFactors === 0) {
+      predictionConfidence = Math.min(30, avgFactorConfidence * 0.4); // Max 30% if 0/5 factors favorable
+    } else if (favorableFactors === 1) {
+      predictionConfidence = Math.min(50, avgFactorConfidence * 0.6); // Max 50% if 1/5 factors favorable
+    } else if (favorableFactors === 2) {
+      predictionConfidence = Math.min(70, avgFactorConfidence * 0.8); // Max 70% if 2/5 factors favorable
+    } else if (favorableFactors >= 3) {
+      predictionConfidence = avgFactorConfidence; // Full confidence if 3+ factors favorable
     }
     
-    return Math.round(avgConfidence);
+    return Math.round(predictionConfidence);
   }
 
   private generateRecommendation(probability: number, confidence: number): 'GO' | 'SKIP' | 'MARGINAL' {

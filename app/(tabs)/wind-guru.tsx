@@ -78,8 +78,45 @@ export default function WindGuruScreen() {
     }
   };
 
-  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high'): string => {
-    return confidence.charAt(0).toUpperCase() + confidence.slice(1);
+  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number): string => {
+    const baseLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
+    if (confidenceScore !== undefined) {
+      return `${baseLabel} (${confidenceScore}%)`;
+    }
+    return baseLabel;
+  };
+
+  const getConfidenceExplanation = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number, favorableFactors?: number): string => {
+    if (favorableFactors !== undefined) {
+      if (favorableFactors === 0) {
+        return `Low confidence due to 0/5 favorable factors despite good data quality`;
+      } else if (favorableFactors <= 2) {
+        return `${confidence} confidence - ${favorableFactors}/5 factors support prediction`;
+      } else {
+        return `${confidence} confidence - ${favorableFactors}/5 factors strongly support prediction`;
+      }
+    }
+    
+    switch (confidence) {
+      case 'high': return 'High confidence - data quality excellent and factors align well';
+      case 'medium': return 'Medium confidence - mixed signals from prediction factors';
+      case 'low': return 'Low confidence - factors indicate poor conditions';
+    }
+  };
+
+  // Helper to count favorable factors from prediction
+  const countFavorableFactors = (prediction: any): number => {
+    if (!prediction?.factors) return 0;
+    
+    const factors = [
+      prediction.factors.precipitation?.meets,
+      prediction.factors.skyConditions?.meets,
+      prediction.factors.pressureChange?.meets,
+      prediction.factors.temperatureDifferential?.meets,
+      prediction.factors.wavePattern?.meets
+    ];
+    
+    return factors.filter(Boolean).length;
   };
 
   const getRecommendationText = (recommendation: 'go' | 'maybe' | 'skip'): string => {
@@ -441,8 +478,18 @@ export default function WindGuruScreen() {
                   styles.confidenceText,
                   { color: getConfidenceColor(katabaticAnalysis.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(katabaticAnalysis.prediction.confidence)} Confidence - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
+                  {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} Confidence - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Confidence Explanation */}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
+                  {getConfidenceExplanation(
+                    katabaticAnalysis.prediction.confidence, 
+                    katabaticAnalysis.prediction.confidenceScore,
+                    countFavorableFactors(katabaticAnalysis.prediction)
+                  )}
+                </ThemedText>
+                
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
                   {katabaticAnalysis.prediction.explanation}
                 </ThemedText>
@@ -551,8 +598,18 @@ export default function WindGuruScreen() {
                   styles.confidenceText,
                   { color: getConfidenceColor(tomorrowPrediction.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(tomorrowPrediction.prediction.confidence)} Confidence - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
+                  {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} Confidence - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Confidence Explanation */}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
+                  {getConfidenceExplanation(
+                    tomorrowPrediction.prediction.confidence, 
+                    tomorrowPrediction.prediction.confidenceScore,
+                    countFavorableFactors(tomorrowPrediction.prediction)
+                  )}
+                </ThemedText>
+                
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
                   {tomorrowPrediction.prediction.explanation}
                 </ThemedText>
