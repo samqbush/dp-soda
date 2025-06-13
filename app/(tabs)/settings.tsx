@@ -1,4 +1,3 @@
-import { VersionDisplay } from '@/components/SecretGestureActivator';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -196,15 +195,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Auto-save information box */}
-        <View style={styles.autoSaveInfoBox}>
-          <ThemedText style={styles.autoSaveInfoTitle}>💾 Auto-Save Enabled</ThemedText>
-          <ThemedText style={styles.autoSaveInfoText}>
-            Your settings are automatically saved as you type. No need to press a save button! 
-            You&apos;ll see a &quot;💾 Saving...&quot; indicator when changes are being saved, followed by &quot;✅ Saved!&quot; when complete.
-          </ThemedText>
-        </View>
-
         <View style={styles.infoSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>About Dawn Patrol Alarm</ThemedText>
           <ThemedText style={styles.infoText}>
@@ -251,12 +241,6 @@ export default function SettingsScreen() {
             
             <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>3. Consecutive Good Points</ThemedText> - Counts the maximum number of consecutive data points that meet speed criteria. Ensures sustained favorable conditions rather than brief gusts.{'\n'}
           </ThemedText>
-          
-          
-        {/* Version display with secret gesture detection */}
-        <View style={styles.versionContainer}>
-          <VersionDisplay />
-        </View>
       </ThemedView>
     </ScrollView>
   );
@@ -350,26 +334,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: 'italic',
   },
-  autoSaveInfoBox: {
-    backgroundColor: 'rgba(52, 199, 89, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#34C759',
-  },
-  autoSaveInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#34C759',
-  },
-  autoSaveInfoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.8,
-  },
   infoSection: {
     marginTop: 16,
   },
@@ -391,18 +355,6 @@ const styles = StyleSheet.create({
   switchLabelContainer: {
     flex: 1,
     marginRight: 16,
-  },
-  versionContainer: {
-    marginTop: 32,
-    marginBottom: 20,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Subtle background to make it more visible
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)', // Light border for definition
-    minHeight: 60, // Ensure minimum tappable area
   },
   backgroundAlarmTester: {
     marginTop: 24,
@@ -451,4 +403,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Testing components removed - replaced with unified AlarmTestingPanel
+// Testing functionality is now handled by SimpleAlarmTester component above

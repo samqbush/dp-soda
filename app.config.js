@@ -1,10 +1,10 @@
-import 'dotenv/config';
+require('dotenv/config');
 
-export default {
+module.exports = {
   expo: {
     name: "Dawn Patrol Alarm",
     slug: "dp-soda",
-    version: "1.0.3",
+    version: "1.0.4",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dpsoda",
@@ -12,7 +12,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.samqbush.dpsoda",
-      buildNumber: "3",
+      buildNumber: "8",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
       },
@@ -42,7 +42,7 @@ export default {
       ],
       softwareKeyboardLayoutMode: "pan",
       allowBackup: true,
-      versionCode: 7,
+      versionCode: 8,
       theme: "@style/Theme.App.SplashScreen",
       jsEngine: "jsc",
       enableHermes: false,

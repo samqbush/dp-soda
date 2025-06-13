@@ -9,47 +9,52 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 - **Verification System**: Confirms predictions using 6am-8am window data
 - **Fully Configurable**: Customize all wind criteria to match your preferences
 - **Standley Lake Monitor**: Monitor real-time wind conditions at Standley Lake (via Ecowitt weather stations)
-- **🎯 NEW: Katabatic Wind Prediction**: Advanced meteorological analysis for mountain wind patterns (Phase 2 Complete!)
+- **🎯 NEW: Mountain Wave-Katabatic Interaction (MKI)**: Revolutionary 6-factor atmospheric analysis (Phase 4 Complete!)
 
-## Phase 2: Prediction Engine ✅ COMPLETE
+## Phase 4: MKI Integration ✅ COMPLETE
 
-**Advanced Katabatic Wind Prediction System**
+**Mountain Wave-Katabatic Interaction Prediction System**
 
-The Wind Guru tab now features a sophisticated meteorological analysis engine that predicts katabatic wind conditions with scientific accuracy. Unlike simple weather apps, our system analyzes the specific physics of mountain wind formation.
+The Wind Guru tab now features groundbreaking meteorological analysis based on atmospheric science research. Our system is the first consumer implementation of Mountain Wave-Katabatic Interaction (MKI) theory, providing unprecedented accuracy in mountain wind prediction.
 
 ### How It Works
 
-**4-Factor Scientific Analysis:**
-1. **☔ Precipitation Risk** (30% weight): Rain disrupts katabatic flow
-2. **🌙 Sky Conditions** (25% weight): Clear skies needed for radiative cooling (2-5am)  
-3. **📈 Pressure Changes** (25% weight): Indicates active air movement patterns
-4. **🌡️ Temperature Differential** (20% weight): Valley vs mountain temperature drives flow
+**Enhanced 6-Factor MKI Analysis:**
+1. **☔ Precipitation Risk** (25% weight): Rain disrupts both katabatic flow and wave patterns
+2. **🌙 Sky Conditions** (20% weight): Clear skies enable radiative cooling and wave development
+3. **📈 Pressure Changes** (20% weight): Enhanced analysis including wave-induced pressure modifications
+4. **🌡️ Temperature Differential** (15% weight): Valley vs mountain temperature with wave mixing effects
+5. **🌊 Wave Pattern** (15% weight): Mountain wave enhancement using Froude number analysis
+6. **🏔️ Atmospheric Stability** (5% weight): Multi-layer coupling efficiency between surface and wave levels
 
-**Smart Probability Calculation:**
-- Weighted algorithm considers factor importance
-- Penalty system for unmet critical criteria  
-- Confidence scoring validates prediction reliability
+**Advanced MKI Calculations:**
+- Froude number assessment for optimal wave conditions (Fr = 0.4-0.6)
+- Nonlinear wave-katabatic interaction modeling
+- Multi-scale variability analysis (mesoscale hourly + microscale rapid)
+- Enhanced bonus system for positive wave enhancement scenarios
 - Results in probability percentage with explanation
 
-**Example: Understanding 47% Prediction**
+**Example: Understanding 73% MKI Prediction**
 ```
-✅ Rain: 17.8% (good, below 20% threshold)
-❌ Sky: 56% clear (poor, below 70% requirement)  
-✅ Pressure: -7.3 hPa change (good, above 2.0 threshold)
-✅ Temp Diff: 6.1°C (good, above 5.0 threshold)
+✅ Rain: 8.2% (excellent, below 25% threshold)
+✅ Sky: 78% clear (good, above 45% requirement)  
+✅ Pressure: +3.1 hPa change (excellent, above 1.0 threshold)
+✅ Temp Diff: 7.3°F (good, above 6.0°F threshold)
+✅ Wave Pattern: Fr=0.52 (optimal, positive enhancement)
+❌ Stability: 42% coupling (marginal, below 50% threshold)
 
-Result: 47% probability, Low confidence → SKIP
-Why: Poor sky conditions prevent reliable cooling
+Result: 73% probability, High confidence → GO!
+Why: Strong basic conditions + positive wave enhancement
 ```
 
-### Katabatic Analysis Features
+### MKI Analysis Features
 
-1. **Real-time Probability Scoring**: Live percentage with visual indicators
-2. **Confidence Assessment**: High/Medium/Low reliability ratings
-3. **Factor-by-Factor Breakdown**: See exactly what's working/not working
-4. **Smart Recommendations**: Clear GO/MAYBE/SKIP guidance with explanations
-5. **Detailed Analysis**: Technical explanations for weather enthusiasts
-6. **Conservative Approach**: Better to miss good conditions than recommend poor ones
+1. **6-Factor Probability Scoring**: Live percentage with MKI visual indicators
+2. **Enhanced Confidence**: High/Medium/Low reliability with wave consideration
+3. **Complete Factor Breakdown**: See all 6 atmospheric interactions
+4. **MKI-Aware Recommendations**: GO/MAYBE/SKIP with wave enhancement context
+5. **Scientific Analysis**: Technical explanations based on atmospheric research
+6. **Intelligent Approach**: Captures complex scenarios traditional models miss
 
 ## Getting Started
 
@@ -107,13 +112,15 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 
 ### Wind Guru Tab
 
-The new **Wind Guru** tab provides advanced katabatic wind prediction:
+The enhanced **Wind Guru** tab provides revolutionary MKI wind prediction:
 
-- **Real-time Prediction**: Live probability scoring with confidence levels
-- **Factor Analysis**: Detailed breakdown of precipitation, sky conditions, pressure, and temperature
-- **Visual Indicators**: Color-coded probability bars and condition status
-- **Smart Recommendations**: Clear GO/MAYBE/SKIP guidance with explanations
-- **Enhanced Insights**: Best time windows and detailed meteorological analysis
+- **6-Factor MKI Analysis**: Complete atmospheric interaction assessment 
+- **Live Probability Scoring**: Real-time percentage with confidence levels
+- **Enhanced Factor Breakdown**: Detailed analysis of precipitation, sky, pressure, temperature, wave patterns, and stability
+- **Mountain Wave Assessment**: Froude number analysis and wave enhancement potential
+- **Visual MKI Indicators**: Color-coded probability bars and comprehensive condition status
+- **Scientific Recommendations**: GO/MAYBE/SKIP guidance based on atmospheric research
+- **Advanced Insights**: Optimal time windows and detailed meteorological analysis with wave considerations
 
 ## Customizing Your Experience
 

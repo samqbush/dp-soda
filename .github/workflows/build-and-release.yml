@@ -1,0 +1,619 @@
+name: Build Dawn Patrol Alarm - Combined Release
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # iOS Build Job
+  ios-build:
+    runs-on: macos-latest
+    outputs:
+      app-version: ${{ steps.get_version.outputs.version }}
+      bundle-id: ${{ steps.get_version.outputs.bundle_id }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 🧹 Clean previous builds and caches
+        run: |
+          rm -rf node_modules/.cache .expo ios
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Install Expo CLI and authenticate
+        run: |
+          npm install -g @expo/cli
+          npx expo whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: 1
+
+      - name: 🔍 Fix package versions
+        run: npx expo install --fix
+
+      - name: 🧪 Run checks
+        run: |
+          npm run lint
+
+      # Extract app version and bundle identifier from app.config.js
+      - name: 🏷️ Extract app version and bundle ID from app.config.js
+        id: get_version
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          BUNDLE_ID=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.ios.bundleIdentifier")
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "bundle_id=$BUNDLE_ID" >> $GITHUB_OUTPUT
+          echo "App Version: $VERSION"
+          echo "Bundle Identifier: $BUNDLE_ID"
+          
+      # Create .env file from GitHub secrets
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+          echo "OPENWEATHER_API_KEY=${{ secrets.OPENWEATHER_API_KEY }}" >> .env
+          echo "✅ Created .env file with API credentials"
+
+      # Set up Xcode
+      - name: 🍎 Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Generate the native iOS project
+      - name: 🔧 Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
+        env:
+          CI: 1
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      
+      # Install CocoaPods dependencies
+      - name: 📦 Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      # Set up iOS signing
+      - name: 🔐 Set up iOS signing
+        run: |
+          # Create keychain
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security set-keychain-settings -t 1800 -l build.keychain
+          
+          # Import distribution certificate
+          echo "${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          
+          # Import provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.IOS_DIST_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          
+          # Set code signing permissions
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          
+          echo "iOS distribution signing setup complete"
+
+      # Build and archive iOS app
+      - name: 🏗️ Build and Archive iOS App
+        run: |
+          cd ios
+          
+          # Find the .xcworkspace (required)
+          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
+          echo "Found workspace: $WORKSPACE_FILE"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          
+          # Extract provisioning profile UUID and name
+          PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          PROFILE_NAME=$(grep -A1 -a '<key>Name</key>' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Provisioning Profile UUID: $PROFILE_UUID"
+          echo "Provisioning Profile Name: $PROFILE_NAME"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
+          
+          # Confirm the bundle identifier we're using
+          echo "Using bundle identifier: ${{ env.BUNDLE_ID }}"
+          
+          # Build and archive
+          $BUILD_COMMAND \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath ../build/dpsoda.xcarchive \
+            CODE_SIGN_IDENTITY="${{ secrets.IOS_DIST_CODE_SIGN_IDENTITY }}" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE="Manual" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+          echo "iOS app archived successfully"
+
+      # Export IPA
+      - name: 📦 Export IPA
+        run: |
+          # Use bundle identifier from previous step
+          echo "Using Bundle Identifier: ${{ env.BUNDLE_ID }}"
+          
+          # Create export options plist with provisioning profile
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${{ env.BUNDLE_ID }}</key>
+              <string>${{ env.PROFILE_NAME }}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          
+          # Display export options for debugging
+          echo "Export options:"
+          cat ExportOptions.plist
+          
+          # Export IPA
+          xcodebuild -exportArchive \
+            -archivePath build/dpsoda.xcarchive \
+            -exportPath build \
+            -exportOptionsPlist ExportOptions.plist
+          
+          # Find and rename the exported IPA 
+          echo "Searching for IPA file in build directory..."
+          ls -la build/
+          EXPORTED_IPA=$(find build -name "*.ipa" | head -1)
+          echo "Found IPA file: $EXPORTED_IPA"
+          
+          # Rename IPA to include version
+          mv "$EXPORTED_IPA" ./dp-soda-${{ env.APP_VERSION }}.ipa
+          
+          echo "IPA exported successfully"
+
+      # Upload IPA as artifact for the release job
+      - name: 📤 Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ./dp-soda-${{ env.APP_VERSION }}.ipa
+          retention-days: 1
+
+  # Android Build Job
+  android-build:
+    runs-on: ubuntu-latest
+    outputs:
+      app-version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 🧹 Clean previous builds and caches
+        run: |
+          rm -rf node_modules/.cache .expo android
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Install Expo CLI and authenticate
+        run: |
+          npm install -g @expo/cli
+          npx expo whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: 1
+
+      - name: 🔍 Fix package versions
+        run: npx expo install --fix
+
+      - name: 🧪 Run checks
+        run: |
+          npm run lint
+          
+      # Create .env file from GitHub secrets
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+          echo "OPENWEATHER_API_KEY=${{ secrets.OPENWEATHER_API_KEY }}" >> .env
+          echo "✅ Created .env file with API credentials"
+        
+      # Android build setup
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📱 Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: 💾 Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Generate the native Android project
+      - name: 🔧 Generate native Android project
+        run: npx expo prebuild --platform android --clean
+        env:
+          CI: 1
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # Create a keystore file from secrets
+      - name: 🔐 Setup Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "storeFile=upload-keystore.jks" >> android/gradle.properties
+          echo "keyAlias=upload-key" >> android/gradle.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
+          echo "keyPassword=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
+
+      # Configure app/build.gradle for proper signing
+      - name: 🔏 Configure signing in build.gradle
+        run: |
+          if [ -f "android/app/build.gradle" ]; then
+            echo "📄 Found build.gradle file"
+            
+            # Create a backup of the original file
+            cp android/app/build.gradle android/app/build.gradle.bak
+            
+            # First analyze the file structure
+            echo "🔍 Analyzing build.gradle structure..."
+            grep -n "android {" android/app/build.gradle
+            grep -n "buildTypes {" android/app/build.gradle
+            grep -n "signingConfigs" android/app/build.gradle || echo "No existing signingConfigs found"
+            
+            # Find the buildTypes section line number
+            BUILDTYPES_LINE=$(grep -n "buildTypes {" android/app/build.gradle | head -n1 | cut -d: -f1)
+            
+            if [ -n "$BUILDTYPES_LINE" ]; then
+              echo "✅ Found buildTypes section at line $BUILDTYPES_LINE"
+              
+              # Create a temp file with proper structure
+              TEMP_FILE=$(mktemp)
+              
+              # Write the first part of the file up to buildTypes
+              sed -n "1,$((BUILDTYPES_LINE-1))p" android/app/build.gradle > "$TEMP_FILE"
+              
+              # Insert signingConfigs BEFORE buildTypes
+              echo '    signingConfigs {' >> "$TEMP_FILE"
+              echo '        debug {' >> "$TEMP_FILE"
+              echo '            storeFile file("debug.keystore")' >> "$TEMP_FILE"
+              echo '            storePassword "android"' >> "$TEMP_FILE"
+              echo '            keyAlias "androiddebugkey"' >> "$TEMP_FILE"
+              echo '            keyPassword "android"' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '        release {' >> "$TEMP_FILE"
+              echo '            storeFile file("upload-keystore.jks")' >> "$TEMP_FILE"
+              echo '            storePassword project.storePassword' >> "$TEMP_FILE"
+              echo '            keyAlias project.keyAlias' >> "$TEMP_FILE"
+              echo '            keyPassword project.keyPassword' >> "$TEMP_FILE"
+              echo '            v1SigningEnabled true' >> "$TEMP_FILE"
+              echo '            v2SigningEnabled true' >> "$TEMP_FILE"
+              echo '        }' >> "$TEMP_FILE"
+              echo '    }' >> "$TEMP_FILE"
+              echo '' >> "$TEMP_FILE"
+              
+              # Append the rest of the file starting with buildTypes
+              sed -n "${BUILDTYPES_LINE},\$p" android/app/build.gradle >> "$TEMP_FILE"
+              
+              # Replace original with our new file
+              mv "$TEMP_FILE" android/app/build.gradle
+              
+              echo "✅ Added signingConfigs section before buildTypes section"
+            fi
+            
+            # Update the release buildType section to use release signing
+            if grep -q "signingConfig signingConfigs.debug" android/app/build.gradle; then
+              echo "🔧 Found debug signing config reference, replacing with release..."
+              sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
+              echo "✅ Updated signing config references in buildType"
+            fi
+          fi
+
+      # Update gradle.properties for better build performance
+      - name: ⚙️ Configure Gradle for production build
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.configureondemand=true" >> android/gradle.properties
+          echo "android.enableR8.fullMode=false" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
+          echo "android.enableR8=true" >> android/gradle.properties
+          echo "android.enableProguard=false" >> android/gradle.properties
+
+      - name: 🔧 Add build metadata
+        run: |
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            sed -i '/<application/a\        <meta-data android:name="crash_detection_build" android:value="github_actions_enhanced" />' android/app/src/main/AndroidManifest.xml
+            sed -i '/<application/a\        <meta-data android:name="build_timestamp" android:value="'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" />' android/app/src/main/AndroidManifest.xml
+          fi
+
+      # Extract app version from app.config.js
+      - name: 🏷️ Extract app version from app.config.js
+        id: get_version
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # Build the AAB
+      - name: 🏗️ Build Android App Bundle
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      # Fallback manual signing of the AAB with jarsigner
+      - name: 🔏 Manual signing fallback
+        run: |
+          echo "Applying fallback manual signing to ensure proper release signing..."
+          # Sign the AAB with jarsigner
+          jarsigner -verbose \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.STORE_PASSWORD }}" \
+            -keypass "${{ secrets.STORE_PASSWORD }}" \
+            -signedjar android/app/build/outputs/bundle/release/app-release-signed.aab \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            upload-key
+          
+          # Use the manually signed AAB
+          mv android/app/build/outputs/bundle/release/app-release-signed.aab android/app/build/outputs/bundle/release/app-release.aab
+          
+          echo "Manual signing complete"
+
+      # Rename AAB to include version
+      - name: 🏷️ Rename AAB with version
+        run: |
+          mv android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.aab
+
+      # Convert AAB to APKs for device testing
+      - name: 📥 Download Bundletool
+        run: |
+          curl -L -o bundletool.jar https://github.com/google/bundletool/releases/download/1.15.6/bundletool-all-1.15.6.jar
+
+      - name: 📱 Generate Universal APK from AAB
+        run: |
+          java -jar bundletool.jar build-apks \
+            --bundle=android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.aab \
+            --output=android/app/build/outputs/bundle/release/app-release.apks \
+            --ks=android/app/upload-keystore.jks \
+            --ks-key-alias=upload-key \
+            --ks-pass=pass:${{ secrets.STORE_PASSWORD }} \
+            --key-pass=pass:${{ secrets.STORE_PASSWORD }} \
+            --mode=universal
+
+      - name: 📦 Extract Universal APK
+        run: |
+          cd android/app/build/outputs/bundle/release
+          unzip -j app-release.apks universal.apk
+          mv universal.apk dp-soda-${{ env.APP_VERSION }}.apk
+
+      # Upload Android artifacts for the release job
+      - name: 📤 Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.aab
+          retention-days: 1
+
+      - name: 📤 Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.apk
+          retention-days: 1
+
+  # Unified Release Job (only for pull requests)
+  create-release:
+    if: github.event_name == 'pull_request'
+    needs: [ios-build, android-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: ./artifacts/
+
+      - name: 📥 Download Android AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: ./artifacts/
+
+      - name: 📥 Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./artifacts/
+
+      - name: 📋 List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -la ./artifacts/
+
+      - name: 🚀 Create Unified Draft Release
+        run: |
+          # Set version from build outputs
+          APP_VERSION="${{ needs.ios-build.outputs.app-version }}"
+          BUNDLE_ID="${{ needs.ios-build.outputs.bundle-id }}"
+          
+          # Create comprehensive release body content
+          cat > release_body.md << 'EOF'
+          ## Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}
+          
+          **Pre-Release Build from PR #${{ github.event.number }}**
+          
+          ### 📱 Available Downloads:
+          - **iOS IPA**: For TestFlight and App Store distribution
+          - **Android AAB**: For Google Play Store submission
+          - **Android APK**: For direct device installation and testing
+          
+          ### 🔧 Build Information:
+          - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
+          - Source branch: `${{ github.head_ref }}`
+          - Target branch: `${{ github.base_ref }}`
+          - Commit: ${{ github.event.pull_request.head.sha }}
+          - Platforms: iOS + Android
+          - Build type: Release (signed for distribution)
+          - iOS Bundle ID: ${{ needs.ios-build.outputs.bundle-id }}
+          
+          ### 📋 Installation Instructions:
+          
+          **For iOS TestFlight:**
+          1. Download the `.ipa` file
+          2. Upload to App Store Connect
+          3. Add to TestFlight for beta testing
+          
+          **For iOS App Store:**
+          1. Download the `.ipa` file
+          2. Upload to App Store Connect
+          3. Submit for App Store review
+          
+          **For Google Play Store:**
+          1. Download the `.aab` file
+          2. Upload to Google Play Console
+          
+          **For Direct Android Installation:**
+          1. Download the `.apk` file
+          2. Enable "Install from unknown sources" on your Android device
+          3. Install the APK file
+          
+          ### ⚠️ Pre-Release Notice
+          This is a draft release created from a pull request. Review and test thoroughly before publishing.
+          
+          ---
+          *This is an automated draft release created by GitHub Actions*
+          EOF
+          
+          # Create the unified draft release with all files
+          gh release create "v${{ needs.ios-build.outputs.app-version }}" \
+            --draft \
+            --title "Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}" \
+            --notes-file "release_body.md" \
+            "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa#iOS App Store IPA" \
+            "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.aab#Android App Bundle (AAB)" \
+            "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.apk#Universal Android APK"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Build Summary
+        run: |
+          echo "## 🎉 Unified Draft Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Tag**: v${{ needs.ios-build.outputs.app-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: iOS + Android" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Type**: Release (signed for distribution)" >> $GITHUB_STEP_SUMMARY
+          echo "- **iOS Bundle ID**: ${{ needs.ios-build.outputs.bundle-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source**: PR #${{ github.event.number }} - \"${{ github.event.pull_request.title }}\"" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
+          echo "- **iOS IPA**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa\` (for TestFlight/App Store)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android AAB**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.aab\` (for Google Play Store)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android APK**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.apk\` (for direct installation)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the draft release in the [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test the builds on your devices if needed" >> $GITHUB_STEP_SUMMARY
+          echo "3. Upload IPA to [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
+          echo "4. Upload AAB to [Google Play Console](https://play.google.com/console)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
+
+  # Upload artifacts for workflow_dispatch runs
+  upload-artifacts:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [ios-build, android-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: ./artifacts/
+
+      - name: 📥 Download Android AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: ./artifacts/
+
+      - name: 📥 Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./artifacts/
+
+      - name: 📤 Upload Combined Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dp-soda-combined-v${{ needs.ios-build.outputs.app-version }}
+          path: ./artifacts/
+          retention-days: 30
+
+      - name: 📋 Build Summary
+        run: |
+          echo "## 🎉 Combined Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 Build Information:" >> $GITHUB_STEP_SUMMARY
+          echo "- **App Version**: ${{ needs.ios-build.outputs.app-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: iOS + Android" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Type**: Release (signed for distribution)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Available Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Combined Package**: \`dp-soda-combined-v${{ needs.ios-build.outputs.app-version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **iOS IPA**: Ready for TestFlight and App Store" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android AAB**: Ready for Google Play Store" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android APK**: Ready for direct installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the combined artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "2. Upload IPA to [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Upload AAB to [Google Play Console](https://play.google.com/console)" >> $GITHUB_STEP_SUMMARY
+          echo "4. Test APK on Android devices if needed" >> $GITHUB_STEP_SUMMARY

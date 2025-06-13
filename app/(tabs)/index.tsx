@@ -1,52 +1,59 @@
-import React from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { Platform, StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
+import { Image } from 'expo-image';
+
+import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { WindChart } from '@/components/WindChart';
-import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
+import { AlarmControlPanel } from '@/components/AlarmControlPanel';
+import { SafeImage } from '@/components/SafeImage';
+import { useDPAlarm } from '@/hooks/useDPAlarm';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
+import { productionCrashDetector } from '@/services/productionCrashDetector';
 
-export default function SodaLakeScreen() {
+export default function DPAlarmScreen() {
+  useEffect(() => {
+    console.log('⏰ DP Alarm screen mounted');
+    productionCrashDetector.logUserAction('dp_alarm_screen_loaded');
+  }, []);
+
   const {
-    windData,
-    chartData,
-    analysis,
-    isLoading,
+    alarmStatus,
     error,
-    lastUpdated,
-    refreshData,
-    clearCache
-  } = useSodaLakeWind();
+    refreshData
+  } = useDPAlarm();
+
+  // Debug logging for threshold changes
+  useEffect(() => {
+    console.log('🎯 DP Alarm threshold updated:', alarmStatus.threshold);
+  }, [alarmStatus.threshold]);
 
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 
-  // Auto-refresh data when tab comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('🏔️ Soda Lake tab focused - refreshing data...');
-      refreshData();
-    }, [refreshData])
-  );
+  // Track component loaded state for Android
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    // Mark component as fully loaded after a delay on Android
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, Platform.OS === 'android' ? 500 : 0);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleRefresh = async () => {
-    await refreshData();
+    try {
+      await refreshData();
+    } catch {
+      Alert.alert('Error', 'Failed to refresh wind data. Please try again.');
+    }
   };
 
   const formatLastUpdated = () => {
-    if (!lastUpdated) return 'Never';
+    if (!alarmStatus.lastUpdated) return 'Never';
     const now = new Date();
-    const diff = now.getTime() - lastUpdated.getTime();
+    const diff = now.getTime() - alarmStatus.lastUpdated.getTime();
     const minutes = Math.floor(diff / 60000);
     
     if (minutes < 1) return 'Just now';
@@ -57,174 +64,115 @@ export default function SodaLakeScreen() {
     return `${days}d ago`;
   };
 
-  const getCurrentWindSpeed = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windSpeedMph;
-  };
-
-  const getCurrentWindDirection = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windDirection;
-  };
-
-  const getWindDirectionText = (degrees: number | null) => {
-    if (degrees === null) return 'N/A';
-    
-    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-    const index = Math.round(degrees / 22.5) % 16;
-    return directions[index];
-  };
+  // Show loading on Android until component is ready
+  if (Platform.OS === 'android' && !isLoaded) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={handleRefresh}
-            tintColor={tintColor}
+    <ParallaxScrollView
+      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerImage={
+        Platform.OS === 'android' ? (
+          <SafeImage
+            source={require('@/assets/images/dawnpatrol.jpeg')}
+            style={styles.headerImage}
+            backgroundColor="#A1CEDC"
+            contentFit="cover"
           />
-        }
-      >
-        <View style={styles.header}>
-          <View>
-            <ThemedText type="title">Soda Lake</ThemedText>
-            <ThemedText style={styles.subtitle}>Ecowitt monitor located at the head of the lake</ThemedText>
-          </View>
-        </View>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>⚠️ {error}</ThemedText>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-              <ThemedText style={[styles.retryButtonText, { color: tintColor }]}>
-                Retry
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={tintColor} />
-            <ThemedText style={styles.loadingText}>Fetching wind data...</ThemedText>
-          </View>
-        )}
-
-        {/* Current Conditions */}
-        <View style={[styles.currentConditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
-          <View style={styles.currentConditionsGrid}>
-            <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {getCurrentWindSpeed()?.toFixed(1) || '--'} mph
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Direction</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {getWindDirectionText(getCurrentWindDirection())} ({getCurrentWindDirection()?.toFixed(0) || '--'}°)
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Data Points</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {windData.length}
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {formatLastUpdated()}
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-
-        {/* Wind Chart */}
-        {chartData.length > 0 ? (
-          <View style={[styles.chartCard, { backgroundColor: cardColor }]}>
-            <WindChart
-              data={chartData}
-              title="Today's Wind Speed"
-              timeWindow={getWindChartTimeWindow()} // Use smart time window (4am to current, max 9pm)
-            />
-          </View>
         ) : (
-          <View style={[styles.noDataCard, { backgroundColor: cardColor }]}>
-            <ThemedText style={styles.noDataText}>
-              No wind data available for today. Pull to refresh.
-            </ThemedText>
-          </View>
-        )}
+          <Image
+            source={require('@/assets/images/dawnpatrol.jpeg')}
+            style={styles.headerImage}
+            contentFit="cover"
+          />
+        )
+      }>
+      
+      <ThemedView style={styles.titleContainer}>
+        <ThemedText type="title">Dawn Patrol Alarm</ThemedText>
+      </ThemedView>
 
-        {/* Analysis */}
-        {analysis && (
-          <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
-            <ThemedText style={styles.analysisText}>
-              Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
-              Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}
-              Consecutive Good Points: {analysis.consecutiveGoodPoints}{'\n'}
-              {analysis.analysis}
-            </ThemedText>
-          </View>
-        )}
-
-        {/* Detailed Weather Data Link */}
-        <View style={[styles.linkCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Detailed Weather Data</ThemedText>
-          <ThemedText style={styles.linkDescription}>
-            For more detailed wind analysis and historical data, visit the Ecowitt weather station page:
-          </ThemedText>
-          <TouchableOpacity
-            style={[styles.linkButton, { borderColor: tintColor }]}
-            onPress={() => Linking.openURL('https://www.ecowitt.net/home/share?authorize=9S85P3')}
-          >
-            <ThemedText style={[styles.linkButtonText, { color: tintColor }]}>
-              📊 View Detailed Weather Data
+      {error && (
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>⚠️ {error}</ThemedText>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <ThemedText style={[styles.retryButtonText, { color: tintColor }]}>
+              Retry
             </ThemedText>
           </TouchableOpacity>
         </View>
+      )}
 
-        {/* Debug Actions */}
-        {__DEV__ && (
-          <View style={styles.debugContainer}>
-            <TouchableOpacity
-              style={[styles.debugButton, { borderColor: tintColor }]}
-              onPress={clearCache}
-            >
-              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
-                Clear Cache
-              </ThemedText>
-            </TouchableOpacity>
+      {/* Large Alarm Status Display */}
+      <View style={[styles.alarmStatusCard, { backgroundColor: cardColor }]}>
+        <View style={styles.alarmStatusContainer}>
+          <ThemedText style={[
+            styles.alarmStatusText,
+            { color: alarmStatus.shouldWakeUp ? '#34C759' : '#FF3B30' }
+          ]}>
+            {alarmStatus.shouldWakeUp ? 'Wake Up! 🌊' : 'Sleep In 😴'}
+          </ThemedText>
+          
+          <ThemedText style={styles.reasonText}>
+            {alarmStatus.reason}
+          </ThemedText>
+        </View>
+      </View>
+
+      {/* Alarm Time Conditions */}
+      <View style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+        <ThemedText type="subtitle" style={styles.cardTitle}>Alarm Time Conditions</ThemedText>
+        <View style={styles.conditionsGrid}>
+          <View style={styles.conditionItem}>
+            <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
+            <ThemedText style={styles.conditionValue}>
+              {alarmStatus.currentSpeed?.toFixed(1) || '--'} mph
+            </ThemedText>
           </View>
-        )}
-      </ScrollView>
-    </ThemedView>
+          <View style={styles.conditionItem}>
+            <ThemedText style={styles.conditionLabel}>Average Speed</ThemedText>
+            <ThemedText style={styles.conditionValue}>
+              {alarmStatus.averageSpeed?.toFixed(1) || '--'} mph
+            </ThemedText>
+          </View>
+          <View style={styles.conditionItem}>
+            <ThemedText style={styles.conditionLabel}>Threshold</ThemedText>
+            <ThemedText style={styles.conditionValue}>
+              {alarmStatus.threshold} mph
+            </ThemedText>
+          </View>
+          <View style={styles.conditionItem}>
+            <ThemedText style={styles.conditionLabel}>Alarm Time</ThemedText>
+            <ThemedText style={styles.conditionValue}>
+              {formatLastUpdated()}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+
+      {/* Alarm Control Panel */}
+      <AlarmControlPanel />
+
+    </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
+  titleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    gap: 8,
   },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    marginTop: 4,
+  headerImage: {
+    width: '100%', 
+    height: '100%',
+    position: 'absolute',
+    resizeMode: 'cover',
   },
   errorContainer: {
     margin: 16,
@@ -245,15 +193,29 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontWeight: '600',
   },
-  loadingContainer: {
+  alarmStatusCard: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
     alignItems: 'center',
-    padding: 32,
   },
-  loadingText: {
-    marginTop: 12,
-    opacity: 0.7,
+  alarmStatusContainer: {
+    alignItems: 'center',
   },
-  currentConditionsCard: {
+  alarmStatusText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 40,
+  },
+  reasonText: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.8,
+    lineHeight: 22,
+  },
+  conditionsCard: {
     margin: 16,
     padding: 16,
     borderRadius: 12,
@@ -261,7 +223,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     marginBottom: 12,
   },
-  currentConditionsGrid: {
+  conditionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
@@ -278,64 +240,5 @@ const styles = StyleSheet.create({
   conditionValue: {
     fontSize: 18,
     fontWeight: '600',
-  },
-  chartCard: {
-    margin: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  noDataCard: {
-    margin: 16,
-    padding: 32,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  noDataText: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  analysisCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-  },
-  analysisText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  linkCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-  },
-  linkDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-    opacity: 0.8,
-  },
-  linkButton: {
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  linkButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  debugContainer: {
-    margin: 16,
-    paddingBottom: 32,
-  },
-  debugButton: {
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  debugButtonText: {
-    fontSize: 14,
   },
 });

@@ -73,7 +73,8 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
   async scheduleAlarmNotification(
     triggerDate: Date,
     title: string,
-    body: string
+    body: string,
+    data?: any
   ): Promise<string | null> {
     try {
       if (!this.isNotificationSupported()) {
@@ -82,6 +83,25 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
       }
 
       AlarmLogger.info(`Scheduling alarm notification for ${triggerDate.toLocaleString()}`);
+      
+      // DEBUG: Check if the date is in the future
+      const now = new Date();
+      const msUntilTrigger = triggerDate.getTime() - now.getTime();
+      const hoursUntilTrigger = msUntilTrigger / (1000 * 60 * 60);
+      
+      AlarmLogger.info(`🔍 DEBUG: Notification date check:`, {
+        triggerDate: triggerDate.toISOString(),
+        now: now.toISOString(),
+        msUntilTrigger,
+        hoursUntilTrigger: hoursUntilTrigger.toFixed(2),
+        isInFuture: msUntilTrigger > 0
+      });
+      
+      // If the date is not in the future, don't schedule it
+      if (msUntilTrigger <= 0) {
+        AlarmLogger.warning(`⚠️ Cannot schedule notification for past date: ${triggerDate.toLocaleString()}`);
+        return null;
+      }
 
       // Cancel any existing notification
       if (this.scheduledNotificationId) {
@@ -89,6 +109,11 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
       }
 
       // Schedule the new notification
+      // Try seconds-based trigger as alternative to date-based trigger for reliability
+      const secondsUntilTrigger = Math.ceil(msUntilTrigger / 1000);
+      
+      AlarmLogger.info(`🔍 DEBUG: Using seconds-based trigger: ${secondsUntilTrigger} seconds from now`);
+      
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -96,9 +121,10 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
           sound: 'default',
           priority: 'high',
           categoryIdentifier: 'wind-alarm',
+          data: data || {},
         },
         trigger: {
-          date: triggerDate,
+          seconds: secondsUntilTrigger,
           channelId: 'wind-alarm-channel',
         },
       });

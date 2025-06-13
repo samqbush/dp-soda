@@ -1,7 +1,6 @@
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { AndroidDebugger } from './AndroidDebugger';
 import { EmergencyRecovery } from './EmergencyRecovery';
 import { WhiteScreenDetective } from './WhiteScreenDetective';
 
@@ -12,7 +11,6 @@ import { WhiteScreenDetective } from './WhiteScreenDetective';
  */
 export function SafeAppLoader() {
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [showDebug, setShowDebug] = useState(false);
   const [forceReload, setForceReload] = useState(0);
   
   useEffect(() => {
@@ -31,11 +29,6 @@ export function SafeAppLoader() {
     const interval = setInterval(() => {
       setTimeElapsed(prev => {
         const newVal = prev + 1;
-        
-        // Show debug info after 5 seconds
-        if (newVal === 5 && Platform.OS === 'android') {
-          setShowDebug(true);
-        }
         
         // Extra safety - if we're stuck for 10 seconds, force reload
         if (newVal >= 10 && Platform.OS === 'android') {
@@ -65,7 +58,6 @@ export function SafeAppLoader() {
   return (
     <View style={styles.container}>
       <WhiteScreenDetective />
-      <AndroidDebugger enabled={showDebug} />
       
       <ActivityIndicator
         size="large"

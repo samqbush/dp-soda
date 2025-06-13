@@ -81,28 +81,60 @@ interface WeatherService {
 
 ### Katabatic Analyzer (`hooks/useKatabaticAnalyzer.ts`)
 
-**Purpose**: Advanced wind prediction using 4-factor meteorological analysis
+**Purpose**: Advanced wind prediction using 6-factor MKI meteorological analysis
 
 **Analysis Factors**:
-1. **Rain Factor**: Precipitation probability during dawn patrol
-2. **Clear Sky Factor**: Cloud cover during overnight cooling
-3. **Pressure Factor**: Barometric pressure changes
-4. **Temperature Factor**: Elevation-based temperature gradients
+1. **Precipitation Factor** (25%): Precipitation probability during dawn patrol
+2. **Sky Conditions Factor** (20%): Cloud cover during overnight cooling
+3. **Pressure Change Factor** (20%): Barometric pressure changes and wave-induced modifications
+4. **Temperature Differential Factor** (15%): Elevation-based temperature gradients
+5. **Wave Pattern Factor** (15%): Mountain wave enhancement using Froude number analysis
+6. **Atmospheric Stability Factor** (5%): Multi-layer stability for wave-katabatic coupling
+
+**MKI Enhancement Features**:
+- Enhanced bonus system for multiple favorable factors (4+ factors: 20%, 5+ factors: 45%, 6 factors: 55%)
+- Special MKI enhancement bonuses for positive wave conditions (+10% when confidence >70%)
+- Improved confidence calculation accounting for wave interactions
+- Nonlinear interaction modeling based on atmospheric research
 
 **Calculation Process**:
 ```typescript
-// Simplified calculation flow
-const calculatePrediction = (weatherData: WeatherData) => {
+// Enhanced MKI calculation flow
+const calculatePrediction = (weatherData: WeatherData, waveAnalysis: MountainWaveAnalysis) => {
   const rainScore = calculateRainFactor(weatherData);
   const skyScore = calculateSkyFactor(weatherData);
   const pressureScore = calculatePressureFactor(weatherData);
   const tempScore = calculateTemperatureFactor(weatherData);
+  const waveScore = calculateWavePatternFactor(waveAnalysis);
+  const stabilityScore = calculateStabilityFactor(weatherData);
   
-  const overallProbability = (rainScore + skyScore + pressureScore + tempScore) / 4;
-  const confidence = calculateConfidence(weatherData);
+  const weightedProbability = calculateWeightedMKIScore(factors);
+  const confidence = calculateMKIConfidence(weatherData, waveAnalysis);
   
-  return { probability: overallProbability, confidence };
+  return { prediction: weightedProbability, confidence, mkiFactors };
 };
+```
+
+### Mountain Wave Analyzer (`services/mountainWaveAnalyzer.ts`)
+
+**Purpose**: Analyzes mountain wave conditions for MKI integration
+
+**Key Functions**:
+- **Froude Number Calculation**: Fr = U/(N*H) for mountain wave assessment
+- **Wave Pattern Analysis**: Amplitude, organization, and surface coupling evaluation
+- **Atmospheric Stability Profiling**: Multi-layer stability assessment
+- **Enhancement Potential**: Determines positive/neutral/negative wave impact on katabatic flow
+
+**Analysis Output**:
+```typescript
+interface MountainWaveAnalysis {
+  froudeNumber: number;
+  waveAmplitude: 'low' | 'moderate' | 'high';
+  waveOrganization: 'organized' | 'mixed' | 'chaotic';
+  surfaceCoupling: 'strong' | 'moderate' | 'weak';
+  enhancement: 'positive' | 'neutral' | 'negative';
+  confidence: number;
+}
 ```
 
 ### Audio Service (`services/alarmAudioService.ts`)
@@ -346,6 +378,56 @@ const weatherConfig = {
 1. **Request Batching**: Combine multiple API calls when possible
 2. **Compression**: Enable gzip for API responses
 3. **Connection Pooling**: Reuse connections for better performance
+
+## MKI Integration Architecture
+
+### Mountain Wave-Katabatic Interaction Implementation
+
+The Phase 4 MKI integration represents a significant architectural enhancement that transforms the prediction system from basic meteorological analysis to sophisticated atmospheric science modeling.
+
+### Enhanced Prediction Pipeline
+
+```
+Weather Data Input
+      ↓
+Basic Meteorological Analysis (4 factors)
+      ↓
+Mountain Wave Analysis (NEW)
+      ↓
+Atmospheric Stability Profiling (NEW)
+      ↓
+MKI Integration & Enhancement Calculation
+      ↓
+6-Factor Weighted Prediction with Confidence
+```
+
+### New Service Integration
+
+**Mountain Wave Analyzer Service**:
+- Calculates Froude numbers for wave assessment
+- Analyzes wave amplitude, organization, and surface coupling
+- Determines enhancement potential (positive/neutral/negative)
+- Integrates with main prediction pipeline
+
+**Enhanced Katabatic Analyzer**:
+- Rebalanced factor weights for 6-factor system (25%, 20%, 20%, 15%, 15%, 5%)
+- Advanced bonus system with MKI-aware calculations
+- Multi-scale confidence assessment
+- Nonlinear interaction modeling
+
+### Technical Implementation Benefits
+
+1. **Accuracy Improvement**: Target 15-25% increase in prediction accuracy
+2. **Edge Case Handling**: Better handling of marginal conditions with wave enhancement
+3. **Scientific Foundation**: First practical consumer implementation of MKI research
+4. **Scalable Architecture**: Foundation for future machine learning integration
+
+### Performance Considerations for MKI
+
+- **Computation Caching**: Complex Froude number calculations cached for 30 minutes
+- **Background Processing**: Wave analysis performed asynchronously
+- **Graceful Degradation**: Falls back to 4-factor system if wave data unavailable
+- **Memory Optimization**: Efficient wave pattern data structures
 
 ## Security Considerations
 

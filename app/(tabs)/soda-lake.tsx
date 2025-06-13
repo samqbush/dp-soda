@@ -1,11 +1,7 @@
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { WindChart } from '@/components/WindChart';
-import { useStandleyLakeWind } from '@/hooks/useStandleyLakeWind';
-import { useThemeColor } from '@/hooks/useThemeColor';
 import React from 'react';
 import {
   ActivityIndicator,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,8 +9,13 @@ import {
   View
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { WindChart } from '@/components/WindChart';
+import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
-export default function StandleyLakeScreen() {
+export default function SodaLakeScreen() {
   const {
     windData,
     chartData,
@@ -24,17 +25,15 @@ export default function StandleyLakeScreen() {
     lastUpdated,
     refreshData,
     clearCache
-  } = useStandleyLakeWind();
+  } = useSodaLakeWind();
 
-  // const textColor = useThemeColor({}, 'text'); // Currently unused
-  // const backgroundColor = useThemeColor({}, 'background'); // Currently unused
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 
   // Auto-refresh data when tab comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('🏔️ Standley Lake tab focused - refreshing data...');
+      console.log('🏔️ Soda Lake tab focused - refreshing data...');
       refreshData();
     }, [refreshData])
   );
@@ -118,8 +117,8 @@ export default function StandleyLakeScreen() {
       >
         <View style={styles.header}>
           <View>
-            <ThemedText type="title">Standley Lake Wind Monitor</ThemedText>
-            <ThemedText style={styles.subtitle}>Real-time wind conditions</ThemedText>
+            <ThemedText type="title">Soda Lake</ThemedText>
+            <ThemedText style={styles.subtitle}>Ecowitt monitor located at the head of the lake</ThemedText>
           </View>
         </View>
 
@@ -148,7 +147,7 @@ export default function StandleyLakeScreen() {
               {getDataFreshnessMessage()}
             </ThemedText>
             <ThemedText style={[styles.staleDataSubtext]}>
-              Station may not be reporting. Try refreshing or check back later.
+              Station may not be reporting. Check the detailed weather data link below for current status.
             </ThemedText>
           </View>
         )}
@@ -182,6 +181,10 @@ export default function StandleyLakeScreen() {
               </ThemedText>
             </View>
           </View>
+          {/* Data freshness message */}
+          <ThemedText style={styles.freshnessMessage}>
+            {getDataFreshnessMessage()}
+          </ThemedText>
         </View>
 
         {/* Wind Chart */}
@@ -212,6 +215,22 @@ export default function StandleyLakeScreen() {
             </ThemedText>
           </View>
         )}
+
+        {/* Detailed Weather Data Link */}
+        <View style={[styles.linkCard, { backgroundColor: cardColor }]}>
+          <ThemedText type="subtitle" style={styles.cardTitle}>Detailed Weather Data</ThemedText>
+          <ThemedText style={styles.linkDescription}>
+            For more detailed wind analysis and historical data, visit the Ecowitt weather station page:
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.linkButton, { borderColor: tintColor }]}
+            onPress={() => Linking.openURL('https://www.ecowitt.net/home/share?authorize=9S85P3')}
+          >
+            <ThemedText style={[styles.linkButtonText, { color: tintColor }]}>
+              📊 View Detailed Weather Data
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
 
         {/* Debug Actions */}
         {__DEV__ && (
@@ -275,6 +294,24 @@ const styles = StyleSheet.create({
     marginTop: 12,
     opacity: 0.7,
   },
+  staleDataContainer: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  staleDataText: {
+    color: '#FF9500',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  staleDataSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
   currentConditionsCard: {
     margin: 16,
     padding: 16,
@@ -301,6 +338,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  freshnessMessage: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
   chartCard: {
     margin: 16,
     borderRadius: 12,
@@ -325,6 +368,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  linkCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  linkDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  linkButton: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  linkButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   debugContainer: {
     margin: 16,
     paddingBottom: 32,
@@ -337,23 +402,5 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     fontSize: 14,
-  },
-  staleDataContainer: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: 'rgba(255, 149, 0, 0.1)',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
-  },
-  staleDataText: {
-    color: '#FF9500',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  staleDataSubtext: {
-    fontSize: 14,
-    opacity: 0.8,
   },
 });
