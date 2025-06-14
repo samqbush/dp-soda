@@ -4,8 +4,9 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useDPAlarm } from '@/hooks/useDPAlarm';
 import type { SimplifiedAlarmCriteria } from '@/hooks/useDPAlarm';
+import { useAppSettings } from '@/contexts/SettingsContext';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Simple inline alarm testing component
@@ -82,6 +83,7 @@ function SimpleAlarmTester() {
 
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useDPAlarm();
+  const { settings, updateSetting } = useAppSettings();
   const [localCriteria, setLocalCriteria] = useState<SimplifiedAlarmCriteria>(criteria);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -158,6 +160,56 @@ export default function SettingsScreen() {
         <ThemedText style={styles.subtitle}>
           Configure the criteria used to determine if wind conditions are worth waking up for.
         </ThemedText>
+
+        <View style={styles.settingSection}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>App Features</ThemedText>
+          
+          <View style={styles.settingItem}>
+            <ThemedText style={styles.settingLabel}>
+              Wind Guru Tab
+            </ThemedText>
+            <ThemedText style={styles.settingDescription}>
+              Enable the experimental Wind Guru tab with katabatic wind predictions. This feature provides advanced wind forecasting but is still in development.
+            </ThemedText>
+            <View style={styles.switchContainer}>
+              <View style={styles.switchLabelContainer}>
+                <ThemedText style={[styles.settingLabel, { fontSize: 16 }]}>
+                  {settings.windGuruEnabled ? 'Enabled' : 'Disabled'}
+                </ThemedText>
+                <ThemedText style={[styles.settingDescription, { fontSize: 12, marginTop: 2 }]}>
+                  {settings.windGuruEnabled 
+                    ? 'The Wind Guru tab is visible in the navigation' 
+                    : 'The Wind Guru tab is hidden from navigation'
+                  }
+                </ThemedText>
+              </View>
+              <Switch
+                trackColor={{ false: '#767577', true: tintColor }}
+                thumbColor={settings.windGuruEnabled ? '#f5dd4b' : '#f4f3f4'}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={async (value) => {
+                  try {
+                    await updateSetting('windGuruEnabled', value);
+                  } catch (err) {
+                    console.error('Failed to update Wind Guru setting:', err);
+                    Alert.alert('Error', 'Failed to update Wind Guru setting');
+                  }
+                }}
+                value={settings.windGuruEnabled}
+              />
+            </View>
+            {settings.windGuruEnabled && (
+              <ThemedView style={styles.warningBox}>
+                <ThemedText style={[styles.warningText, { color: '#FF9500' }]}>
+                  ⚠️ <ThemedText style={{ fontWeight: 'bold' }}>Experimental Feature</ThemedText>
+                </ThemedText>
+                <ThemedText style={[styles.warningText, { color: textColor, opacity: 0.8 }]}>
+                  The Wind Guru tab is under active development. Weather predictions may not be reliable for critical decisions. Use at your own discretion.
+                </ThemedText>
+              </ThemedView>
+            )}
+          </View>
+        </View>
 
         <View style={styles.settingSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Criteria</ThemedText>
@@ -400,6 +452,19 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  warningBox: {
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9500',
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 4,
   },
 });
 

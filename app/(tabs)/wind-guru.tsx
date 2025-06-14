@@ -11,13 +11,15 @@ import { PressureChart } from '@/components/PressureChart';
 import { WeeklyForecast } from '@/components/WeeklyForecast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
+import { useAppSettings } from '@/contexts/SettingsContext';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+  const { settings } = useAppSettings();
   
-  // State for collapsible sections
+  // State for collapsible sections - must be called before any conditional returns
   const [isHowItWorksExpanded, setIsHowItWorksExpanded] = useState(false);
 
   // Temperature conversion helper
@@ -35,7 +37,7 @@ export default function WindGuruScreen() {
     return `${fahrenheitDiff.toFixed(1)}°F`;
   };
 
-  // Use the weather data hook with Phase 2 prediction engine
+  // Use the weather data hook with Phase 2 prediction engine - must be called unconditionally
   const {
     weatherData,
     isLoading,
@@ -52,6 +54,37 @@ export default function WindGuruScreen() {
     getWeeklyPredictions,
     getForecastAvailability,
   } = useWeatherData();
+
+  // Show disabled message if Wind Guru is not enabled
+  if (!settings.windGuruEnabled) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedView style={[styles.disabledContainer, { backgroundColor: cardColor }]}>
+          <ThemedText style={styles.disabledTitle}>🔒 Wind Guru Disabled</ThemedText>
+          <ThemedText style={styles.disabledText}>
+            The Wind Guru tab is currently disabled. This experimental feature provides advanced katabatic wind predictions but is still in development.
+          </ThemedText>
+          <ThemedText style={[styles.disabledText, { marginTop: 16 }]}>
+            To enable Wind Guru:
+          </ThemedText>
+          <ThemedText style={styles.disabledSteps}>
+            1. Go to the Settings tab{'\n'}
+            2. Find &quot;App Features&quot; section{'\n'}
+            3. Toggle &quot;Wind Guru Tab&quot; to enabled{'\n'}
+            4. Return to this tab to access the feature
+          </ThemedText>
+          <ThemedView style={[styles.warningNote, { backgroundColor: 'rgba(255, 149, 0, 0.1)', borderColor: '#FF9500' }]}>
+            <ThemedText style={[styles.warningText, { color: '#FF9500' }]}>
+              ⚠️ <ThemedText style={{ fontWeight: 'bold' }}>Experimental Feature</ThemedText>
+            </ThemedText>
+            <ThemedText style={[styles.warningText, { color: textColor, opacity: 0.8 }]}>
+              Wind predictions may not be reliable for critical decisions. Use at your own discretion.
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
+      </ThemedView>
+    );
+  }
 
   // Get current analysis data
   const tempDiff = getTemperatureDifferential();
@@ -1470,5 +1503,53 @@ const styles = StyleSheet.create({
   dataQualityExplanation: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  // Disabled state styles
+  disabledContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 16,
+    padding: 24,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  disabledTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  disabledText: {
+    fontSize: 16,
+    lineHeight: 22,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 8,
+  },
+  disabledSteps: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'left',
+    opacity: 0.9,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  warningNote: {
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    width: '100%',
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 4,
   },
 });
