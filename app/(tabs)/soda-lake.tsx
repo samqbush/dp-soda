@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 
 export default function SodaLakeScreen() {
   const {
@@ -193,6 +194,7 @@ export default function SodaLakeScreen() {
             <WindChart
               data={chartData}
               title="Today's Wind Speed - All Data"
+              timeWindow={getWindChartTimeWindow()}
             />
           </View>
         ) : (

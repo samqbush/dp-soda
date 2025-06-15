@@ -4,10 +4,10 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
 import { filterWindDataByTimeWindow, type TimeWindow } from '@/utils/timeWindowUtils';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import Svg, { Circle, G, Line, Path, Text } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 
 interface WindChartProps {
   data: WindDataPoint[];
@@ -111,6 +111,20 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
   const directionColor = '#4A90E2'; // Bright blue for better visibility of direction arrows
+
+  // Ref for the horizontal ScrollView to control scrolling
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to the latest data (current time) when chart loads or data changes
+  useEffect(() => {
+    if (scrollViewRef.current && data && data.length > 0) {
+      // Small delay to ensure the chart has rendered before scrolling
+      const timer = setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [data]);
 
   if (!data || data.length < 2) {
     return (
@@ -413,6 +427,7 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
           textColor={textColor} 
         />
         <ScrollView 
+          ref={scrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={true}
           style={styles.chartScrollContainer}
@@ -455,16 +470,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
                               strokeDasharray="8,4"
                               opacity={0.8}
                             />
-                            <Text
-                              x={chartLeft + chartInnerWidth - 5}
-                              y={chartTop + (1 - (idealWindSpeed / maxSpeed)) * chartInnerHeight - 5}
-                              fill="#FF8C00"
-                              fontSize="10"
-                              textAnchor="end"
-                              opacity={0.9}
-                            >
-                              {idealWindSpeed}mph
-                            </Text>
                           </G>
                         )}
                         {goodPointPositions.map((pos, i) => (

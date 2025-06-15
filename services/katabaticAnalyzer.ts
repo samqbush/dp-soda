@@ -64,6 +64,7 @@ export interface KatabaticFactors {
 export interface KatabaticPrediction {
   probability: number;
   confidence: 'low' | 'medium' | 'high';
+  confidenceScore: number; // 0-100 numerical confidence
   factors: KatabaticFactors;
   recommendation: 'go' | 'maybe' | 'skip';
   explanation: string;
@@ -112,7 +113,7 @@ export class KatabaticAnalyzer {
     
     const factors = this.analyzeFactors(weatherData, activeCriteria);
     const probability = this.calculateOverallProbability(factors);
-    const confidence = this.determineConfidence(factors, probability);
+    const { confidence, confidenceScore } = this.determineConfidence(factors, probability);
     const recommendation = this.generateRecommendation(probability, confidence);
     const explanation = this.generateExplanation(factors, probability, recommendation);
     const detailedAnalysis = this.generateDetailedAnalysis(factors, weatherData);
@@ -121,6 +122,7 @@ export class KatabaticAnalyzer {
     return {
       probability,
       confidence,
+      confidenceScore,
       factors,
       recommendation,
       explanation,
@@ -342,17 +344,46 @@ export class KatabaticAnalyzer {
     return Math.round(finalProbability);
   }
 
-  private determineConfidence(factors: KatabaticFactors, probability: number): 'low' | 'medium' | 'high' {
+  private determineConfidence(factors: KatabaticFactors, probability: number): { confidence: 'low' | 'medium' | 'high', confidenceScore: number } {
     const highConfidenceFactors = Object.values(factors).filter(f => f.confidence > 70).length;
     const avgConfidence = Object.values(factors).reduce((sum, f) => sum + f.confidence, 0) / 5;
 
-    if (highConfidenceFactors >= 3 && avgConfidence > 75) {
-      return 'high';
-    } else if (highConfidenceFactors >= 2 && avgConfidence > 60) {
-      return 'medium';
-    } else {
-      return 'low';
+    // Count how many factors are favorable
+    const favorableFactors = [
+      factors.precipitation.meets,
+      factors.skyConditions.meets,
+      factors.pressureChange.meets,
+      factors.temperatureDifferential.meets,
+      factors.wavePattern.meets
+    ].filter(Boolean).length;
+
+    // Adjust confidence based on factor alignment, not just data quality
+    let adjustedConfidence = avgConfidence;
+    
+    // Penalize confidence when factors don't support the prediction
+    if (favorableFactors === 0) {
+      adjustedConfidence = Math.min(30, avgConfidence * 0.4); // Max 30% if 0/5 factors favorable
+    } else if (favorableFactors === 1) {
+      adjustedConfidence = Math.min(50, avgConfidence * 0.6); // Max 50% if 1/5 factors favorable
+    } else if (favorableFactors === 2) {
+      adjustedConfidence = Math.min(70, avgConfidence * 0.8); // Max 70% if 2/5 factors favorable
+    } else if (favorableFactors >= 3) {
+      adjustedConfidence = avgConfidence; // Full confidence if 3+ factors favorable
     }
+
+    const confidenceScore = Math.round(adjustedConfidence);
+
+    // Convert numeric confidence to string categories
+    let confidence: 'low' | 'medium' | 'high';
+    if (adjustedConfidence >= 70) {
+      confidence = 'high';
+    } else if (adjustedConfidence >= 45) {
+      confidence = 'medium';
+    } else {
+      confidence = 'low';
+    }
+
+    return { confidence, confidenceScore };
   }
 
   private generateRecommendation(probability: number, confidence: 'low' | 'medium' | 'high'): 'go' | 'maybe' | 'skip' {

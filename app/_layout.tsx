@@ -22,6 +22,7 @@ import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
 import { initializeNotificationService } from '@/services/alarmNotificationService';
+import { SettingsProvider } from '@/contexts/SettingsContext';
 
 // Ignore specific warnings in production builds
 if (!__DEV__) {
@@ -237,13 +238,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AndroidSafeWrapper>
         <ErrorBoundary>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
-          </ThemeProvider>
+          <SettingsProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </SettingsProvider>
         </ErrorBoundary>
         {/* Global crash recovery overlay */}
         <GlobalCrashRecovery />

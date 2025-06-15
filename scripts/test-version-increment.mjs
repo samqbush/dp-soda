@@ -83,12 +83,16 @@ async function getBaseVersionFromGit() {
     console.log(`📄 Getting app.config.js from ${baseBranch} branch...`);
     const baseAppConfigContent = execSync(`git show origin/${baseBranch}:app.config.js`, { encoding: 'utf8' });
     
-    // Write temp file and import it
+    // Convert CommonJS to ES module format temporarily
     const tempPath = path.resolve('temp-app-config.mjs');
-    fs.writeFileSync(tempPath, baseAppConfigContent);
+    const moduleContent = baseAppConfigContent
+      .replace(/require\('dotenv\/config'\);?\s*/, '') // Remove dotenv require
+      .replace(/module\.exports\s*=/, 'export default'); // Convert to ES export
+    
+    fs.writeFileSync(tempPath, moduleContent);
     
     try {
-      const baseModule = await import(`file://${tempPath}`);
+      const baseModule = await import(`file://${tempPath}?t=${Date.now()}`);
       const baseData = baseModule.default;
       
       // Clean up temp file
@@ -123,8 +127,27 @@ async function main() {
   // Import the app.config.js module dynamically
   const path = await import('path');
   const appConfigPath = path.resolve('app.config.js');
-  const currentAppModule = await import(`file://${appConfigPath}`);
-  const currentAppData = currentAppModule.default;
+  
+  // Read and convert CommonJS to ES module format temporarily
+  const appConfigContent = fs.readFileSync(appConfigPath, 'utf8');
+  const tempCurrentPath = path.resolve('temp-current-app-config.mjs');
+  const moduleContent = appConfigContent
+    .replace(/require\('dotenv\/config'\);?\s*/, '') // Remove dotenv require
+    .replace(/module\.exports\s*=/, 'export default'); // Convert to ES export
+  
+  fs.writeFileSync(tempCurrentPath, moduleContent);
+  
+  let currentAppData;
+  try {
+    const currentAppModule = await import(`file://${tempCurrentPath}?t=${Date.now()}`);
+    currentAppData = currentAppModule.default;
+    // Clean up temp file
+    fs.unlinkSync(tempCurrentPath);
+  } catch (importError) {
+    // Clean up temp file on error
+    if (fs.existsSync(tempCurrentPath)) fs.unlinkSync(tempCurrentPath);
+    throw importError;
+  }
   
   const currentVersion = currentAppData.expo.version;
   const currentBuildNumber = parseInt(currentAppData.expo.ios.buildNumber);
