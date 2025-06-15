@@ -535,14 +535,23 @@ export default function WindGuruScreen() {
                   ]} />
                 </ThemedView>
                 <ThemedText style={styles.probabilityText}>
-                  {katabaticAnalysis.prediction.probability}% Probability
+                  {katabaticAnalysis.prediction.probability}% Chance of Good Winds
                 </ThemedText>
                 <ThemedText style={[
                   styles.confidenceText,
                   { color: getConfidenceColor(katabaticAnalysis.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} Confidence - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
+                  Prediction Reliability: {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Clear explanation of the two metrics */}
+                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
+                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
+                  </ThemedText>
+                </ThemedView>
                 
                 {/* Confidence Explanation */}
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
@@ -655,14 +664,23 @@ export default function WindGuruScreen() {
                   ]} />
                 </ThemedView>
                 <ThemedText style={styles.probabilityText}>
-                  {tomorrowPrediction.prediction.probability}% Probability
+                  {tomorrowPrediction.prediction.probability}% Chance of Good Winds
                 </ThemedText>
                 <ThemedText style={[
                   styles.confidenceText,
                   { color: getConfidenceColor(tomorrowPrediction.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} Confidence - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
+                  Prediction Reliability: {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Clear explanation of the two metrics */}
+                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
+                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
+                  </ThemedText>
+                </ThemedView>
                 
                 {/* Confidence Explanation */}
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
