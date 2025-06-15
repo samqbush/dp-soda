@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -53,7 +54,36 @@ export default function WindGuruScreen() {
     // Phase 2.5: Extended predictions
     getWeeklyPredictions,
     getForecastAvailability,
+    // Phase 3: Prediction tracking (June 14, 2025)
+    logCurrentPrediction,
+    getPredictionAccuracy,
   } = useWeatherData();
+
+  // State for prediction accuracy tracking
+  const [predictionAccuracy, setPredictionAccuracy] = React.useState<any>(null);
+
+  // Load prediction accuracy on component mount and when predictions change
+  React.useEffect(() => {
+    const loadAccuracy = async () => {
+      try {
+        const accuracy = await getPredictionAccuracy();
+        setPredictionAccuracy(accuracy);
+      } catch (error) {
+        console.error('❌ Failed to load prediction accuracy:', error);
+      }
+    };
+
+    loadAccuracy();
+  }, [getPredictionAccuracy, katabaticAnalysis.prediction]);
+
+  // Auto-log predictions when they're generated (for tracking)
+  React.useEffect(() => {
+    if (katabaticAnalysis.prediction && weatherData) {
+      logCurrentPrediction().catch(error => {
+        console.error('❌ Failed to log prediction:', error);
+      });
+    }
+  }, [katabaticAnalysis.prediction, weatherData, logCurrentPrediction]);
 
   // Show disabled message if Wind Guru is not enabled
   if (!settings.windGuruEnabled) {
@@ -1025,6 +1055,53 @@ export default function WindGuruScreen() {
             </ThemedView>
           )}
         </ThemedView>
+
+        {/* Phase 3: Prediction Accuracy Tracking - June 14, 2025 */}
+        {predictionAccuracy && predictionAccuracy.totalPredictions > 0 && (
+          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              📊 Prediction Accuracy
+            </ThemedText>
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
+              Learning from actual wind outcomes to improve future predictions
+            </ThemedText>
+            
+            <View style={styles.conditionsCard}>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Total Predictions:</ThemedText>
+                <ThemedText style={styles.conditionValue}>{predictionAccuracy.totalPredictions}</ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Accuracy Rate:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
+                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
+                }]}>
+                  {predictionAccuracy.accuracy.toFixed(1)}%
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Correct Predictions:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { color: '#4CAF50' }]}>
+                  {predictionAccuracy.correctPredictions}
+                </ThemedText>
+              </View>
+              {predictionAccuracy.falsePositives > 0 && (
+                <View style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>False Alarms:</ThemedText>
+                  <ThemedText style={[styles.conditionValue, { color: '#F44336' }]}>
+                    {predictionAccuracy.falsePositives}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
+              💡 Predictions become more accurate as we collect more data. 
+              {predictionAccuracy.totalPredictions < 10 && ' Need more data for reliable statistics.'}
+            </ThemedText>
+          </ThemedView>
+        )}
 
         {/* Phase 2.5: Weekly Forecast */}
         <WeeklyForecast 

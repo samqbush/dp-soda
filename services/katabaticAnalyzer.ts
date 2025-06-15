@@ -295,12 +295,14 @@ export class KatabaticAnalyzer {
   }
 
   private calculateOverallProbability(factors: KatabaticFactors): number {
+    // UPDATED WEIGHTS - June 14, 2025: Increased temperature differential importance
+    // Temperature inversion is CRITICAL for katabatic winds - learned from prediction failures
     const weights = {
-      precipitation: 0.25,
-      skyConditions: 0.25,
-      pressureChange: 0.20,
-      temperatureDifferential: 0.15,
-      wavePattern: 0.10,
+      temperatureDifferential: 0.30, // Increased from 15% → 30% (most critical factor)
+      precipitation: 0.25,           // Unchanged
+      skyConditions: 0.20,           // Decreased from 25% → 20%
+      pressureChange: 0.15,          // Decreased from 20% → 15%
+      wavePattern: 0.10,             // Unchanged
     };
 
     let weightedScore = 0;
@@ -320,18 +322,23 @@ export class KatabaticAnalyzer {
 
     const baseProbability = totalWeight > 0 ? (weightedScore / totalWeight) : 0;
 
-    // Apply bonuses for good factor combinations
+    // CONSERVATIVE MODE - June 14, 2025: More demanding requirements for high probability
+    // Require ALL 5 factors favorable for >90% probability to prevent overconfident predictions
     let bonusMultiplier = 1.0;
     const factorsMet = Object.values(factors).filter(f => f.meets).length;
-
-    if (factorsMet >= 4) {
-      bonusMultiplier = 1.15;
+    
+    if (factorsMet === 5) {
+      bonusMultiplier = 1.15; // Full bonus only when all factors align
+    } else if (factorsMet >= 4) {
+      bonusMultiplier = 1.05; // Reduced bonus for 4/5 factors
     } else if (factorsMet >= 3) {
-      bonusMultiplier = 1.10;
+      bonusMultiplier = 1.0; // No bonus for 3/5 factors
+    } else {
+      bonusMultiplier = 0.85; // Penalty for <3 factors
     }
 
-    // Special bonus for critical combinations
-    const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets;
+    // Special bonus for critical combinations - but require temperature differential
+    const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
     if (hasCriticalCombo) {
       bonusMultiplier += 0.05;
     }
@@ -357,27 +364,41 @@ export class KatabaticAnalyzer {
       factors.wavePattern.meets
     ].filter(Boolean).length;
 
-    // Adjust confidence based on factor alignment, not just data quality
+    // CONSERVATIVE MODE - June 14, 2025: More conservative confidence scoring
+    // Apply stronger penalties and require more evidence for high confidence
     let adjustedConfidence = avgConfidence;
     
     // Penalize confidence when factors don't support the prediction
     if (favorableFactors === 0) {
       adjustedConfidence = Math.min(30, avgConfidence * 0.4); // Max 30% if 0/5 factors favorable
     } else if (favorableFactors === 1) {
-      adjustedConfidence = Math.min(50, avgConfidence * 0.6); // Max 50% if 1/5 factors favorable
+      adjustedConfidence = Math.min(40, avgConfidence * 0.5); // Max 40% if 1/5 factors favorable  
     } else if (favorableFactors === 2) {
-      adjustedConfidence = Math.min(70, avgConfidence * 0.8); // Max 70% if 2/5 factors favorable
-    } else if (favorableFactors >= 3) {
-      adjustedConfidence = avgConfidence; // Full confidence if 3+ factors favorable
+      adjustedConfidence = Math.min(55, avgConfidence * 0.7); // Max 55% if 2/5 factors favorable
+    } else if (favorableFactors === 3) {
+      adjustedConfidence = Math.min(65, avgConfidence * 0.8); // Max 65% if 3/5 factors favorable
+    } else if (favorableFactors === 4) {
+      adjustedConfidence = Math.min(75, avgConfidence * 0.9); // Max 75% if 4/5 factors favorable
+    } else if (favorableFactors === 5) {
+      adjustedConfidence = avgConfidence; // Full confidence only if ALL factors favorable
     }
+
+    // CRITICAL FACTOR CHECK - Temperature differential is essential for katabatic winds
+    // If temperature differential doesn't meet criteria, cap confidence at 50%
+    if (!factors.temperatureDifferential.meets) {
+      adjustedConfidence = Math.min(50, adjustedConfidence);
+    }
+
+    // LEARNING MODE CAP - June 14, 2025: Cap confidence at 65% until validation system proves accuracy
+    adjustedConfidence = Math.min(65, adjustedConfidence);
 
     const confidenceScore = Math.round(adjustedConfidence);
 
-    // Convert numeric confidence to string categories
+    // Convert numeric confidence to string categories (adjusted thresholds)
     let confidence: 'low' | 'medium' | 'high';
-    if (adjustedConfidence >= 70) {
+    if (adjustedConfidence >= 60) {
       confidence = 'high';
-    } else if (adjustedConfidence >= 45) {
+    } else if (adjustedConfidence >= 40) {
       confidence = 'medium';
     } else {
       confidence = 'low';
@@ -412,12 +433,15 @@ export class KatabaticAnalyzer {
         }
       });
 
+    // LEARNING MODE DISCLAIMER - June 14, 2025
+    const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
+
     if (recommendation === 'go') {
-      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence.`;
+      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence. ${learningModeNote}`;
     } else if (recommendation === 'maybe') {
-      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn.`;
+      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn. ${learningModeNote}`;
     } else {
-      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions.`;
+      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions. ${learningModeNote}`;
     }
   }
 

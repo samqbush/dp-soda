@@ -3,10 +3,12 @@ import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService'
 import { hybridWeatherService } from '@/services/hybridWeatherService';
 import { useKatabaticAnalyzer } from '@/hooks/useKatabaticAnalyzer';
 import { katabaticAnalyzer } from '@/services/katabaticAnalyzer';
+import { predictionTrackingService } from '@/services/predictionTrackingService';
 
 /**
  * Custom hook for managing weather data state and operations
  * Follows the same patterns as useWindData.ts
+ * Updated June 14, 2025: Added prediction tracking for continuous improvement
  */
 export const useWeatherData = () => {
   const [weatherData, setWeatherData] = useState<WeatherServiceData | null>(null);
@@ -417,6 +419,133 @@ export const useWeatherData = () => {
     };
   }, [weatherData]);
 
+  /**
+   * Log prediction for tracking (called when prediction is made)
+   */
+  const logCurrentPrediction = useCallback(async () => {
+    if (!weatherData || !katabaticAnalysis.prediction) return;
+    
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(6, 0, 0, 0); // Dawn patrol time
+      
+      // Extract weather conditions for tracking
+      const weatherConditions = {
+        morrisonTemp: weatherData.morrison?.current?.temperature || 0,
+        mountainTemp: weatherData.mountain?.current?.temperature || 0,
+        actualTempDiff: (weatherData.morrison?.current?.temperature || 0) - (weatherData.mountain?.current?.temperature || 0),
+        precipitation: weatherData.morrison?.current?.precipitationProbability || 0,
+        cloudCover: weatherData.morrison?.current?.cloudCover || 0,
+        pressure: weatherData.morrison?.current?.pressure || 0,
+      };
+      
+      await predictionTrackingService.logPrediction(
+        tomorrow,
+        katabaticAnalysis.prediction,
+        weatherConditions
+      );
+      
+      console.log('📊 Logged prediction for tracking:', {
+        date: tomorrow.toDateString(),
+        probability: katabaticAnalysis.prediction.probability,
+        confidence: katabaticAnalysis.prediction.confidenceScore
+      });
+    } catch (error) {
+      console.error('❌ Failed to log prediction:', error);
+      // Don't throw - prediction tracking shouldn't break the main functionality
+    }
+  }, [weatherData, katabaticAnalysis.prediction]);
+
+  /**
+   * Validate past predictions against actual wind data
+   * Should be called after dawn patrol to check prediction accuracy
+   */
+  const validatePastPredictions = useCallback(async (actualWindData: Array<{
+    time: Date;
+    windSpeedMph: number;
+    windDirection: number;
+  }>) => {
+    try {
+      const today = new Date();
+      today.setHours(6, 0, 0, 0); // Dawn patrol time
+      
+      // Find prediction that needs validation
+      const pendingPrediction = await predictionTrackingService.findPredictionNeedingOutcome(today);
+      
+      if (!pendingPrediction) {
+        console.log('📊 No pending predictions to validate for today');
+        return null;
+      }
+      
+      // Filter wind data for dawn patrol window (6-8 AM)
+      const dawnPatrolStart = new Date(today);
+      dawnPatrolStart.setHours(6, 0, 0, 0);
+      const dawnPatrolEnd = new Date(today);
+      dawnPatrolEnd.setHours(8, 0, 0, 0);
+      
+      const dawnPatrolWinds = actualWindData.filter(point => 
+        point.time >= dawnPatrolStart && point.time <= dawnPatrolEnd
+      );
+      
+      if (dawnPatrolWinds.length === 0) {
+        console.log('📊 No wind data available for validation');
+        return null;
+      }
+      
+      // Calculate outcome metrics
+      const avgSpeed = dawnPatrolWinds.reduce((sum, point) => sum + point.windSpeedMph, 0) / dawnPatrolWinds.length;
+      const maxSpeed = Math.max(...dawnPatrolWinds.map(point => point.windSpeedMph));
+      const minSpeed = Math.min(...dawnPatrolWinds.map(point => point.windSpeedMph));
+      const avgDirection = dawnPatrolWinds.reduce((sum, point) => sum + point.windDirection, 0) / dawnPatrolWinds.length;
+      
+      const outcome = {
+        timestamp: new Date(),
+        actualWindSpeed: avgSpeed,
+        actualWindDirection: avgDirection,
+        actualMaxSpeed: maxSpeed,
+        actualMinSpeed: minSpeed,
+        dataPoints: dawnPatrolWinds.length,
+        success: avgSpeed >= 15, // 15+ mph threshold for good katabatic winds
+        source: 'soda-lake' as const,
+        notes: `Avg: ${avgSpeed.toFixed(1)} mph, Max: ${maxSpeed.toFixed(1)} mph, ${dawnPatrolWinds.length} data points`
+      };
+      
+      await predictionTrackingService.updatePredictionOutcome(pendingPrediction.id, outcome);
+      
+      const wasAccurate = (pendingPrediction.prediction.probability >= 50) === outcome.success;
+      
+      console.log('📊 Validated prediction:', {
+        predicted: pendingPrediction.prediction.probability,
+        actualAvg: avgSpeed.toFixed(1),
+        successful: outcome.success,
+        accurate: wasAccurate
+      });
+      
+      return {
+        prediction: pendingPrediction,
+        outcome,
+        accurate: wasAccurate
+      };
+      
+    } catch (error) {
+      console.error('❌ Failed to validate predictions:', error);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Get prediction accuracy metrics
+   */
+  const getPredictionAccuracy = useCallback(async () => {
+    try {
+      return await predictionTrackingService.getPredictionAccuracy();
+    } catch (error) {
+      console.error('❌ Failed to get prediction accuracy:', error);
+      return null;
+    }
+  }, []);
+
   // Initialize data on mount
   useEffect(() => {
     fetchWeatherData();
@@ -461,5 +590,10 @@ export const useWeatherData = () => {
     getDayPrediction,
     getWeeklyPredictions,
     getForecastAvailability,
+    
+    // Phase 3: Prediction tracking & validation (June 14, 2025)
+    logCurrentPrediction,
+    validatePastPredictions,
+    getPredictionAccuracy,
   };
 };
