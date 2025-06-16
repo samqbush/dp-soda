@@ -13,7 +13,6 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WindChart } from '@/components/WindChart';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
-import { useWeatherData } from '@/hooks/useWeatherData';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 
@@ -29,9 +28,6 @@ export default function SodaLakeScreen() {
     clearCache
   } = useSodaLakeWind();
 
-  // Add weather data hook for prediction validation
-  const { validatePastPredictions } = useWeatherData();
-
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
 
@@ -42,36 +38,6 @@ export default function SodaLakeScreen() {
       refreshData();
     }, [refreshData])
   );
-
-  // Auto-validate predictions when wind data is available
-  React.useEffect(() => {
-    if (windData.length > 0) {
-      // Check if we're past dawn patrol time (8 AM) and have wind data
-      const now = new Date();
-      const eightAM = new Date();
-      eightAM.setHours(8, 0, 0, 0);
-      
-      if (now > eightAM) {
-        // Convert wind data for validation
-        const validationData = windData.map(point => ({
-          time: new Date(point.time),
-          windSpeedMph: point.windSpeedMph,
-          windDirection: point.windDirection
-        }));
-        
-        // Validate predictions in the background
-        validatePastPredictions(validationData)
-          .then(result => {
-            if (result) {
-              console.log('📊 Prediction validation completed:', result);
-            }
-          })
-          .catch(error => {
-            console.error('❌ Prediction validation failed:', error);
-          });
-      }
-    }
-  }, [windData, validatePastPredictions]);
 
   const handleRefresh = async () => {
     await refreshData();

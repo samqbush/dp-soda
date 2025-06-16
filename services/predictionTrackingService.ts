@@ -298,18 +298,62 @@ export class PredictionTrackingService {
   }
 
   /**
-   * Find prediction that needs outcome update
+   * Find a prediction that needs outcome validation
    */
-  async findPredictionNeedingOutcome(dawnPatrolDate: Date): Promise<PredictionEntry | null> {
-    const predictions = await this.getPredictionsForDate(dawnPatrolDate);
-    
-    // Find the most recent prediction for this date that doesn't have an outcome
-    const pendingPredictions = predictions.filter(p => !p.outcome);
-    
-    if (pendingPredictions.length === 0) return null;
-    
-    // Return the most recent prediction
-    return pendingPredictions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+  async findPredictionNeedingOutcome(predictionDate: Date): Promise<PredictionEntry | null> {
+    try {
+      const predictions = await this.getAllPredictions();
+      const targetDateStr = predictionDate.toDateString();
+      
+      console.log('🔍 PREDICTION SEARCH DEBUG:', {
+        targetDate: targetDateStr,
+        totalPredictions: predictions.length,
+        allPredictions: predictions.map(p => ({
+          id: p.id,
+          predictionDate: p.predictionDate.toDateString(),
+          timestamp: p.timestamp.toLocaleString(),
+          hasOutcome: !!p.outcome,
+          probability: p.prediction.probability
+        }))
+      });
+      
+      // Find the most recent prediction for the target date that doesn't have an outcome yet
+      const pendingPredictions = predictions.filter(p => {
+        const matches = p.predictionDate.toDateString() === targetDateStr && !p.outcome;
+        console.log(`📅 Checking prediction ${p.id}:`, {
+          predictionDate: p.predictionDate.toDateString(),
+          targetDate: targetDateStr,
+          dateMatches: p.predictionDate.toDateString() === targetDateStr,
+          hasOutcome: !!p.outcome,
+          isMatch: matches
+        });
+        return matches;
+      });
+      
+      console.log('🔍 PENDING PREDICTIONS FOUND:', {
+        count: pendingPredictions.length,
+        predictions: pendingPredictions.map(p => ({
+          id: p.id,
+          date: p.predictionDate.toDateString(),
+          probability: p.prediction.probability
+        }))
+      });
+      
+      if (pendingPredictions.length === 0) return null;
+      
+      // Return the most recent prediction
+      const result = pendingPredictions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+      console.log('✅ SELECTED PREDICTION FOR VALIDATION:', {
+        id: result.id,
+        date: result.predictionDate.toDateString(),
+        probability: result.prediction.probability
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to find prediction needing outcome:', error);
+      return null;
+    }
   }
 
   /**
