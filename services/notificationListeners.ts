@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { AlarmLogger } from './alarmDebugLogger';
+import { isNotificationRecentlyScheduled } from './alarmNotificationService';
 
 /**
  * Notification Event Listeners
@@ -17,6 +18,11 @@ class NotificationListeners {
   private isInitializing: boolean = false; // Track if we're still initializing
   private instanceId: string = Math.random().toString(36).substr(2, 9); // Unique instance ID
   private initializationTime: number = 0; // Track when initialization started
+  
+  // Static tracking to prevent multiple instances from processing the same notification
+  private static lastProcessedNotificationId: string | null = null;
+  private static lastProcessedTime: number = 0;
+  private static globalInitTime: number = Date.now(); // Global init time for all instances
 
   constructor() {
     AlarmLogger.info(`🆔 NotificationListeners instance created: ${this.instanceId}`);
@@ -90,18 +96,86 @@ class NotificationListeners {
    */
   private async handleNotificationReceived(notification: Notifications.Notification): Promise<void> {
     try {
-      const { categoryIdentifier, title, body } = notification.request.content;
+      const { categoryIdentifier, title, body, data } = notification.request.content;
+      const notificationId = notification.request.identifier;
       
       AlarmLogger.info('🔔 NOTIFICATION RECEIVED (app in foreground):', {
         categoryIdentifier,
         title,
         body,
-        identifier: notification.request.identifier,
+        identifier: notificationId,
+        data,
         timestamp: new Date().toISOString()
       });
 
       // Check if this is a wind alarm notification that should trigger alarm logic
       if (categoryIdentifier === 'wind-alarm' || categoryIdentifier === 'wind-alarm-test') {
+        
+        // RECENTLY SCHEDULED CHECK: Block notifications that were just scheduled (likely bugs)
+        if (isNotificationRecentlyScheduled(notificationId)) {
+          AlarmLogger.warning('🚫 BLOCKED: Notification was recently scheduled and is likely firing due to a bug, ignoring!', {
+            notificationId,
+            instanceId: this.instanceId
+          });
+          return;
+        }
+        
+        // METADATA VALIDATION: Check if this is a real scheduled notification
+        if (data && data.scheduledForFuture && data.scheduledTime) {
+          const scheduledTime = new Date(data.scheduledTime as string);
+          const now = new Date();
+          const timeDifference = Math.abs(now.getTime() - scheduledTime.getTime());
+          
+          // If the notification is firing way before its scheduled time, it's likely a bug
+          if (timeDifference > 60000) { // More than 1 minute difference
+            AlarmLogger.warning('🚫 BLOCKED: Notification firing at wrong time - likely a scheduling bug, ignoring!', {
+              scheduledTime: scheduledTime.toISOString(),
+              actualTime: now.toISOString(),
+              timeDifference: `${timeDifference}ms`,
+              notificationId,
+              instanceId: this.instanceId
+            });
+            return;
+          }
+        }
+        
+        // GLOBAL DEDUPLICATION: Prevent multiple instances from processing the same notification
+        if (NotificationListeners.lastProcessedNotificationId === notificationId) {
+          AlarmLogger.warning('🚫 BLOCKED: Notification already processed by another instance, skipping!', {
+            notificationId,
+            instanceId: this.instanceId
+          });
+          return;
+        }
+        
+        // GLOBAL TIMING SAFEGUARD: Use global init time to prevent notifications that fire too soon
+        const timeSinceGlobalInit = Date.now() - NotificationListeners.globalInitTime;
+        if (timeSinceGlobalInit < 15000) { // 15 seconds global protection
+          AlarmLogger.warning('🚫 BLOCKED: Notification received too soon after app initialization - likely a scheduling bug, ignoring!', {
+            timeSinceGlobalInit: `${timeSinceGlobalInit}ms`,
+            categoryIdentifier,
+            identifier: notificationId,
+            instanceId: this.instanceId
+          });
+          return;
+        }
+        
+        // INSTANCE TIMING SAFEGUARD: Additional per-instance protection
+        const timeSinceInstanceInit = Date.now() - this.initializationTime;
+        if (timeSinceInstanceInit < 10000) { // 10 seconds per instance
+          AlarmLogger.warning('🚫 BLOCKED: Notification received too soon after instance initialization - likely a scheduling bug, ignoring!', {
+            timeSinceInstanceInit: `${timeSinceInstanceInit}ms`,
+            categoryIdentifier,
+            identifier: notificationId,
+            instanceId: this.instanceId
+          });
+          return;
+        }
+        
+        // Mark this notification as processed
+        NotificationListeners.lastProcessedNotificationId = notificationId;
+        NotificationListeners.lastProcessedTime = Date.now();
+        
         AlarmLogger.info('⏰ VALID ALARM NOTIFICATION: Auto-triggering wind condition check');
         
         // CRITICAL: This should trigger immediately when the scheduled notification fires
@@ -135,6 +209,30 @@ class NotificationListeners {
 
       // Check if this is a wind alarm notification
       if (categoryIdentifier === 'wind-alarm' || categoryIdentifier === 'wind-alarm-test') {
+        
+        // GLOBAL TIMING SAFEGUARD: Use global init time to prevent notifications that fire too soon
+        const timeSinceGlobalInit = Date.now() - NotificationListeners.globalInitTime;
+        if (timeSinceGlobalInit < 15000) { // 15 seconds global protection
+          AlarmLogger.warning('🚫 BLOCKED: Notification tapped too soon after app initialization - likely a scheduling bug, ignoring!', {
+            timeSinceGlobalInit: `${timeSinceGlobalInit}ms`,
+            categoryIdentifier,
+            actionIdentifier,
+            instanceId: this.instanceId
+          });
+          return;
+        }
+        
+        // INSTANCE TIMING SAFEGUARD: Additional per-instance protection
+        const timeSinceInstanceInit = Date.now() - this.initializationTime;
+        if (timeSinceInstanceInit < 10000) { // 10 seconds per instance
+          AlarmLogger.warning('🚫 BLOCKED: Notification tapped too soon after instance initialization - likely a scheduling bug, ignoring!', {
+            timeSinceInstanceInit: `${timeSinceInstanceInit}ms`,
+            categoryIdentifier,
+            actionIdentifier,
+            instanceId: this.instanceId
+          });
+          return;
+        }
         
         // Handle deep link navigation if present
         if (data && data.deepLink && typeof data.deepLink === 'string') {

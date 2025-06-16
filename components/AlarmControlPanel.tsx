@@ -134,9 +134,11 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
       const timeString = `${hours}:${minutes}`;
       setTempTime(timeString);
       
-      if (Platform.OS === 'android' || event.type === 'set') {
+      // On Android, immediately apply the change when user confirms
+      if (Platform.OS === 'android') {
         handleTimeChange(timeString);
       }
+      // On iOS, we'll handle the change when user clicks "Done" button
     } else if (Platform.OS === 'android') {
       // User cancelled on Android
       setShowTimePicker(false);
@@ -301,10 +303,8 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
                       <TouchableOpacity
                         style={[styles.iosPickerButton, { backgroundColor: tintColor }]}
                         onPress={() => {
-                          const hours = pickerDate.getHours().toString().padStart(2, '0');
-                          const minutes = pickerDate.getMinutes().toString().padStart(2, '0');
-                          const timeString = `${hours}:${minutes}`;
-                          handleTimeChange(timeString);
+                          // Use tempTime which is updated by the picker change handler
+                          handleTimeChange(tempTime);
                         }}
                       >
                         <ThemedText style={styles.iosPickerButtonText}>

@@ -32,6 +32,30 @@ export interface AlarmNotificationService {
 
 class AlarmNotificationServiceImpl implements AlarmNotificationService {
   private scheduledNotificationId: string | null = null;
+  private static recentlyScheduledNotifications: Map<string, number> = new Map(); // Track recently scheduled notifications
+
+  /**
+   * Track when a notification was scheduled to prevent immediate firing bugs
+   */
+  private static markNotificationAsRecentlyScheduled(notificationId: string): void {
+    this.recentlyScheduledNotifications.set(notificationId, Date.now());
+    
+    // Clean up old entries after 30 seconds
+    setTimeout(() => {
+      this.recentlyScheduledNotifications.delete(notificationId);
+    }, 30000);
+  }
+
+  /**
+   * Check if a notification was recently scheduled (within last 30 seconds)
+   */
+  static isNotificationRecentlyScheduled(notificationId: string): boolean {
+    const scheduledTime = this.recentlyScheduledNotifications.get(notificationId);
+    if (!scheduledTime) return false;
+    
+    const timeSinceScheduled = Date.now() - scheduledTime;
+    return timeSinceScheduled < 30000; // 30 seconds
+  }
 
   /**
    * Request notification permissions from the user
@@ -103,6 +127,16 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
         return null;
       }
 
+      // WORKAROUND: If scheduling for more than 12 hours in the future, there's a known bug
+      // where notifications fire immediately. Skip notification scheduling in this case.
+      if (hoursUntilTrigger > 12) {
+        AlarmLogger.warning(`🚫 SKIPPING NOTIFICATION: Known Expo bug causes notifications > 12 hours to fire immediately. Using foreground timer only.`, {
+          hoursUntilTrigger: hoursUntilTrigger.toFixed(2),
+          scheduledTime: triggerDate.toISOString()
+        });
+        return null;
+      }
+
       // Cancel any existing notification
       if (this.scheduledNotificationId) {
         await this.cancelAlarmNotification(this.scheduledNotificationId);
@@ -112,27 +146,71 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
       // Try seconds-based trigger as alternative to date-based trigger for reliability
       const secondsUntilTrigger = Math.ceil(msUntilTrigger / 1000);
       
-      AlarmLogger.info(`🔍 DEBUG: Using seconds-based trigger: ${secondsUntilTrigger} seconds from now`);
+      // SAFEGUARD: Expo notifications might have issues with very large second values
+      // If it's more than 7 days (604800 seconds), use date-based trigger instead
+      const useSecondsBasedTrigger = secondsUntilTrigger <= 604800; // 7 days
       
-      const identifier = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          sound: 'default',
-          priority: 'high',
-          categoryIdentifier: 'wind-alarm',
-          data: data || {},
-        },
-        trigger: {
-          seconds: secondsUntilTrigger,
-          channelId: 'wind-alarm-channel',
-        },
-      });
-
-      this.scheduledNotificationId = identifier;
-      AlarmLogger.success(`Alarm notification scheduled with ID: ${identifier}`);
-      
-      return identifier;
+      if (useSecondsBasedTrigger) {
+        AlarmLogger.info(`🔍 DEBUG: Using seconds-based trigger: ${secondsUntilTrigger} seconds from now`);
+        
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            sound: 'default',
+            priority: 'high',
+            categoryIdentifier: 'wind-alarm',
+            data: {
+              ...data,
+              scheduledTime: triggerDate.toISOString(),
+              scheduledForFuture: true,
+              secondsUntilTrigger: secondsUntilTrigger
+            },
+          },
+          trigger: {
+            seconds: secondsUntilTrigger,
+            channelId: 'wind-alarm-channel',
+          },
+        });
+        
+        this.scheduledNotificationId = identifier;
+        AlarmLogger.success(`Alarm notification scheduled with ID: ${identifier} using seconds trigger`);
+        
+        // Track this notification as recently scheduled
+        AlarmNotificationServiceImpl.markNotificationAsRecentlyScheduled(identifier);
+        
+        return identifier;
+      } else {
+        AlarmLogger.info(`🔍 DEBUG: Using date-based trigger for far future date: ${triggerDate.toLocaleString()}`);
+        
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            sound: 'default',
+            priority: 'high',
+            categoryIdentifier: 'wind-alarm',
+            data: {
+              ...data,
+              scheduledTime: triggerDate.toISOString(),
+              scheduledForFuture: true,
+              useDateTrigger: true
+            },
+          },
+          trigger: {
+            date: triggerDate,
+            channelId: 'wind-alarm-channel',
+          },
+        });
+        
+        this.scheduledNotificationId = identifier;
+        AlarmLogger.success(`Alarm notification scheduled with ID: ${identifier} using date trigger`);
+        
+        // Track this notification as recently scheduled
+        AlarmNotificationServiceImpl.markNotificationAsRecentlyScheduled(identifier);
+        
+        return identifier;
+      }
     } catch (error) {
       AlarmLogger.error('Error scheduling alarm notification:', error);
       return null;
@@ -267,6 +345,11 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
 
 // Export singleton instance
 export const alarmNotificationService = new AlarmNotificationServiceImpl();
+
+// Export static methods for notification validation
+export const isNotificationRecentlyScheduled = (notificationId: string): boolean => {
+  return AlarmNotificationServiceImpl.isNotificationRecentlyScheduled(notificationId);
+};
 
 /**
  * Initialize notification service (call this at app startup)
