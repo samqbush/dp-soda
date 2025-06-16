@@ -7,9 +7,11 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useAppSettings } from '@/contexts/SettingsContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { settings } = useAppSettings();
 
   return (
     <Tabs
@@ -52,6 +54,7 @@ export default function TabLayout() {
         options={{
           title: 'Wind Guru',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cloud.sun.fill" color={color} />,
+          href: settings.windGuruEnabled ? '/wind-guru' : null,
         }}
       />
       <Tabs.Screen

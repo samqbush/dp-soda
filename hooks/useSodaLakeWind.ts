@@ -30,7 +30,7 @@ export interface UseSodaLakeWindReturn {
 }
 
 export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
-  console.log('🏔️ useSodaLakeWind hook initializing...');
+  // console.log('🏔️ useSodaLakeWind hook initializing...'); // Commented out - too noisy
   
   const [windData, setWindData] = useState<EcowittWindDataPoint[]>([]);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);

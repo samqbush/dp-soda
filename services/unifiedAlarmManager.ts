@@ -426,7 +426,12 @@ class UnifiedAlarmManager {
             '🌊 DAWN PATROL ALARM!',
             'Checking wind conditions now... Tap to see if you should wake up! 🏄‍♂️'
           );
-          AlarmLogger.success('Background notification scheduled as primary alarm mechanism');
+          
+          if (this.scheduledNotificationId) {
+            AlarmLogger.success('Background notification scheduled as primary alarm mechanism');
+          } else {
+            AlarmLogger.warning('Background notification could not be scheduled (likely due to timing bug) - relying on foreground timer only');
+          }
         } else {
           AlarmLogger.warning('No notification permissions - alarm will only work in foreground');
         }

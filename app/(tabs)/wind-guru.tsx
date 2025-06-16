@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { PressureChart } from '@/components/PressureChart';
-import { WeeklyForecast } from '@/components/WeeklyForecast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
+import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
+import { useAppSettings } from '@/contexts/SettingsContext';
+import { PressureChart } from '@/components/PressureChart';
+import { WeeklyForecast } from '@/components/WeeklyForecast';
+import { PredictionTrackingService } from '@/services/predictionTrackingService';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+  const { settings } = useAppSettings();
   
-  // State for collapsible sections
+  // State for collapsible sections - must be called before any conditional returns
   const [isHowItWorksExpanded, setIsHowItWorksExpanded] = useState(false);
 
   // Temperature conversion helper
@@ -35,7 +35,7 @@ export default function WindGuruScreen() {
     return `${fahrenheitDiff.toFixed(1)}°F`;
   };
 
-  // Use the weather data hook with Phase 2 prediction engine
+  // Use the weather data hook with Phase 2 prediction engine - must be called unconditionally
   const {
     weatherData,
     isLoading,
@@ -51,7 +51,124 @@ export default function WindGuruScreen() {
     // Phase 2.5: Extended predictions
     getWeeklyPredictions,
     getForecastAvailability,
+    // Phase 3: Prediction tracking (June 14, 2025)
+    logCurrentPrediction,
+    getPredictionAccuracy,
+    validatePastPredictions,
   } = useWeatherData();
+
+  // Import Soda Lake wind data for prediction validation
+  const { windData: sodaLakeWindData } = useSodaLakeWind();
+
+  // State for prediction accuracy tracking
+  const [predictionAccuracy, setPredictionAccuracy] = React.useState<any>(null);
+  const [cleanupStatus, setCleanupStatus] = React.useState<string>('');
+  const [validationResults, setValidationResults] = React.useState<any>(null);
+
+  // Load prediction accuracy on component mount and when predictions change
+  React.useEffect(() => {
+    const loadAccuracy = async () => {
+      try {
+        const accuracy = await getPredictionAccuracy();
+        setPredictionAccuracy(accuracy);
+      } catch (error) {
+        console.error('❌ Failed to load prediction accuracy:', error);
+      }
+    };
+
+    loadAccuracy();
+  }, [getPredictionAccuracy, katabaticAnalysis.prediction]);
+
+  // Auto-log predictions when they're generated (for tracking)
+  React.useEffect(() => {
+    if (katabaticAnalysis.prediction && weatherData) {
+      logCurrentPrediction().catch(error => {
+        console.error('❌ Failed to log prediction:', error);
+      });
+    }
+  }, [katabaticAnalysis.prediction, weatherData, logCurrentPrediction]);
+
+  // Auto-validate predictions using Soda Lake wind data after 8 AM
+  React.useEffect(() => {
+    // Only log once per session to reduce noise
+    const shouldLog = sodaLakeWindData.length > 0 && new Date().getHours() >= 8;
+    if (shouldLog) {
+      console.log('🔍 Wind Guru validation check:', {
+        sodaLakeDataPoints: sodaLakeWindData.length,
+        currentTime: new Date().toLocaleTimeString(),
+        validationReady: true
+      });
+    }
+
+    if (sodaLakeWindData.length > 0) {
+      // Check if we're past dawn patrol time (8 AM) and have wind data
+      const now = new Date();
+      const eightAM = new Date();
+      eightAM.setHours(8, 0, 0, 0);
+      
+      if (now > eightAM) {
+        if (shouldLog) console.log('✅ Starting validation process...');
+        
+        // Convert wind data for validation
+        const validationData = sodaLakeWindData.map(point => ({
+          time: new Date(point.time),
+          windSpeedMph: point.windSpeedMph,
+          windDirection: point.windDirection
+        }));
+        
+        // Validate predictions and store results for display
+        validatePastPredictions(validationData)
+          .then(result => {
+            if (result) {
+              console.log('✅ Validation completed - setting results for display');
+              setValidationResults(result);
+              // Reload accuracy stats after validation
+              getPredictionAccuracy().then(accuracy => {
+                setPredictionAccuracy(accuracy);
+              }).catch(error => {
+                console.error('❌ Failed to reload accuracy after validation:', error);
+              });
+            } else {
+              console.log('⚠️ No validation result (no pending predictions)');
+            }
+          })
+          .catch(error => {
+            console.error('❌ Prediction validation failed:', error);
+          });
+      }
+    }
+  }, [sodaLakeWindData, validatePastPredictions, getPredictionAccuracy]);
+
+  // Show disabled message if Wind Guru is not enabled
+  if (!settings.windGuruEnabled) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedView style={[styles.disabledContainer, { backgroundColor: cardColor }]}>
+          <ThemedText style={styles.disabledTitle}>🔒 Wind Guru Disabled</ThemedText>
+          <ThemedText style={styles.disabledText}>
+            The Wind Guru tab is currently disabled. This experimental feature provides advanced katabatic wind predictions but is still in development.
+          </ThemedText>
+          <ThemedText style={[styles.disabledText, { marginTop: 16 }]}>
+            To enable Wind Guru:
+          </ThemedText>
+          <ThemedText style={styles.disabledSteps}>
+            1. Go to the Settings tab{'\n'}
+            2. Find &quot;App Features&quot; section{'\n'}
+            3. Toggle &quot;Wind Guru Tab&quot; to enabled{'\n'}
+            4. Return to this tab to access the feature
+          </ThemedText>
+          <ThemedView style={[styles.warningNote, { backgroundColor: 'rgba(255, 149, 0, 0.1)', borderColor: '#FF9500' }]}>
+            <ThemedText style={[styles.warningText, { color: '#FF9500' }]}>
+              ⚠️ <ThemedText style={{ fontWeight: 'bold' }}>Experimental Feature</ThemedText>
+            </ThemedText>
+            <ThemedText style={[styles.warningText, { color: textColor, opacity: 0.8 }]}>
+              Wind predictions may not be reliable for critical decisions. Use at your own discretion.
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
+      </ThemedView>
+    );
+  }
 
   // Get current analysis data
   const tempDiff = getTemperatureDifferential();
@@ -78,8 +195,45 @@ export default function WindGuruScreen() {
     }
   };
 
-  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high'): string => {
-    return confidence.charAt(0).toUpperCase() + confidence.slice(1);
+  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number): string => {
+    const baseLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
+    if (confidenceScore !== undefined) {
+      return `${baseLabel} (${confidenceScore}%)`;
+    }
+    return baseLabel;
+  };
+
+  const getConfidenceExplanation = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number, favorableFactors?: number): string => {
+    if (favorableFactors !== undefined) {
+      if (favorableFactors === 0) {
+        return `Low confidence due to 0/5 favorable factors despite good data quality`;
+      } else if (favorableFactors <= 2) {
+        return `${confidence} confidence - ${favorableFactors}/5 factors support prediction`;
+      } else {
+        return `${confidence} confidence - ${favorableFactors}/5 factors strongly support prediction`;
+      }
+    }
+    
+    switch (confidence) {
+      case 'high': return 'High confidence - data quality excellent and factors align well';
+      case 'medium': return 'Medium confidence - mixed signals from prediction factors';
+      case 'low': return 'Low confidence - factors indicate poor conditions';
+    }
+  };
+
+  // Helper to count favorable factors from prediction
+  const countFavorableFactors = (prediction: any): number => {
+    if (!prediction?.factors) return 0;
+    
+    const factors = [
+      prediction.factors.precipitation?.meets,
+      prediction.factors.skyConditions?.meets,
+      prediction.factors.pressureChange?.meets,
+      prediction.factors.temperatureDifferential?.meets,
+      prediction.factors.wavePattern?.meets
+    ];
+    
+    return factors.filter(Boolean).length;
   };
 
   const getRecommendationText = (recommendation: 'go' | 'maybe' | 'skip'): string => {
@@ -97,6 +251,64 @@ export default function WindGuruScreen() {
       console.log('Wind Guru: Data refreshed successfully');
     } catch (error) {
       console.error('Wind Guru: Refresh failed:', error);
+    }
+  };
+
+  // 🧹 TEMPORARY: Cleanup function for removing duplicate predictions
+  const handleCleanupDuplicates = async () => {
+    try {
+      setCleanupStatus('🔄 Cleaning up duplicates...');
+      
+      const service = PredictionTrackingService.getInstance();
+      
+      // Get stats before cleanup
+      const statsBefore = await service.getDebugStats();
+      console.log('📊 Before cleanup:', statsBefore);
+      
+      // Perform cleanup
+      const result = await service.cleanupDuplicates();
+      
+      // Get stats after cleanup
+      const statsAfter = await service.getDebugStats();
+      console.log('📊 After cleanup:', statsAfter);
+      
+      // Refresh prediction accuracy
+      const accuracy = await getPredictionAccuracy();
+      setPredictionAccuracy(accuracy);
+      
+      setCleanupStatus(`✅ Cleaned up ${result.removed} duplicates! Now have ${result.kept} unique predictions.`);
+      
+      // Clear status after 5 seconds
+      setTimeout(() => setCleanupStatus(''), 5000);
+      
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
+      setCleanupStatus(`❌ Cleanup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setCleanupStatus(''), 5000);
+    }
+  };
+
+  // 🗑️ NUCLEAR OPTION: Clear all predictions (for testing)
+  const handleClearAllPredictions = async () => {
+    try {
+      setCleanupStatus('🗑️ Clearing all predictions...');
+      
+      // This is the nuclear option - clear everything
+      await AsyncStorage.removeItem('wind_predictions');
+      
+      // Refresh prediction accuracy (should be empty now)
+      const accuracy = await getPredictionAccuracy();
+      setPredictionAccuracy(accuracy);
+      
+      setCleanupStatus('🗑️ All predictions cleared! Fresh start.');
+      
+      // Clear status after 5 seconds
+      setTimeout(() => setCleanupStatus(''), 5000);
+      
+    } catch (error) {
+      console.error('❌ Clear all failed:', error);
+      setCleanupStatus(`❌ Clear failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setCleanupStatus(''), 5000);
     }
   };
 
@@ -435,14 +647,33 @@ export default function WindGuruScreen() {
                   ]} />
                 </ThemedView>
                 <ThemedText style={styles.probabilityText}>
-                  {katabaticAnalysis.prediction.probability}% Probability
+                  {katabaticAnalysis.prediction.probability}% Chance of Good Winds
                 </ThemedText>
                 <ThemedText style={[
                   styles.confidenceText,
                   { color: getConfidenceColor(katabaticAnalysis.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(katabaticAnalysis.prediction.confidence)} Confidence - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
+                  Prediction Reliability: {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Clear explanation of the two metrics */}
+                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
+                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
+                  </ThemedText>
+                </ThemedView>
+                
+                {/* Confidence Explanation */}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
+                  {getConfidenceExplanation(
+                    katabaticAnalysis.prediction.confidence, 
+                    katabaticAnalysis.prediction.confidenceScore,
+                    countFavorableFactors(katabaticAnalysis.prediction)
+                  )}
+                </ThemedText>
+                
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
                   {katabaticAnalysis.prediction.explanation}
                 </ThemedText>
@@ -545,14 +776,33 @@ export default function WindGuruScreen() {
                   ]} />
                 </ThemedView>
                 <ThemedText style={styles.probabilityText}>
-                  {tomorrowPrediction.prediction.probability}% Probability
+                  {tomorrowPrediction.prediction.probability}% Chance of Good Winds
                 </ThemedText>
                 <ThemedText style={[
                   styles.confidenceText,
                   { color: getConfidenceColor(tomorrowPrediction.prediction.confidence) }
                 ]}>
-                  {getConfidenceLabel(tomorrowPrediction.prediction.confidence)} Confidence - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
+                  Prediction Reliability: {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
                 </ThemedText>
+                
+                {/* Clear explanation of the two metrics */}
+                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
+                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
+                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
+                  </ThemedText>
+                </ThemedView>
+                
+                {/* Confidence Explanation */}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
+                  {getConfidenceExplanation(
+                    tomorrowPrediction.prediction.confidence, 
+                    tomorrowPrediction.prediction.confidenceScore,
+                    countFavorableFactors(tomorrowPrediction.prediction)
+                  )}
+                </ThemedText>
+                
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
                   {tomorrowPrediction.prediction.explanation}
                 </ThemedText>
@@ -936,6 +1186,199 @@ export default function WindGuruScreen() {
           )}
         </ThemedView>
 
+        {/* Phase 3: Prediction Accuracy Tracking - June 14, 2025 */}
+        {/* Development Mode: Show detailed accuracy stats for debugging */}
+        {__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions > 0 && (
+          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              📊 Prediction Accuracy (Development Mode)
+            </ThemedText>
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
+              Learning from actual wind outcomes to improve future predictions
+            </ThemedText>
+            
+            <View style={styles.conditionsCard}>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Total Predictions:</ThemedText>
+                <ThemedText style={styles.conditionValue}>{predictionAccuracy.totalPredictions}</ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Accuracy Rate:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
+                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
+                }]}>
+                  {predictionAccuracy.accuracy.toFixed(1)}%
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Correct Predictions:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { color: '#4CAF50' }]}>
+                  {predictionAccuracy.correctPredictions}
+                </ThemedText>
+              </View>
+              {predictionAccuracy.falsePositives > 0 && (
+                <View style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>False Alarms:</ThemedText>
+                  <ThemedText style={[styles.conditionValue, { color: '#F44336' }]}>
+                    {predictionAccuracy.falsePositives}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
+              💡 Development Mode: Predictions become more accurate as we collect more data. 
+              {predictionAccuracy.totalPredictions < 10 && ' Need more data for reliable statistics.'}
+            </ThemedText>
+          </ThemedView>
+        )}
+
+        {/* Production Mode: Simple prediction learning indicator */}
+        {!__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions >= 10 && (
+          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              🧠 Prediction Learning System
+            </ThemedText>
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
+              The system is learning from wind patterns to improve future predictions
+            </ThemedText>
+            
+            <View style={styles.conditionsCard}>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Learning Status:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
+                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
+                }]}>
+                  {predictionAccuracy.accuracy >= 70 ? 'Excellent' :
+                   predictionAccuracy.accuracy >= 50 ? 'Good' : 'Learning'}
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Data Points:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { color: tintColor }]}>
+                  {predictionAccuracy.totalPredictions} predictions analyzed
+                </ThemedText>
+              </View>
+            </View>
+            
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
+              💡 Predictions improve over time as the system learns local wind patterns.
+            </ThemedText>
+          </ThemedView>
+        )}
+
+        {/* Prediction Validation Results - Show actionable feedback when predictions are wrong */}
+        {__DEV__ && (
+          <ThemedView style={{ margin: 16, padding: 12, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8 }}>
+            <ThemedText style={{ fontSize: 12, fontFamily: 'monospace' }}>
+              🐛 Debug Info:{'\n'}
+              validationResults: {validationResults ? 'HAS DATA' : 'NULL'}{'\n'}
+              Current time: {new Date().toLocaleTimeString()}{'\n'}
+              Soda Lake data points: {sodaLakeWindData.length}{'\n'}
+              {validationResults && `Validation data: ${JSON.stringify(validationResults, null, 2)}`}
+            </ThemedText>
+          </ThemedView>
+        )}
+        
+        {__DEV__ && validationResults && (
+          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              🔍 Recent Prediction Analysis {validationResults.alreadyValidated ? '(Completed Earlier)' : '(Just Completed)'}
+            </ThemedText>
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
+              Analysis of {validationResults.predictionDate ? new Date(validationResults.predictionDate).toLocaleDateString() : 'recent'} prediction vs actual wind data
+              {validationResults.alreadyValidated && (
+                <>
+                  {'\n'}
+                  <ThemedText style={{ fontStyle: 'italic', fontSize: 12 }}>
+                    This validation was completed earlier. {validationResults.validationNotes}
+                  </ThemedText>
+                </>
+              )}
+            </ThemedText>
+            
+            <View style={styles.conditionsCard}>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Prediction Result:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: validationResults.predictionWasAccurate ? '#4CAF50' : '#F44336'
+                }]}>
+                  {validationResults.predictionWasAccurate ? '✅ Accurate' : '❌ Inaccurate'}
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Predicted:</ThemedText>
+                <ThemedText style={styles.conditionValue}>
+                  {validationResults.predictedSuccess ? 'Good winds' : 'Poor winds'} ({validationResults.predictedProbability?.toFixed(0)}%)
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Actual Result:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: validationResults.actualSuccess ? '#4CAF50' : '#F44336'
+                }]}>
+                  {validationResults.actualSuccess ? 'Good winds' : 'Poor winds'} (avg: {validationResults.avgSpeed?.toFixed(1)} mph)
+                </ThemedText>
+              </View>
+              {validationResults.goodWindPercentage !== undefined && (
+                <View style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>Wind Quality:</ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {validationResults.goodWindPercentage.toFixed(0)}% of time ≥15 mph
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+
+            {/* Show detailed failure analysis and improvement suggestions */}
+            {!validationResults.predictionWasAccurate && validationResults.failureAnalysis && (
+              <View style={[styles.conditionsCard, { marginTop: 12, backgroundColor: 'rgba(244, 67, 54, 0.05)', borderLeftWidth: 4, borderLeftColor: '#F44336' }]}>
+                <ThemedText style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8, color: '#F44336' }]}>
+                  🔧 Prediction Failure Analysis
+                </ThemedText>
+                
+                {validationResults.failureAnalysis.summary && (
+                  <ThemedText style={[styles.explanationText, { color: textColor, marginBottom: 12 }]}>
+                    {validationResults.failureAnalysis.summary}
+                  </ThemedText>
+                )}
+
+                {validationResults.failureAnalysis.factorAnalysis && validationResults.failureAnalysis.factorAnalysis.length > 0 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <ThemedText style={[styles.conditionLabel, { fontWeight: '600', marginBottom: 6 }]}>
+                      Factor Analysis:
+                    </ThemedText>
+                    {validationResults.failureAnalysis.factorAnalysis.map((factor: any, index: number) => (
+                      <ThemedText key={index} style={[styles.conditionValue, { fontSize: 12, marginBottom: 4, opacity: 0.9 }]}>
+                        • {factor}
+                      </ThemedText>
+                    ))}
+                  </View>
+                )}
+
+                {validationResults.failureAnalysis.improvementSuggestions && validationResults.failureAnalysis.improvementSuggestions.length > 0 && (
+                  <View>
+                    <ThemedText style={[styles.conditionLabel, { fontWeight: '600', marginBottom: 6, color: '#FF9800' }]}>
+                      💡 Code Improvement Suggestions:
+                    </ThemedText>
+                    {validationResults.failureAnalysis.improvementSuggestions.map((suggestion: any, index: number) => (
+                      <ThemedText key={index} style={[styles.conditionValue, { fontSize: 12, marginBottom: 6, color: '#FF9800', fontWeight: '500' }]}>
+                        {index + 1}. {suggestion}
+                      </ThemedText>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
+              🚀 This analysis helps improve the prediction algorithm by identifying weaknesses and suggesting code improvements.
+            </ThemedText>
+          </ThemedView>
+        )}
+
         {/* Phase 2.5: Weekly Forecast */}
         <WeeklyForecast 
           predictions={weeklyPredictions}
@@ -943,24 +1386,83 @@ export default function WindGuruScreen() {
           isLoading={isLoading}
         />
 
-        {/* Development Info */}
-        <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🎯 Phase 3: Weekly Forecast Active!
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            ✅ Today & Tomorrow detailed analysis
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            📅 5-day extended forecast with quick overview
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🌤️ Using OpenWeatherMap API (up to 5 days available)
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            Next: Historical accuracy tracking & push notifications
-          </ThemedText>
-        </ThemedView>
+        {/* Development Info - Only show in development mode */}
+        {__DEV__ && (
+          <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              🎯 Development Mode: Phase 3 Weekly Forecast Active!
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              ✅ Today & Tomorrow detailed analysis
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              📅 5-day extended forecast with quick overview
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              🌤️ Using OpenWeatherMap API (up to 5 days available)
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              Next: Historical accuracy tracking & push notifications
+            </ThemedText>
+            
+            {/* Temporary cleanup buttons */}
+            <ThemedView style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 8 }}>
+              <ThemedText style={[styles.devText, { color: '#FF9800', fontWeight: '600', marginBottom: 8 }]}>
+                🧹 Temporary Cleanup Tools:
+              </ThemedText>
+              
+              <ThemedView style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: tintColor,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    flex: 1
+                  }}
+                  onPress={handleCleanupDuplicates}
+                >
+                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                    🧹 Remove Duplicates
+                  </ThemedText>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#F44336',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    flex: 1
+                  }}
+                  onPress={handleClearAllPredictions}
+                >
+                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                    🗑️ Clear All
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
+              
+              {cleanupStatus ? (
+                <ThemedText style={{ color: textColor, fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
+                  {cleanupStatus}
+                </ThemedText>
+              ) : null}
+            </ThemedView>
+          </ThemedView>
+        )}
+
+        {/* Production Footer - Simple status for production users */}
+        {!__DEV__ && (
+          <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.02)', borderRadius: 8, padding: 12, marginTop: 16 }}>
+            <ThemedText style={{ color: textColor, opacity: 0.6, fontSize: 12, textAlign: 'center' }}>
+              🌤️ Wind Guru uses advanced 5-factor analysis with NOAA & OpenWeather data
+            </ThemedText>
+            <ThemedText style={{ color: textColor, opacity: 0.5, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+              Predictions improve over time as the system learns local patterns
+            </ThemedText>
+          </ThemedView>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -1413,5 +1915,53 @@ const styles = StyleSheet.create({
   dataQualityExplanation: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  // Disabled state styles
+  disabledContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 16,
+    padding: 24,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  disabledTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  disabledText: {
+    fontSize: 16,
+    lineHeight: 22,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 8,
+  },
+  disabledSteps: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'left',
+    opacity: 0.9,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  warningNote: {
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    width: '100%',
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 4,
   },
 });

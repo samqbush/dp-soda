@@ -3,10 +3,12 @@ import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService'
 import { hybridWeatherService } from '@/services/hybridWeatherService';
 import { useKatabaticAnalyzer } from '@/hooks/useKatabaticAnalyzer';
 import { katabaticAnalyzer } from '@/services/katabaticAnalyzer';
+import { predictionTrackingService } from '@/services/predictionTrackingService';
 
 /**
  * Custom hook for managing weather data state and operations
  * Follows the same patterns as useWindData.ts
+ * Updated June 14, 2025: Added prediction tracking for continuous improvement
  */
 export const useWeatherData = () => {
   const [weatherData, setWeatherData] = useState<WeatherServiceData | null>(null);
@@ -417,6 +419,464 @@ export const useWeatherData = () => {
     };
   }, [weatherData]);
 
+  /**
+   * Log prediction for tracking (called when prediction is made)
+   */
+  const logCurrentPrediction = useCallback(async () => {
+    if (!weatherData || !katabaticAnalysis.prediction) return;
+    
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(6, 0, 0, 0); // Dawn patrol time
+      
+      // Extract weather conditions for tracking
+      const weatherConditions = {
+        morrisonTemp: weatherData.morrison?.current?.temperature || 0,
+        mountainTemp: weatherData.mountain?.current?.temperature || 0,
+        actualTempDiff: (weatherData.morrison?.current?.temperature || 0) - (weatherData.mountain?.current?.temperature || 0),
+        precipitation: weatherData.morrison?.current?.precipitationProbability || 0,
+        cloudCover: weatherData.morrison?.current?.cloudCover || 0,
+        pressure: weatherData.morrison?.current?.pressure || 0,
+      };
+      
+      // 🆕 Add call tracking for debugging
+      const logDetails = {
+        timestamp: new Date().toISOString(),
+        predictionDate: tomorrow.toDateString(),
+        probability: katabaticAnalysis.prediction.probability,
+        confidence: katabaticAnalysis.prediction.confidenceScore,
+        triggeredBy: 'useWeatherData',
+        environment: __DEV__ ? 'development' : 'production'
+      };
+      
+      // In production, reduce logging noise
+      if (__DEV__) {
+        console.log('🔄 logCurrentPrediction called:', logDetails);
+      }
+      
+      await predictionTrackingService.logPrediction(
+        tomorrow,
+        katabaticAnalysis.prediction,
+        weatherConditions
+      );
+      
+      // In production, reduce logging noise
+      const logMessage = __DEV__ ? 
+        'Logged prediction for tracking:' : 
+        'Prediction logged for learning system:';
+        
+      console.log(`📊 ${logMessage}`, {
+        date: tomorrow.toDateString(),
+        probability: katabaticAnalysis.prediction.probability,
+        confidence: katabaticAnalysis.prediction.confidenceScore
+      });
+    } catch (error) {
+      console.error('❌ Failed to log prediction:', error);
+      // Don't throw - prediction tracking shouldn't break the main functionality
+    }
+  }, [weatherData, katabaticAnalysis.prediction]);
+
+  /**
+   * Enhanced prediction validation with detailed failure analysis
+   * Automatically validates predictions against Ecowitt wind data after 8 AM
+   */
+  const validatePastPredictions = useCallback(async (actualWindData: Array<{
+    time: Date;
+    windSpeedMph: number;
+    windDirection: number;
+  }>) => {
+    try {
+      const today = new Date();
+      console.log('🔍 Starting validation process:', {
+        currentTime: today.toLocaleString(),
+        currentHour: today.getHours()
+      });
+      
+      // Look for predictions made for today (not dawn patrol time specifically)
+      const todayDateOnly = new Date(today);
+      todayDateOnly.setHours(0, 0, 0, 0); // Start of day
+      
+      console.log('📅 Looking for predictions for date:', todayDateOnly.toDateString());
+      
+      // Find prediction that needs validation
+      const pendingPrediction = await predictionTrackingService.findPredictionNeedingOutcome(todayDateOnly);
+      
+      console.log('🔍 Prediction search result:', {
+        found: !!pendingPrediction,
+        predictionId: pendingPrediction?.id,
+        predictionDate: pendingPrediction?.predictionDate?.toDateString(),
+        hasOutcome: !!pendingPrediction?.outcome
+      });
+      
+      if (!pendingPrediction) {
+        console.log('📊 No pending predictions to validate for today');
+        // Let's also check what predictions we do have
+        const allPredictions = await predictionTrackingService.getAllPredictions();
+        console.log('📊 All stored predictions:', allPredictions.map(p => ({
+          id: p.id,
+          date: p.predictionDate.toDateString(),
+          hasOutcome: !!p.outcome,
+          probability: p.prediction.probability
+        })));
+        
+        // Check if we have a recent completed validation to show
+        const todaysPrediction = allPredictions.find(p => 
+          p.predictionDate.toDateString() === todayDateOnly.toDateString()
+        );
+        
+        if (todaysPrediction && todaysPrediction.outcome) {
+          console.log('📊 Found completed validation for today, displaying results');
+          
+          // Enhanced algorithm debugging for completed validation
+          const validationOutcome = todaysPrediction.outcome;
+          const wasPredictedSuccess = todaysPrediction.prediction.probability >= 50;
+          const wasAccurate = wasPredictedSuccess === validationOutcome.success;
+          
+          console.log('🧮 DETAILED ALGORITHM ANALYSIS FOR COMPLETED VALIDATION');
+          console.log('=' .repeat(80));
+          console.log('📊 PREDICTION BREAKDOWN:', {
+            predictionId: todaysPrediction.id,
+            predictionDate: todaysPrediction.predictionDate.toDateString(),
+            predictedProbability: todaysPrediction.prediction.probability,
+            predictedConfidence: todaysPrediction.prediction.confidence,
+            predictedRecommendation: todaysPrediction.prediction.recommendation,
+            predictedSuccess: wasPredictedSuccess,
+            actualSuccess: validationOutcome.success,
+            predictionWasAccurate: wasAccurate,
+            failureType: !wasAccurate ? 
+              (wasPredictedSuccess && !validationOutcome.success ? 'FALSE_POSITIVE' : 'FALSE_NEGATIVE') : 'CORRECT'
+          });
+          
+          console.log('🌤️ ACTUAL WIND CONDITIONS:', {
+            avgWindSpeed: validationOutcome.actualWindSpeed.toFixed(1) + ' mph',
+            maxWindSpeed: validationOutcome.actualMaxSpeed.toFixed(1) + ' mph',
+            minWindSpeed: validationOutcome.actualMinSpeed.toFixed(1) + ' mph',
+            dataPoints: validationOutcome.dataPoints,
+            windSuccess: validationOutcome.success,
+            validationSource: validationOutcome.source,
+            notes: validationOutcome.notes
+          });
+          
+          // Detailed factor analysis if prediction was wrong
+          if (!wasAccurate) {
+            console.log('🔍 FACTOR-BY-FACTOR ANALYSIS OF PREDICTION FAILURE:');
+            
+            const predictionData = todaysPrediction.prediction;
+            if (predictionData.factors) {
+              console.log('  📈 PREDICTED FACTORS BREAKDOWN:');
+              
+              Object.entries(predictionData.factors).forEach(([factorName, factor]) => {
+                console.log(`    • ${factorName.toUpperCase()}:`, {
+                  meets: factor.meets ? '✅ MET' : '❌ NOT MET',
+                  value: factor.value !== undefined ? factor.value : 'N/A',
+                  threshold: factor.threshold !== undefined ? factor.threshold : 'N/A',
+                  weight: factor.weight !== undefined ? factor.weight : 'N/A',
+                  contribution: factor.meets ? '+' : '-'
+                });
+              });
+            }
+            
+            console.log('  💡 ALGORITHM CONFIDENCE BREAKDOWN:');
+            console.log(`    - Overall Probability: ${predictionData.probability}% (threshold: 50%)`);
+            console.log(`    - Confidence Level: ${predictionData.confidence}%`);
+            console.log(`    - Recommendation: ${predictionData.recommendation}`);
+            
+            if (wasPredictedSuccess && !validationOutcome.success) {
+              console.log('  ⚠️ FALSE POSITIVE ANALYSIS:');
+              console.log(`    - Algorithm said: ${predictionData.probability}% chance of good winds`);
+              console.log(`    - Reality: ${validationOutcome.actualWindSpeed.toFixed(1)} mph average (need 15+ mph)`);
+              console.log(`    - Gap: Algorithm was overconfident by ${predictionData.probability - 0}%`);
+              console.log('  🔧 LIKELY ALGORITHM ISSUES:');
+              console.log('    - Factor weights may be too aggressive');
+              console.log('    - Confidence calculation may be inflated');
+              console.log('    - Missing critical negative factors');
+            }
+            
+            console.log('  🎯 SPECIFIC IMPROVEMENT TARGETS:');
+            console.log('    1. Review factor weights in katabaticAnalyzer.ts');
+            console.log('    2. Analyze weather conditions that led to failure');
+            console.log('    3. Add penalty for similar failed patterns');
+            console.log('    4. Recalibrate confidence thresholds');
+          }
+          console.log('=' .repeat(80));
+          
+          // Return the completed validation results for display
+          const outcome = todaysPrediction.outcome;
+          const predictedSuccess = todaysPrediction.prediction.probability >= 50;
+          const predictionWasAccurate = predictedSuccess === outcome.success;
+          
+          return {
+            predictionWasAccurate,
+            actualSuccess: outcome.success,
+            predictedSuccess,
+            avgSpeed: outcome.actualWindSpeed,
+            maxSpeed: outcome.actualMaxSpeed,
+            goodWindPercentage: outcome.success ? 80 : 20, // Estimate based on success
+            katabaticConsistency: 70, // Estimate
+            predictedProbability: todaysPrediction.prediction.probability,
+            predictionDate: todaysPrediction.predictionDate,
+            alreadyValidated: true,
+            validationNotes: outcome.notes || 'Validation completed earlier',
+            failureAnalysis: !predictionWasAccurate ? {
+              type: predictedSuccess && !outcome.success ? 'FALSE_POSITIVE' : 
+                    !predictedSuccess && outcome.success ? 'FALSE_NEGATIVE' : 'CORRECT',
+              summary: predictedSuccess && !outcome.success ? 
+                       'Predicted good winds but conditions were poor' :
+                       'Predicted poor winds but conditions were actually good',
+              factorAnalysis: [
+                `Actual wind speed: ${outcome.actualWindSpeed.toFixed(1)} mph`,
+                `Wind success: ${outcome.success ? 'Good winds achieved' : 'Poor wind conditions'}`,
+                'Detailed factor analysis from original validation'
+              ],
+              improvementSuggestions: [
+                'Review prediction factors for this type of condition',
+                'Analyze why prediction confidence didn\'t match reality',
+                'Consider adjusting algorithm weights based on this outcome'
+              ]
+            } : null
+          };
+        }
+        
+        return null;
+      }
+      
+      console.log('🔍 STARTING PREDICTION VALIDATION', {
+        predictionDate: todayDateOnly.toDateString(),
+        predictionId: pendingPrediction.id,
+        predictedProbability: pendingPrediction.prediction.probability,
+        predictedConfidence: pendingPrediction.prediction.confidence,
+        actualWindDataPoints: actualWindData.length
+      });
+      
+      // Filter wind data for dawn patrol window (6-8 AM)
+      const dawnPatrolStart = new Date(todayDateOnly);
+      dawnPatrolStart.setHours(6, 0, 0, 0);
+      const dawnPatrolEnd = new Date(todayDateOnly);
+      dawnPatrolEnd.setHours(8, 0, 0, 0);
+      
+      const dawnPatrolWinds = actualWindData.filter(point => 
+        point.time >= dawnPatrolStart && point.time <= dawnPatrolEnd
+      );
+      
+      if (dawnPatrolWinds.length === 0) {
+        console.log('📊 No wind data available for validation window (6-8 AM)');
+        return null;
+      }
+      
+      // Calculate comprehensive wind metrics
+      const avgSpeed = dawnPatrolWinds.reduce((sum, point) => sum + point.windSpeedMph, 0) / dawnPatrolWinds.length;
+      const maxSpeed = Math.max(...dawnPatrolWinds.map(point => point.windSpeedMph));
+      const minSpeed = Math.min(...dawnPatrolWinds.map(point => point.windSpeedMph));
+      const avgDirection = dawnPatrolWinds.reduce((sum, point) => sum + point.windDirection, 0) / dawnPatrolWinds.length;
+      
+      // Determine if winds were actually good (15+ mph sustained)
+      const goodWindPoints = dawnPatrolWinds.filter(point => point.windSpeedMph >= 15);
+      const goodWindPercentage = (goodWindPoints.length / dawnPatrolWinds.length) * 100;
+      const actualSuccess = goodWindPercentage >= 70; // 70% of time with good winds = success
+      
+      // Analyze wind direction consistency (katabatic should be downslope)
+      const katabaticDirections = dawnPatrolWinds.filter(point => 
+        (point.windDirection >= 270 && point.windDirection <= 360) || 
+        (point.windDirection >= 0 && point.windDirection <= 90)
+      );
+      const katabaticConsistency = (katabaticDirections.length / dawnPatrolWinds.length) * 100;
+      
+      // Extract predicted conditions for comparison
+      const predictedFactors = pendingPrediction.prediction.factors;
+      const actualConditions = pendingPrediction.weatherConditions;
+      
+      // Determine prediction accuracy
+      const predictedSuccess = pendingPrediction.prediction.probability >= 50;
+      const predictionWasAccurate = predictedSuccess === actualSuccess;
+      
+      // Determine failure type for analysis
+      const failureType = predictionWasAccurate ? 'CORRECT' : 
+                         predictedSuccess && !actualSuccess ? 'FALSE_POSITIVE' : 
+                         !predictedSuccess && actualSuccess ? 'FALSE_NEGATIVE' : 'CORRECT';
+      
+      console.log('📊 VALIDATION RESULTS:', {
+        predicted: {
+          probability: pendingPrediction.prediction.probability,
+          confidence: pendingPrediction.prediction.confidence,
+          recommendation: pendingPrediction.prediction.recommendation,
+          predictedSuccess
+        },
+        actual: {
+          avgSpeed: avgSpeed.toFixed(1),
+          maxSpeed: maxSpeed.toFixed(1),
+          goodWindPercentage: goodWindPercentage.toFixed(1),
+          katabaticConsistency: katabaticConsistency.toFixed(1),
+          actualSuccess
+        },
+        accuracy: {
+          predictionWasAccurate,
+          type: failureType
+        }
+      });
+      
+      // 🚨 DETAILED FAILURE ANALYSIS for algorithm improvement
+      if (!predictionWasAccurate) {
+        console.log('🔍 PREDICTION FAILURE ANALYSIS - ALGORITHM IMPROVEMENT NEEDED');
+        console.log('=' .repeat(80));
+        
+        if (failureType === 'FALSE_POSITIVE') {
+          console.log('❌ FALSE POSITIVE: Predicted good winds, but winds were poor');
+          console.log('💡 IMPROVEMENT ANALYSIS:');
+          
+          // Analyze what factors were wrong
+          if (avgSpeed < 10) {
+            console.log('  • ISSUE: Wind speeds too low despite positive prediction');
+            console.log(`    - Predicted probability: ${pendingPrediction.prediction.probability}%`);
+            console.log(`    - Actual average speed: ${avgSpeed.toFixed(1)} mph`);
+            console.log('    - RECOMMENDATION: Increase weight of wind speed factors');
+          }
+          
+          if (katabaticConsistency < 50) {
+            console.log('  • ISSUE: Wind direction not katabatic despite positive prediction');
+            console.log(`    - Katabatic consistency: ${katabaticConsistency.toFixed(1)}%`);
+            console.log('    - RECOMMENDATION: Strengthen wave pattern analysis requirements');
+          }
+          
+          // Check specific factor predictions vs reality
+          console.log('  • FACTOR ANALYSIS:');
+          console.log(`    - Precipitation factor: ${predictedFactors.precipitation.meets ? 'MET' : 'NOT MET'} (predicted low precip)`);
+          console.log(`    - Sky conditions: ${predictedFactors.skyConditions.meets ? 'MET' : 'NOT MET'} (predicted clear)`);
+          console.log(`    - Pressure change: ${predictedFactors.pressureChange.meets ? 'MET' : 'NOT MET'} (${predictedFactors.pressureChange.change.toFixed(1)} hPa)`);
+          console.log(`    - Temp differential: ${predictedFactors.temperatureDifferential.meets ? 'MET' : 'NOT MET'} (${predictedFactors.temperatureDifferential.differential.toFixed(1)}°F diff)`);
+          console.log(`    - Wave pattern: ${predictedFactors.wavePattern.meets ? 'MET' : 'NOT MET'} (${predictedFactors.wavePattern.waveEnhancement})`);
+          
+        } else if (failureType === 'FALSE_NEGATIVE') {
+          console.log('❌ FALSE NEGATIVE: Predicted poor winds, but winds were actually good');
+          console.log('💡 IMPROVEMENT ANALYSIS:');
+          
+          console.log(`  • SURPRISE SUCCESS: Algorithm missed good conditions`);
+          console.log(`    - Predicted probability: ${pendingPrediction.prediction.probability}%`);
+          console.log(`    - Actual average speed: ${avgSpeed.toFixed(1)} mph`);
+          console.log(`    - Good wind percentage: ${goodWindPercentage.toFixed(1)}%`);
+          console.log('    - RECOMMENDATION: Review factor thresholds - may be too conservative');
+          
+          // Identify which factors might have been too restrictive
+          let restrictiveFactors = [];
+          if (!predictedFactors.precipitation.meets && predictedFactors.precipitation.value < 30) {
+            restrictiveFactors.push('precipitation (may be too strict)');
+          }
+          if (!predictedFactors.skyConditions.meets && predictedFactors.skyConditions.clearPeriodCoverage > 30) {
+            restrictiveFactors.push('sky conditions (may be too strict)');
+          }
+          if (!predictedFactors.temperatureDifferential.meets && predictedFactors.temperatureDifferential.differential > 2) {
+            restrictiveFactors.push('temperature differential (may be too strict)');
+          }
+          
+          if (restrictiveFactors.length > 0) {
+            console.log(`    - POTENTIALLY TOO RESTRICTIVE: ${restrictiveFactors.join(', ')}`);
+          }
+        }
+        
+        console.log('🔧 RECOMMENDED CODE CHANGES:');
+        console.log('  1. Check katabaticAnalyzer.ts factor weights and thresholds');
+        console.log('  2. Review confidence calculation in determineConfidence()');
+        console.log('  3. Consider adjusting probability calculation in calculateOverallProbability()');
+        console.log('  4. Validate wave pattern analysis accuracy');
+        console.log('=' .repeat(80));
+      } else {
+        console.log('✅ PREDICTION WAS ACCURATE! Algorithm working well for this case.');
+      }
+      
+      // Create outcome record
+      const outcome = {
+        timestamp: new Date(),
+        actualWindSpeed: avgSpeed,
+        actualWindDirection: avgDirection,
+        actualMaxSpeed: maxSpeed,
+        actualMinSpeed: minSpeed,
+        dataPoints: dawnPatrolWinds.length,
+        success: actualSuccess,
+        source: 'soda-lake' as const,
+        notes: `Dawn patrol winds: ${avgSpeed.toFixed(1)} mph avg, ${goodWindPercentage.toFixed(1)}% good winds, ${katabaticConsistency.toFixed(1)}% katabatic direction`
+      };
+      
+      // Update prediction with outcome
+      await predictionTrackingService.updatePredictionOutcome(pendingPrediction.id, outcome);
+      
+      console.log('✅ Prediction validation completed and recorded');
+      
+      // Determine failure analysis details
+      const failureAnalysisType = predictionWasAccurate ? 'CORRECT' : 
+                                 predictedSuccess && !actualSuccess ? 'FALSE_POSITIVE' : 
+                                 !predictedSuccess && actualSuccess ? 'FALSE_NEGATIVE' : 'CORRECT';
+
+      // Generate improvement suggestions based on failure analysis
+      const improvementSuggestions = [];
+      const factorAnalysis = [];
+
+      if (!predictionWasAccurate) {
+        if (failureAnalysisType === 'FALSE_POSITIVE') {
+          factorAnalysis.push('Predicted good winds but winds were poor');
+          if (avgSpeed < 10) {
+            factorAnalysis.push(`Wind speeds too low: ${avgSpeed.toFixed(1)} mph average`);
+            improvementSuggestions.push('Increase weight of wind speed factors in prediction algorithm');
+          }
+          if (katabaticConsistency < 50) {
+            factorAnalysis.push(`Wind direction not katabatic: ${katabaticConsistency.toFixed(1)}% consistency`);
+            improvementSuggestions.push('Strengthen wave pattern analysis requirements');
+          }
+          improvementSuggestions.push('Review factor thresholds in katabaticAnalyzer.ts');
+        } else if (failureAnalysisType === 'FALSE_NEGATIVE') {
+          factorAnalysis.push('Predicted poor winds but winds were actually good');
+          factorAnalysis.push(`Missed good conditions: ${avgSpeed.toFixed(1)} mph average, ${goodWindPercentage.toFixed(1)}% good winds`);
+          improvementSuggestions.push('Review factor thresholds - may be too conservative');
+          improvementSuggestions.push('Consider adjusting probability calculation in calculateOverallProbability()');
+        }
+        improvementSuggestions.push('Validate wave pattern analysis accuracy');
+        improvementSuggestions.push('Check confidence calculation in determineConfidence()');
+      }
+      
+      return {
+        predictionWasAccurate,
+        actualSuccess,
+        predictedSuccess,
+        avgSpeed,
+        maxSpeed,
+        goodWindPercentage,
+        katabaticConsistency,
+        predictedProbability: pendingPrediction.prediction.probability,
+        predictionDate: pendingPrediction.predictionDate,
+        failureAnalysis: !predictionWasAccurate ? {
+          type: failureAnalysisType,
+          summary: failureAnalysisType === 'FALSE_POSITIVE' ? 
+                   'Predicted good winds but conditions were poor' :
+                   'Predicted poor winds but conditions were actually good',
+          factorAnalysis,
+          improvementSuggestions,
+          factors: predictedFactors,
+          actualConditions: {
+            avgSpeed,
+            maxSpeed,
+            goodWindPercentage,
+            katabaticConsistency
+          }
+        } : null
+      };
+      
+    } catch (error) {
+      console.error('❌ Prediction validation failed:', error);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Get prediction accuracy metrics
+   */
+  const getPredictionAccuracy = useCallback(async () => {
+    try {
+      return await predictionTrackingService.getPredictionAccuracy();
+    } catch (error) {
+      console.error('❌ Failed to get prediction accuracy:', error);
+      return null;
+    }
+  }, []);
+
   // Initialize data on mount
   useEffect(() => {
     fetchWeatherData();
@@ -461,5 +921,10 @@ export const useWeatherData = () => {
     getDayPrediction,
     getWeeklyPredictions,
     getForecastAvailability,
+    
+    // Phase 3: Prediction tracking & validation (June 14, 2025)
+    logCurrentPrediction,
+    validatePastPredictions,
+    getPredictionAccuracy,
   };
 };

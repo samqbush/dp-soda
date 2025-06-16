@@ -64,6 +64,7 @@ export interface KatabaticFactors {
 export interface KatabaticPrediction {
   probability: number;
   confidence: 'low' | 'medium' | 'high';
+  confidenceScore: number; // 0-100 numerical confidence
   factors: KatabaticFactors;
   recommendation: 'go' | 'maybe' | 'skip';
   explanation: string;
@@ -112,7 +113,7 @@ export class KatabaticAnalyzer {
     
     const factors = this.analyzeFactors(weatherData, activeCriteria);
     const probability = this.calculateOverallProbability(factors);
-    const confidence = this.determineConfidence(factors, probability);
+    const { confidence, confidenceScore } = this.determineConfidence(factors, probability);
     const recommendation = this.generateRecommendation(probability, confidence);
     const explanation = this.generateExplanation(factors, probability, recommendation);
     const detailedAnalysis = this.generateDetailedAnalysis(factors, weatherData);
@@ -121,6 +122,7 @@ export class KatabaticAnalyzer {
     return {
       probability,
       confidence,
+      confidenceScore,
       factors,
       recommendation,
       explanation,
@@ -293,13 +295,29 @@ export class KatabaticAnalyzer {
   }
 
   private calculateOverallProbability(factors: KatabaticFactors): number {
+    // UPDATED WEIGHTS - June 16, 2025: Enhanced critical factor analysis
+    // Added VETO POWER for critical factors based on prediction failure analysis
     const weights = {
-      precipitation: 0.25,
-      skyConditions: 0.25,
-      pressureChange: 0.20,
-      temperatureDifferential: 0.15,
-      wavePattern: 0.10,
+      temperatureDifferential: 0.30, // Most critical factor
+      precipitation: 0.25,           // Unchanged
+      skyConditions: 0.20,           // Decreased from 25% → 20%
+      pressureChange: 0.15,          // Critical for katabatic formation
+      wavePattern: 0.10,             // Critical for wind enhancement
     };
+
+    // CRITICAL FACTOR ANALYSIS - June 16, 2025 Fix
+    // These factors have "veto power" - if they fail, cap prediction probability
+    const criticalFactors = ['pressureChange', 'wavePattern'];
+    const failedCriticalFactors = criticalFactors.filter(factorName => 
+      !factors[factorName as keyof KatabaticFactors].meets
+    );
+
+    console.log('🔍 CRITICAL FACTOR ANALYSIS:', {
+      criticalFactors,
+      failedCriticalFactors,
+      pressureChange: factors.pressureChange.meets ? 'MET' : 'FAILED',
+      wavePattern: factors.wavePattern.meets ? 'MET' : 'FAILED'
+    });
 
     let weightedScore = 0;
     let totalWeight = 0;
@@ -310,49 +328,149 @@ export class KatabaticAnalyzer {
       if (factor.meets) {
         weightedScore += factor.confidence * weight;
       } else {
-        // Apply penalty but don't completely zero out
-        weightedScore += Math.max(0, factor.confidence - 20) * weight;
+        // ENHANCED PENALTY SYSTEM - June 16, 2025
+        // Apply much stronger penalties for failed factors, especially critical ones
+        const isCritical = criticalFactors.includes(key);
+        const penaltyMultiplier = isCritical ? 0.3 : 0.7; // Critical factors get 70% penalty
+        weightedScore += Math.max(0, factor.confidence * penaltyMultiplier) * weight;
+        
+        console.log(`  ❌ Factor ${key} failed:`, {
+          isCritical,
+          originalConfidence: factor.confidence,
+          penaltyMultiplier,
+          contributedScore: Math.max(0, factor.confidence * penaltyMultiplier) * weight
+        });
       }
       totalWeight += weight;
     });
 
     const baseProbability = totalWeight > 0 ? (weightedScore / totalWeight) : 0;
 
-    // Apply bonuses for good factor combinations
+    // CRITICAL FACTOR VETO SYSTEM - June 16, 2025
+    // If critical factors fail, apply hard caps to prevent overconfident predictions
+    let probabilityCap = 100;
+    
+    if (failedCriticalFactors.length >= 2) {
+      // Both critical factors failed - hard cap at 35%
+      probabilityCap = 35;
+      console.log('🚨 CRITICAL VETO: Both critical factors failed, capping at 35%');
+    } else if (failedCriticalFactors.length === 1) {
+      // One critical factor failed - cap at 55%
+      probabilityCap = 55;
+      console.log('⚠️ CRITICAL VETO: One critical factor failed, capping at 55%');
+    }
+
+    // CONSERVATIVE MODE - Enhanced with critical factor consideration
     let bonusMultiplier = 1.0;
     const factorsMet = Object.values(factors).filter(f => f.meets).length;
-
-    if (factorsMet >= 4) {
-      bonusMultiplier = 1.15;
-    } else if (factorsMet >= 3) {
-      bonusMultiplier = 1.10;
+    
+    // Reduce bonuses when critical factors are missing
+    if (failedCriticalFactors.length > 0) {
+      console.log('📉 Reducing bonuses due to failed critical factors');
+      if (factorsMet === 5) {
+        bonusMultiplier = 1.10; // Reduced from 1.15
+      } else if (factorsMet >= 4) {
+        bonusMultiplier = 1.0;  // Reduced from 1.05
+      } else if (factorsMet >= 3) {
+        bonusMultiplier = 0.95; // Penalty for 3/5 with critical failures
+      } else {
+        bonusMultiplier = 0.75; // Strong penalty for <3 factors + critical failures
+      }
+    } else {
+      // Original bonuses when no critical factors fail
+      if (factorsMet === 5) {
+        bonusMultiplier = 1.15;
+      } else if (factorsMet >= 4) {
+        bonusMultiplier = 1.05;
+      } else if (factorsMet >= 3) {
+        bonusMultiplier = 1.0;
+      } else {
+        bonusMultiplier = 0.85;
+      }
     }
 
-    // Special bonus for critical combinations
-    const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets;
-    if (hasCriticalCombo) {
-      bonusMultiplier += 0.05;
+    // Special bonus for critical combinations - but only if no critical factors fail
+    if (failedCriticalFactors.length === 0) {
+      const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
+      if (hasCriticalCombo) {
+        bonusMultiplier += 0.05;
+      }
+
+      if (factors.wavePattern.waveEnhancement === 'positive') {
+        bonusMultiplier += 0.08;
+      }
     }
 
-    if (factors.wavePattern.waveEnhancement === 'positive') {
-      bonusMultiplier += 0.08;
-    }
+    const calculatedProbability = baseProbability * bonusMultiplier;
+    const finalProbability = Math.min(probabilityCap, calculatedProbability);
 
-    const finalProbability = Math.min(100, baseProbability * bonusMultiplier);
-    return Math.round(finalProbability);
+    console.log('🧮 PROBABILITY CALCULATION BREAKDOWN:', {
+      baseProbability: baseProbability.toFixed(1),
+      bonusMultiplier: bonusMultiplier.toFixed(2),
+      calculatedProbability: calculatedProbability.toFixed(1),
+      probabilityCap,
+      finalProbability: finalProbability.toFixed(1),
+      factorsMet: `${factorsMet}/5`,
+      failedCriticalFactors
+    });
+
+    return Math.min(100, Math.max(0, Math.round(finalProbability)));
   }
 
-  private determineConfidence(factors: KatabaticFactors, probability: number): 'low' | 'medium' | 'high' {
+  private determineConfidence(factors: KatabaticFactors, probability: number): { confidence: 'low' | 'medium' | 'high', confidenceScore: number } {
     const highConfidenceFactors = Object.values(factors).filter(f => f.confidence > 70).length;
     const avgConfidence = Object.values(factors).reduce((sum, f) => sum + f.confidence, 0) / 5;
 
-    if (highConfidenceFactors >= 3 && avgConfidence > 75) {
-      return 'high';
-    } else if (highConfidenceFactors >= 2 && avgConfidence > 60) {
-      return 'medium';
-    } else {
-      return 'low';
+    // Count how many factors are favorable
+    const favorableFactors = [
+      factors.precipitation.meets,
+      factors.skyConditions.meets,
+      factors.pressureChange.meets,
+      factors.temperatureDifferential.meets,
+      factors.wavePattern.meets
+    ].filter(Boolean).length;
+
+    // CONSERVATIVE MODE - June 14, 2025: More conservative confidence scoring
+    // Apply stronger penalties and require more evidence for high confidence
+    let adjustedConfidence = avgConfidence;
+    
+    // Penalize confidence when factors don't support the prediction
+    if (favorableFactors === 0) {
+      adjustedConfidence = Math.min(30, avgConfidence * 0.4); // Max 30% if 0/5 factors favorable
+    } else if (favorableFactors === 1) {
+      adjustedConfidence = Math.min(40, avgConfidence * 0.5); // Max 40% if 1/5 factors favorable  
+    } else if (favorableFactors === 2) {
+      adjustedConfidence = Math.min(55, avgConfidence * 0.7); // Max 55% if 2/5 factors favorable
+    } else if (favorableFactors === 3) {
+      adjustedConfidence = Math.min(65, avgConfidence * 0.8); // Max 65% if 3/5 factors favorable
+    } else if (favorableFactors === 4) {
+      adjustedConfidence = Math.min(75, avgConfidence * 0.9); // Max 75% if 4/5 factors favorable
+    } else if (favorableFactors === 5) {
+      adjustedConfidence = avgConfidence; // Full confidence only if ALL factors favorable
     }
+
+    // CRITICAL FACTOR CHECK - Temperature differential is essential for katabatic winds
+    // If temperature differential doesn't meet criteria, cap confidence at 50%
+    if (!factors.temperatureDifferential.meets) {
+      adjustedConfidence = Math.min(50, adjustedConfidence);
+    }
+
+    // LEARNING MODE CAP - June 14, 2025: Cap confidence at 65% until validation system proves accuracy
+    adjustedConfidence = Math.min(65, adjustedConfidence);
+
+    const confidenceScore = Math.round(adjustedConfidence);
+
+    // Convert numeric confidence to string categories (adjusted thresholds)
+    let confidence: 'low' | 'medium' | 'high';
+    if (adjustedConfidence >= 60) {
+      confidence = 'high';
+    } else if (adjustedConfidence >= 40) {
+      confidence = 'medium';
+    } else {
+      confidence = 'low';
+    }
+
+    return { confidence, confidenceScore };
   }
 
   private generateRecommendation(probability: number, confidence: 'low' | 'medium' | 'high'): 'go' | 'maybe' | 'skip' {
@@ -381,12 +499,15 @@ export class KatabaticAnalyzer {
         }
       });
 
+    // LEARNING MODE DISCLAIMER - June 14, 2025
+    const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
+
     if (recommendation === 'go') {
-      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence.`;
+      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence. ${learningModeNote}`;
     } else if (recommendation === 'maybe') {
-      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn.`;
+      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn. ${learningModeNote}`;
     } else {
-      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions.`;
+      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions. ${learningModeNote}`;
     }
   }
 

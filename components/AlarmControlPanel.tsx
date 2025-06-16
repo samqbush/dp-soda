@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -28,6 +29,13 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
 
   const [timeInputVisible, setTimeInputVisible] = useState(false);
   const [tempTime, setTempTime] = useState(alarmState.alarmTime);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(() => {
+    const [hours, minutes] = alarmState.alarmTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  });
 
   const tintColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
@@ -85,14 +93,16 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
     );
   };
 
-  const handleTimeChange = async () => {
+  const handleTimeChange = async (selectedTime?: string) => {
     try {
-      await setAlarmTime(tempTime);
+      const timeToSet = selectedTime || tempTime;
+      await setAlarmTime(timeToSet);
       setTimeInputVisible(false);
+      setShowTimePicker(false);
       
       if (alarmState.isEnabled) {
         // Parse the new time to give the user better feedback
-        const [hours, minutes] = tempTime.split(':').map(Number);
+        const [hours, minutes] = timeToSet.split(':').map(Number);
         const now = new Date();
         const alarmTime = new Date();
         alarmTime.setHours(hours, minutes, 0, 0);
@@ -103,12 +113,35 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
         
         Alert.alert(
           'Alarm Time Updated',
-          `Alarm set for ${tempTime} ${dayText}${isToday ? '' : ' (time has passed today)'}`,
+          `Alarm set for ${timeToSet} ${dayText}${isToday ? '' : ' (time has passed today)'}`,
           [{ text: 'OK', style: 'default' }]
         );
       }
     } catch {
       Alert.alert('Error', 'Failed to update alarm time. Please try again.');
+    }
+  };
+
+  const onTimePickerChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    
+    if (selectedDate) {
+      setPickerDate(selectedDate);
+      const hours = selectedDate.getHours().toString().padStart(2, '0');
+      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
+      setTempTime(timeString);
+      
+      // On Android, immediately apply the change when user confirms
+      if (Platform.OS === 'android') {
+        handleTimeChange(timeString);
+      }
+      // On iOS, we'll handle the change when user clicks "Done" button
+    } else if (Platform.OS === 'android') {
+      // User cancelled on Android
+      setShowTimePicker(false);
     }
   };
 
@@ -144,6 +177,15 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
     if (alarmState.isActive) return 'Alarm Active';
     return 'Alarm Armed ⏰';
   };
+
+  // Update picker date when alarm time changes
+  useEffect(() => {
+    const [hours, minutes] = alarmState.alarmTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    setPickerDate(date);
+    setTempTime(alarmState.alarmTime);
+  }, [alarmState.alarmTime]);
 
   if (!isInitialized) {
     return (
@@ -223,29 +265,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
               <View style={styles.timeInputRow}>
                 <TouchableOpacity
                   style={[styles.timeInput, { borderColor: tintColor }]}
-                  onPress={() => {
-                    // In a real implementation, you'd show a time picker
-                    Alert.prompt(
-                      'Set Alarm Time',
-                      'Enter time in HH:MM format (24-hour)',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Set',
-                          onPress: (text) => {
-                            if (text && /^\d{2}:\d{2}$/.test(text)) {
-                              setTempTime(text);
-                              handleTimeChange();
-                            } else {
-                              Alert.alert('Invalid Format', 'Please use HH:MM format (e.g., 05:30)');
-                            }
-                          }
-                        }
-                      ],
-                      'plain-text',
-                      tempTime
-                    );
-                  }}
+                  onPress={() => setShowTimePicker(true)}
                 >
                   <ThemedText style={[styles.timeInputText, { color: tintColor }]}>
                     {tempTime}
@@ -253,11 +273,48 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.setTimeButton, { backgroundColor: tintColor }]}
-                  onPress={handleTimeChange}
+                  onPress={() => handleTimeChange()}
                 >
                   <ThemedText style={styles.setTimeButtonText}>Set</ThemedText>
                 </TouchableOpacity>
               </View>
+              
+              {/* Date Time Picker */}
+              {showTimePicker && (
+                <View style={styles.timePickerContainer}>
+                  <DateTimePicker
+                    value={pickerDate}
+                    mode="time"
+                    is24Hour={true}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onTimePickerChange}
+                    style={styles.timePicker}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        style={[styles.iosPickerButton, { borderColor: '#6c757d' }]}
+                        onPress={() => setShowTimePicker(false)}
+                      >
+                        <ThemedText style={[styles.iosPickerButtonText, { color: '#6c757d' }]}>
+                          Cancel
+                        </ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.iosPickerButton, { backgroundColor: tintColor }]}
+                        onPress={() => {
+                          // Use tempTime which is updated by the picker change handler
+                          handleTimeChange(tempTime);
+                        }}
+                      >
+                        <ThemedText style={styles.iosPickerButtonText}>
+                          Done
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -415,6 +472,36 @@ const styles = StyleSheet.create({
   setTimeButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  timePickerContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  timePicker: {
+    width: '100%',
+    minHeight: 120,
+  },
+  iosPickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    width: '100%',
+    gap: 12,
+  },
+  iosPickerButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  iosPickerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
   activeControlsCard: {
     padding: 16,
