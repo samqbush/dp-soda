@@ -295,15 +295,29 @@ export class KatabaticAnalyzer {
   }
 
   private calculateOverallProbability(factors: KatabaticFactors): number {
-    // UPDATED WEIGHTS - June 14, 2025: Increased temperature differential importance
-    // Temperature inversion is CRITICAL for katabatic winds - learned from prediction failures
+    // UPDATED WEIGHTS - June 16, 2025: Enhanced critical factor analysis
+    // Added VETO POWER for critical factors based on prediction failure analysis
     const weights = {
-      temperatureDifferential: 0.30, // Increased from 15% → 30% (most critical factor)
+      temperatureDifferential: 0.30, // Most critical factor
       precipitation: 0.25,           // Unchanged
       skyConditions: 0.20,           // Decreased from 25% → 20%
-      pressureChange: 0.15,          // Decreased from 20% → 15%
-      wavePattern: 0.10,             // Unchanged
+      pressureChange: 0.15,          // Critical for katabatic formation
+      wavePattern: 0.10,             // Critical for wind enhancement
     };
+
+    // CRITICAL FACTOR ANALYSIS - June 16, 2025 Fix
+    // These factors have "veto power" - if they fail, cap prediction probability
+    const criticalFactors = ['pressureChange', 'wavePattern'];
+    const failedCriticalFactors = criticalFactors.filter(factorName => 
+      !factors[factorName as keyof KatabaticFactors].meets
+    );
+
+    console.log('🔍 CRITICAL FACTOR ANALYSIS:', {
+      criticalFactors,
+      failedCriticalFactors,
+      pressureChange: factors.pressureChange.meets ? 'MET' : 'FAILED',
+      wavePattern: factors.wavePattern.meets ? 'MET' : 'FAILED'
+    });
 
     let weightedScore = 0;
     let totalWeight = 0;
@@ -314,41 +328,93 @@ export class KatabaticAnalyzer {
       if (factor.meets) {
         weightedScore += factor.confidence * weight;
       } else {
-        // Apply penalty but don't completely zero out
-        weightedScore += Math.max(0, factor.confidence - 20) * weight;
+        // ENHANCED PENALTY SYSTEM - June 16, 2025
+        // Apply much stronger penalties for failed factors, especially critical ones
+        const isCritical = criticalFactors.includes(key);
+        const penaltyMultiplier = isCritical ? 0.3 : 0.7; // Critical factors get 70% penalty
+        weightedScore += Math.max(0, factor.confidence * penaltyMultiplier) * weight;
+        
+        console.log(`  ❌ Factor ${key} failed:`, {
+          isCritical,
+          originalConfidence: factor.confidence,
+          penaltyMultiplier,
+          contributedScore: Math.max(0, factor.confidence * penaltyMultiplier) * weight
+        });
       }
       totalWeight += weight;
     });
 
     const baseProbability = totalWeight > 0 ? (weightedScore / totalWeight) : 0;
 
-    // CONSERVATIVE MODE - June 14, 2025: More demanding requirements for high probability
-    // Require ALL 5 factors favorable for >90% probability to prevent overconfident predictions
+    // CRITICAL FACTOR VETO SYSTEM - June 16, 2025
+    // If critical factors fail, apply hard caps to prevent overconfident predictions
+    let probabilityCap = 100;
+    
+    if (failedCriticalFactors.length >= 2) {
+      // Both critical factors failed - hard cap at 35%
+      probabilityCap = 35;
+      console.log('🚨 CRITICAL VETO: Both critical factors failed, capping at 35%');
+    } else if (failedCriticalFactors.length === 1) {
+      // One critical factor failed - cap at 55%
+      probabilityCap = 55;
+      console.log('⚠️ CRITICAL VETO: One critical factor failed, capping at 55%');
+    }
+
+    // CONSERVATIVE MODE - Enhanced with critical factor consideration
     let bonusMultiplier = 1.0;
     const factorsMet = Object.values(factors).filter(f => f.meets).length;
     
-    if (factorsMet === 5) {
-      bonusMultiplier = 1.15; // Full bonus only when all factors align
-    } else if (factorsMet >= 4) {
-      bonusMultiplier = 1.05; // Reduced bonus for 4/5 factors
-    } else if (factorsMet >= 3) {
-      bonusMultiplier = 1.0; // No bonus for 3/5 factors
+    // Reduce bonuses when critical factors are missing
+    if (failedCriticalFactors.length > 0) {
+      console.log('📉 Reducing bonuses due to failed critical factors');
+      if (factorsMet === 5) {
+        bonusMultiplier = 1.10; // Reduced from 1.15
+      } else if (factorsMet >= 4) {
+        bonusMultiplier = 1.0;  // Reduced from 1.05
+      } else if (factorsMet >= 3) {
+        bonusMultiplier = 0.95; // Penalty for 3/5 with critical failures
+      } else {
+        bonusMultiplier = 0.75; // Strong penalty for <3 factors + critical failures
+      }
     } else {
-      bonusMultiplier = 0.85; // Penalty for <3 factors
+      // Original bonuses when no critical factors fail
+      if (factorsMet === 5) {
+        bonusMultiplier = 1.15;
+      } else if (factorsMet >= 4) {
+        bonusMultiplier = 1.05;
+      } else if (factorsMet >= 3) {
+        bonusMultiplier = 1.0;
+      } else {
+        bonusMultiplier = 0.85;
+      }
     }
 
-    // Special bonus for critical combinations - but require temperature differential
-    const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
-    if (hasCriticalCombo) {
-      bonusMultiplier += 0.05;
+    // Special bonus for critical combinations - but only if no critical factors fail
+    if (failedCriticalFactors.length === 0) {
+      const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
+      if (hasCriticalCombo) {
+        bonusMultiplier += 0.05;
+      }
+
+      if (factors.wavePattern.waveEnhancement === 'positive') {
+        bonusMultiplier += 0.08;
+      }
     }
 
-    if (factors.wavePattern.waveEnhancement === 'positive') {
-      bonusMultiplier += 0.08;
-    }
+    const calculatedProbability = baseProbability * bonusMultiplier;
+    const finalProbability = Math.min(probabilityCap, calculatedProbability);
 
-    const finalProbability = Math.min(100, baseProbability * bonusMultiplier);
-    return Math.round(finalProbability);
+    console.log('🧮 PROBABILITY CALCULATION BREAKDOWN:', {
+      baseProbability: baseProbability.toFixed(1),
+      bonusMultiplier: bonusMultiplier.toFixed(2),
+      calculatedProbability: calculatedProbability.toFixed(1),
+      probabilityCap,
+      finalProbability: finalProbability.toFixed(1),
+      factorsMet: `${factorsMet}/5`,
+      failedCriticalFactors
+    });
+
+    return Math.min(100, Math.max(0, Math.round(finalProbability)));
   }
 
   private determineConfidence(factors: KatabaticFactors, probability: number): { confidence: 'low' | 'medium' | 'high', confidenceScore: number } {
