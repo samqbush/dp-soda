@@ -440,13 +440,33 @@ export const useWeatherData = () => {
         pressure: weatherData.morrison?.current?.pressure || 0,
       };
       
+      // 🆕 Add call tracking for debugging
+      const logDetails = {
+        timestamp: new Date().toISOString(),
+        predictionDate: tomorrow.toDateString(),
+        probability: katabaticAnalysis.prediction.probability,
+        confidence: katabaticAnalysis.prediction.confidenceScore,
+        triggeredBy: 'useWeatherData',
+        environment: __DEV__ ? 'development' : 'production'
+      };
+      
+      // In production, reduce logging noise
+      if (__DEV__) {
+        console.log('🔄 logCurrentPrediction called:', logDetails);
+      }
+      
       await predictionTrackingService.logPrediction(
         tomorrow,
         katabaticAnalysis.prediction,
         weatherConditions
       );
       
-      console.log('📊 Logged prediction for tracking:', {
+      // In production, reduce logging noise
+      const logMessage = __DEV__ ? 
+        'Logged prediction for tracking:' : 
+        'Prediction logged for learning system:';
+        
+      console.log(`📊 ${logMessage}`, {
         date: tomorrow.toDateString(),
         probability: katabaticAnalysis.prediction.probability,
         confidence: katabaticAnalysis.prediction.confidenceScore

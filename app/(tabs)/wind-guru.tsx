@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { PressureChart } from '@/components/PressureChart';
-import { WeeklyForecast } from '@/components/WeeklyForecast';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useAppSettings } from '@/contexts/SettingsContext';
+import { PressureChart } from '@/components/PressureChart';
+import { WeeklyForecast } from '@/components/WeeklyForecast';
+import { PredictionTrackingService } from '@/services/predictionTrackingService';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
@@ -61,6 +56,7 @@ export default function WindGuruScreen() {
 
   // State for prediction accuracy tracking
   const [predictionAccuracy, setPredictionAccuracy] = React.useState<any>(null);
+  const [cleanupStatus, setCleanupStatus] = React.useState<string>('');
 
   // Load prediction accuracy on component mount and when predictions change
   React.useEffect(() => {
@@ -197,6 +193,65 @@ export default function WindGuruScreen() {
       console.log('Wind Guru: Data refreshed successfully');
     } catch (error) {
       console.error('Wind Guru: Refresh failed:', error);
+    }
+  };
+
+  // 🧹 TEMPORARY: Cleanup function for removing duplicate predictions
+  const handleCleanupDuplicates = async () => {
+    try {
+      setCleanupStatus('🔄 Cleaning up duplicates...');
+      
+      const service = PredictionTrackingService.getInstance();
+      
+      // Get stats before cleanup
+      const statsBefore = await service.getDebugStats();
+      console.log('📊 Before cleanup:', statsBefore);
+      
+      // Perform cleanup
+      const result = await service.cleanupDuplicates();
+      
+      // Get stats after cleanup
+      const statsAfter = await service.getDebugStats();
+      console.log('📊 After cleanup:', statsAfter);
+      
+      // Refresh prediction accuracy
+      const accuracy = await getPredictionAccuracy();
+      setPredictionAccuracy(accuracy);
+      
+      setCleanupStatus(`✅ Cleaned up ${result.removed} duplicates! Now have ${result.kept} unique predictions.`);
+      
+      // Clear status after 5 seconds
+      setTimeout(() => setCleanupStatus(''), 5000);
+      
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
+      setCleanupStatus(`❌ Cleanup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setCleanupStatus(''), 5000);
+    }
+  };
+
+  // 🗑️ NUCLEAR OPTION: Clear all predictions (for testing)
+  const handleClearAllPredictions = async () => {
+    try {
+      setCleanupStatus('🗑️ Clearing all predictions...');
+      
+      // This is the nuclear option - clear everything
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.removeItem('wind_predictions');
+      
+      // Refresh prediction accuracy (should be empty now)
+      const accuracy = await getPredictionAccuracy();
+      setPredictionAccuracy(accuracy);
+      
+      setCleanupStatus('🗑️ All predictions cleared! Fresh start.');
+      
+      // Clear status after 5 seconds
+      setTimeout(() => setCleanupStatus(''), 5000);
+      
+    } catch (error) {
+      console.error('❌ Clear all failed:', error);
+      setCleanupStatus(`❌ Clear failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setCleanupStatus(''), 5000);
     }
   };
 
@@ -1075,10 +1130,11 @@ export default function WindGuruScreen() {
         </ThemedView>
 
         {/* Phase 3: Prediction Accuracy Tracking - June 14, 2025 */}
-        {predictionAccuracy && predictionAccuracy.totalPredictions > 0 && (
+        {/* Development Mode: Show detailed accuracy stats for debugging */}
+        {__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions > 0 && (
           <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
             <ThemedText type="subtitle" style={styles.sectionTitle}>
-              📊 Prediction Accuracy
+              📊 Prediction Accuracy (Development Mode)
             </ThemedText>
             <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
               Learning from actual wind outcomes to improve future predictions
@@ -1115,8 +1171,43 @@ export default function WindGuruScreen() {
             </View>
             
             <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
-              💡 Predictions become more accurate as we collect more data. 
+              💡 Development Mode: Predictions become more accurate as we collect more data. 
               {predictionAccuracy.totalPredictions < 10 && ' Need more data for reliable statistics.'}
+            </ThemedText>
+          </ThemedView>
+        )}
+
+        {/* Production Mode: Simple prediction learning indicator */}
+        {!__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions >= 10 && (
+          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              🧠 Prediction Learning System
+            </ThemedText>
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
+              The system is learning from wind patterns to improve future predictions
+            </ThemedText>
+            
+            <View style={styles.conditionsCard}>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Learning Status:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { 
+                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
+                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
+                }]}>
+                  {predictionAccuracy.accuracy >= 70 ? 'Excellent' :
+                   predictionAccuracy.accuracy >= 50 ? 'Good' : 'Learning'}
+                </ThemedText>
+              </View>
+              <View style={styles.conditionRow}>
+                <ThemedText style={styles.conditionLabel}>Data Points:</ThemedText>
+                <ThemedText style={[styles.conditionValue, { color: tintColor }]}>
+                  {predictionAccuracy.totalPredictions} predictions analyzed
+                </ThemedText>
+              </View>
+            </View>
+            
+            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
+              💡 Predictions improve over time as the system learns local wind patterns.
             </ThemedText>
           </ThemedView>
         )}
@@ -1128,24 +1219,83 @@ export default function WindGuruScreen() {
           isLoading={isLoading}
         />
 
-        {/* Development Info */}
-        <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🎯 Phase 3: Weekly Forecast Active!
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            ✅ Today & Tomorrow detailed analysis
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            📅 5-day extended forecast with quick overview
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            🌤️ Using OpenWeatherMap API (up to 5 days available)
-          </ThemedText>
-          <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-            Next: Historical accuracy tracking & push notifications
-          </ThemedText>
-        </ThemedView>
+        {/* Development Info - Only show in development mode */}
+        {__DEV__ && (
+          <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              🎯 Development Mode: Phase 3 Weekly Forecast Active!
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              ✅ Today & Tomorrow detailed analysis
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              📅 5-day extended forecast with quick overview
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              🌤️ Using OpenWeatherMap API (up to 5 days available)
+            </ThemedText>
+            <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+              Next: Historical accuracy tracking & push notifications
+            </ThemedText>
+            
+            {/* Temporary cleanup buttons */}
+            <ThemedView style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 8 }}>
+              <ThemedText style={[styles.devText, { color: '#FF9800', fontWeight: '600', marginBottom: 8 }]}>
+                🧹 Temporary Cleanup Tools:
+              </ThemedText>
+              
+              <ThemedView style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: tintColor,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    flex: 1
+                  }}
+                  onPress={handleCleanupDuplicates}
+                >
+                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                    🧹 Remove Duplicates
+                  </ThemedText>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#F44336',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    flex: 1
+                  }}
+                  onPress={handleClearAllPredictions}
+                >
+                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                    🗑️ Clear All
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
+              
+              {cleanupStatus ? (
+                <ThemedText style={{ color: textColor, fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
+                  {cleanupStatus}
+                </ThemedText>
+              ) : null}
+            </ThemedView>
+          </ThemedView>
+        )}
+
+        {/* Production Footer - Simple status for production users */}
+        {!__DEV__ && (
+          <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.02)', borderRadius: 8, padding: 12, marginTop: 16 }}>
+            <ThemedText style={{ color: textColor, opacity: 0.6, fontSize: 12, textAlign: 'center' }}>
+              🌤️ Wind Guru uses advanced 5-factor analysis with NOAA & OpenWeather data
+            </ThemedText>
+            <ThemedText style={{ color: textColor, opacity: 0.5, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+              Predictions improve over time as the system learns local patterns
+            </ThemedText>
+          </ThemedView>
+        )}
       </ScrollView>
     </ThemedView>
   );

@@ -76,6 +76,49 @@ export class PredictionTrackingService {
     try {
       const predictions = await this.getAllPredictions();
       
+      // DEDUPLICATION: Check if we already have a prediction for this date
+      const predictionDateStr = predictionDate.toDateString();
+      const existingPrediction = predictions.find(p => 
+        p.predictionDate.toDateString() === predictionDateStr
+      );
+      
+      if (existingPrediction) {
+        console.log('📊 Prediction already exists for date:', {
+          date: predictionDateStr,
+          existingId: existingPrediction.id,
+          existingProbability: existingPrediction.prediction.probability,
+          newProbability: prediction.probability
+        });
+        
+        // In production, be more conservative about updates to avoid confusion
+        const updateThreshold = __DEV__ ? 10 : 15; // Higher threshold in production
+        
+        // Update existing prediction if the new one is significantly different
+        const probabilityDiff = Math.abs(existingPrediction.prediction.probability - prediction.probability);
+        if (probabilityDiff >= updateThreshold) {
+          console.log('📊 Updating existing prediction due to significant change:', {
+            oldProbability: existingPrediction.prediction.probability,
+            newProbability: prediction.probability,
+            difference: probabilityDiff,
+            threshold: updateThreshold,
+            environment: __DEV__ ? 'development' : 'production'
+          });
+          
+          // Update the existing prediction
+          existingPrediction.prediction = prediction;
+          existingPrediction.timestamp = new Date(); // Update timestamp
+          if (weatherConditions) {
+            existingPrediction.weatherConditions = weatherConditions;
+          }
+          
+          await AsyncStorage.setItem(PREDICTION_STORAGE_KEY, JSON.stringify(predictions));
+          return existingPrediction.id;
+        } else {
+          console.log(`📊 Skipping duplicate prediction (probability difference < ${updateThreshold}%)`);
+          return existingPrediction.id;
+        }
+      }
+      
       const entry: PredictionEntry = {
         id: `${predictionDate.toISOString()}-${Date.now()}`,
         timestamp: new Date(),
@@ -93,7 +136,7 @@ export class PredictionTrackingService {
       
       await AsyncStorage.setItem(PREDICTION_STORAGE_KEY, JSON.stringify(predictions));
       
-      console.log('📊 Logged prediction:', {
+      console.log('📊 Logged NEW prediction:', {
         date: predictionDate.toISOString(),
         probability: prediction.probability,
         confidence: prediction.confidenceScore,
@@ -278,6 +321,98 @@ export class PredictionTrackingService {
       console.log('🧹 Cleared all prediction data');
     } catch (error) {
       console.error('❌ Failed to clear predictions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up duplicate predictions (for debugging/maintenance)
+   * Keeps only the most recent prediction for each date
+   */
+  async cleanupDuplicates(): Promise<{ removed: number; kept: number }> {
+    try {
+      const allPredictions = await this.getAllPredictions();
+      const uniqueByDate = new Map<string, PredictionEntry>();
+      
+      // Keep only the most recent prediction for each date
+      allPredictions.forEach(prediction => {
+        const dateKey = prediction.predictionDate.toDateString();
+        const existing = uniqueByDate.get(dateKey);
+        
+        if (!existing || prediction.timestamp > existing.timestamp) {
+          uniqueByDate.set(dateKey, prediction);
+        }
+      });
+      
+      const cleanedPredictions = Array.from(uniqueByDate.values());
+      const removed = allPredictions.length - cleanedPredictions.length;
+      
+      if (removed > 0) {
+        await AsyncStorage.setItem(PREDICTION_STORAGE_KEY, JSON.stringify(cleanedPredictions));
+        console.log('🧹 Cleaned up duplicate predictions:', {
+          originalCount: allPredictions.length,
+          cleanedCount: cleanedPredictions.length,
+          removed
+        });
+      }
+      
+      return { removed, kept: cleanedPredictions.length };
+    } catch (error) {
+      console.error('❌ Failed to cleanup duplicates:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Debug: Get prediction statistics
+   */
+  async getDebugStats(): Promise<{
+    totalPredictions: number;
+    uniqueDates: number;
+    duplicates: number;
+    dateBreakdown: Array<{
+      date: string;
+      count: number;
+      predictions: Array<{
+        id: string;
+        timestamp: Date;
+        probability: number;
+      }>;
+    }>;
+  }> {
+    try {
+      const allPredictions = await this.getAllPredictions();
+      const dateGroups = new Map<string, PredictionEntry[]>();
+      
+      // Group predictions by date
+      allPredictions.forEach(prediction => {
+        const dateKey = prediction.predictionDate.toDateString();
+        if (!dateGroups.has(dateKey)) {
+          dateGroups.set(dateKey, []);
+        }
+        dateGroups.get(dateKey)!.push(prediction);
+      });
+      
+      const dateBreakdown = Array.from(dateGroups.entries()).map(([date, predictions]) => ({
+        date,
+        count: predictions.length,
+        predictions: predictions.map(p => ({
+          id: p.id,
+          timestamp: p.timestamp,
+          probability: p.prediction.probability
+        }))
+      }));
+      
+      const duplicates = allPredictions.length - dateGroups.size;
+      
+      return {
+        totalPredictions: allPredictions.length,
+        uniqueDates: dateGroups.size,
+        duplicates,
+        dateBreakdown
+      };
+    } catch (error) {
+      console.error('❌ Failed to get debug stats:', error);
       throw error;
     }
   }
