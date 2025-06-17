@@ -126,7 +126,7 @@ export class HybridWeatherService {
       // Fetch data from both sources
       const [morrisonHybrid, mountainHybrid] = await Promise.all([
         this.fetchLocationHybridData(LOCATIONS.morrison),
-        this.fetchLocationHybridData(LOCATIONS.nederland)
+        this.fetchLocationHybridData(LOCATIONS.evergreen)
       ]);
 
       const hybridData: WeatherServiceData = {
@@ -137,7 +137,7 @@ export class HybridWeatherService {
           lastUpdated: now,
         },
         mountain: {
-          location: LOCATIONS.nederland.name,
+          location: LOCATIONS.evergreen.name,
           current: mountainHybrid.current,
           hourlyForecast: mountainHybrid.hourlyForecast, 
           lastUpdated: now,

@@ -128,6 +128,160 @@ export const useWeatherData = () => {
   }, [weatherData]);
 
   /**
+   * Enhanced temperature differential calculation using thermal cycles
+   * Hybrid approach: combines historical data (when available) with forecast data
+   * Models the actual physics of katabatic wind formation
+   */
+  const getKatabaticTemperatureDifferential = useCallback(() => {
+    if (!weatherData) return null;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Get forecast data for analysis
+    const morrisonForecast = getHourlyForecast('morrison', 48); // Next 48 hours
+    const evergreenForecast = getHourlyForecast('mountain', 48);
+    
+    if (morrisonForecast.length === 0 || evergreenForecast.length === 0) {
+      // Fallback to current differential if no forecast data
+      return getTemperatureDifferential();
+    }
+    
+    // Helper function to find max temperature in time window for specific day
+    const findMaxTempInWindow = (forecast: WeatherDataPoint[], startHour: number, endHour: number, useHistorical: boolean = false, targetDate?: Date) => {
+      const today = targetDate || now;
+      const todayDateStr = today.toDateString();
+      
+      const windowData = forecast.filter(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        const pointDateStr = pointDate.toDateString();
+        
+        // Only use data from the target date
+        if (pointDateStr !== todayDateStr) return false;
+        
+        // For historical data, only use past data
+        if (useHistorical && pointDate > now) return false;
+        
+        return pointHour >= startHour && pointHour <= endHour;
+      });
+      
+      if (windowData.length === 0) return null;
+      return Math.max(...windowData.map(p => p.temperature));
+    };
+    
+    // Helper function to find min temperature in time window for specific night
+    const findMinTempInWindow = (forecast: WeatherDataPoint[], startHour: number, endHour: number, useHistorical: boolean = false, targetDate?: Date) => {
+      const baseDate = targetDate || now;
+      let searchDate = new Date(baseDate);
+      
+      // For pre-dawn hours (3-7 AM), look at the following night
+      if (startHour <= 7 && endHour <= 7) {
+        searchDate.setDate(searchDate.getDate() + 1);
+      }
+      
+      const searchDateStr = searchDate.toDateString();
+      
+      const windowData = forecast.filter(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        const pointDateStr = pointDate.toDateString();
+        
+        // Only use data from the target date
+        if (pointDateStr !== searchDateStr) return false;
+        
+        // For historical data, only use past data
+        if (useHistorical && pointDate > now) return false;
+        
+        // Handle time windows that span midnight (e.g., 22:00 to 06:00)
+        if (startHour > endHour) {
+          return pointHour >= startHour || pointHour <= endHour;
+        }
+        
+        return pointHour >= startHour && pointHour <= endHour;
+      });
+      
+      if (windowData.length === 0) return null;
+      return Math.min(...windowData.map(p => p.temperature));
+    };
+    
+    // Determine data strategy based on time of day
+    let morrisonMaxTemp: number | null = null;
+    let evergreenMinTemp: number | null = null;
+    let dataStrategy: string = '';
+    
+    if (currentHour >= 6 && currentHour < 18) {
+      // Daytime (6 AM - 6 PM): Use historical max if available, forecast for nighttime min
+      morrisonMaxTemp = findMaxTempInWindow(morrisonForecast, 12, 17, true, now); // Use historical afternoon data
+      if (!morrisonMaxTemp) {
+        // No historical data yet, use forecast
+        morrisonMaxTemp = findMaxTempInWindow(morrisonForecast, 12, 17, false, now);
+      }
+      
+      // Use forecast for tonight's minimum
+      evergreenMinTemp = findMinTempInWindow(evergreenForecast, 3, 7, false, now);
+      dataStrategy = morrisonMaxTemp && currentHour >= 15 ? 'historical_max_forecast_min' : 'forecast_both';
+      
+    } else if (currentHour >= 18 || currentHour < 6) {
+      // Nighttime/Early Morning: Use historical data when available
+      morrisonMaxTemp = findMaxTempInWindow(morrisonForecast, 12, 17, true, now); // Yesterday's max
+      evergreenMinTemp = findMinTempInWindow(evergreenForecast, 3, 7, true, now); // Tonight's min (if available)
+      
+      if (!evergreenMinTemp) {
+        // No historical min yet, use forecast
+        evergreenMinTemp = findMinTempInWindow(evergreenForecast, 3, 7, false, now);
+        dataStrategy = 'historical_max_forecast_min';
+      } else {
+        dataStrategy = 'historical_both';
+      }
+      
+      if (!morrisonMaxTemp) {
+        // Fallback to forecast if no historical max
+        morrisonMaxTemp = findMaxTempInWindow(morrisonForecast, 12, 17, false, now);
+        dataStrategy = 'forecast_both';
+      }
+    }
+    
+    // Fallback to current readings if thermal cycle data unavailable
+    if (!morrisonMaxTemp || !evergreenMinTemp) {
+      const currentData = getTemperatureDifferential();
+      if (!currentData) return null;
+      
+      return {
+        ...currentData,
+        type: 'fallback_current',
+        dataStrategy: 'fallback',
+        confidence: 'low'
+      };
+    }
+    
+    const thermalDifferential = morrisonMaxTemp - evergreenMinTemp;
+    
+    // Determine confidence based on data quality
+    let confidence: 'high' | 'medium' | 'low' = 'medium';
+    if (dataStrategy === 'historical_both') {
+      confidence = 'high';
+    } else if (dataStrategy === 'historical_max_forecast_min') {
+      confidence = 'medium';
+    } else {
+      confidence = 'low';
+    }
+    
+    return {
+      morrison: morrisonMaxTemp,
+      mountain: evergreenMinTemp,
+      differential: thermalDifferential,
+      type: 'thermal_cycle',
+      dataStrategy,
+      confidence,
+      timeWindow: {
+        morrisonMax: '12:00-17:00 (Afternoon heating)',
+        evergreenMin: '03:00-07:00 (Pre-dawn cooling)'
+      }
+    };
+  }, [weatherData, getHourlyForecast, getTemperatureDifferential]);
+
+  /**
    * Get pressure trend analysis
    */
   const getPressureTrend = useCallback((location: 'morrison' | 'mountain', hours: number = 6) => {
@@ -908,6 +1062,7 @@ export const useWeatherData = () => {
     getHourlyForecast,
     getWeatherForTimeWindow,
     getTemperatureDifferential,
+    getKatabaticTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
     isApiKeyConfigured,

@@ -30,8 +30,9 @@ export default function WindGuruScreen() {
     return `${celsiusToFahrenheit(celsius).toFixed(1)}°F`;
   };
 
-  // Helper to format temperature differential (already in Fahrenheit)
-  const formatTempDiffF = (fahrenheitDiff: number): string => {
+  // Helper to format temperature differential (convert from Celsius to Fahrenheit)
+  const formatTempDiffF = (celsiusDiff: number): string => {
+    const fahrenheitDiff = celsiusDiff * 9/5; // Convert temperature difference from C to F
     return `${fahrenheitDiff.toFixed(1)}°F`;
   };
 
@@ -42,7 +43,7 @@ export default function WindGuruScreen() {
     error,
     lastUpdated,
     refreshData,
-    getTemperatureDifferential,
+    getKatabaticTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
     katabaticAnalysis,
@@ -170,8 +171,8 @@ export default function WindGuruScreen() {
     );
   }
 
-  // Get current analysis data
-  const tempDiff = getTemperatureDifferential();
+  // Get current analysis data - Using hybrid thermal cycle temperature differential
+  const tempDiff = getKatabaticTemperatureDifferential();
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
@@ -445,7 +446,7 @@ export default function WindGuruScreen() {
                   <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
                   <ThemedView style={styles.factorContent}>
                     <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (15% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥6.3°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives density-driven flow</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥5.8°F Morrison (valley, 1740m) vs Evergreen (mountain, 2200m) - drives density-driven flow</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -482,7 +483,7 @@ export default function WindGuruScreen() {
                   {'\n'}
                   📍 <ThemedText style={{ fontWeight: '500' }}>Locations:</ThemedText>{'\n'}
                   • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (5,709ft) - Valley reference for katabatic flow formation{'\n'}
-                  • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (8,236ft) - Mountain reference for temperature gradient{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Evergreen, CO</ThemedText> (7,220ft) - Mountain reference for temperature gradient{'\n'}
                   • <ThemedText style={{ fontStyle: 'italic' }}>2,527ft elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
                 </ThemedText>
               </ThemedView>
@@ -1151,31 +1152,130 @@ export default function WindGuruScreen() {
         </ThemedView>
 
         <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>🌡️ Temperature Comparison</ThemedText>
+          <ThemedText style={styles.sectionTitle}>🌡️ Thermal Cycle Temperature Analysis</ThemedText>
           {tempDiff ? (
             <ThemedView style={styles.temperatureComparison}>
-              <ThemedView style={styles.tempLocationRow}>
-                <ThemedText style={styles.tempLocationLabel}>Morrison:</ThemedText>
-                <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.tempLocationRow}>
-                <ThemedText style={styles.tempLocationLabel}>Mountains:</ThemedText>
-                <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
-              </ThemedView>
-              <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
-                <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Differential:</ThemedText>
-                <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
-                  {formatTempDiffF(tempDiff.differential)}
+              {/* Show thermal cycle data if available, otherwise current temps */}
+              {(tempDiff as any)?.type === 'thermal_cycle' ? (
+                <>
+                  <ThemedView style={styles.tempLocationRow}>
+                    <ThemedText style={styles.tempLocationLabel}>Morrison Max (Day):</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={styles.tempLocationRow}>
+                    <ThemedText style={styles.tempLocationLabel}>Evergreen Min (Night):</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
+                    <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Thermal Differential:</ThemedText>
+                    <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
+                      {formatTempDiffF(tempDiff.differential)}
+                    </ThemedText>
+                  </ThemedView>
+                  
+                  {/* Data quality indicator */}
+                  <ThemedView style={[styles.dataQualityIndicator, { 
+                    backgroundColor: (() => {
+                      const confidence = (tempDiff as any)?.confidence;
+                      switch(confidence) {
+                        case 'high': return 'rgba(76, 175, 80, 0.1)';
+                        case 'medium': return 'rgba(255, 152, 0, 0.1)';
+                        case 'low': return 'rgba(244, 67, 54, 0.1)';
+                        default: return 'rgba(128, 128, 128, 0.1)';
+                      }
+                    })(),
+                    borderRadius: 6,
+                    padding: 8,
+                    marginTop: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: (() => {
+                      const confidence = (tempDiff as any)?.confidence;
+                      switch(confidence) {
+                        case 'high': return '#4CAF50';
+                        case 'medium': return '#FF9800';
+                        case 'low': return '#F44336';
+                        default: return '#999';
+                      }
+                    })()
+                  }]}>
+                    <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
+                      Data Quality: <ThemedText style={{ fontWeight: '500', textTransform: 'capitalize' }}>{(tempDiff as any)?.confidence}</ThemedText> • Strategy: {(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')}
+                    </ThemedText>
+                  </ThemedView>
+                </>
+              ) : (
+                <>
+                  {/* Fallback to current temperature display */}
+                  <ThemedView style={styles.tempLocationRow}>
+                    <ThemedText style={styles.tempLocationLabel}>Morrison (Current):</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={styles.tempLocationRow}>
+                    <ThemedText style={styles.tempLocationLabel}>Evergreen (Current):</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
+                    <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Current Differential:</ThemedText>
+                    <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
+                      {formatTempDiffF(tempDiff.differential)}
+                    </ThemedText>
+                  </ThemedView>
+                  
+                  <ThemedView style={[styles.dataQualityIndicator, { 
+                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    borderRadius: 6,
+                    padding: 8,
+                    marginTop: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#F44336'
+                  }]}>
+                    <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
+                      ⚠️ Using current temps (thermal cycle data unavailable)
+                    </ThemedText>
+                  </ThemedView>
+                </>
+              )}
+              
+              <ThemedText style={[styles.tempExplanation, { color: textColor, opacity: 0.7 }]}>
+                {(() => {
+                  const fahrenheitDiff = tempDiff.differential * 9/5; // Convert to Fahrenheit for comparison
+                  // Adjust thresholds for thermal cycle (higher differentials expected)
+                  const thresholds = (tempDiff as any)?.type === 'thermal_cycle' ? 
+                    { good: 20, moderate: 12 } : 
+                    { good: 9, moderate: 3.6 };
+                  
+                  if (fahrenheitDiff > thresholds.good) return 'Excellent thermal differential for katabatic winds';
+                  if (fahrenheitDiff > thresholds.moderate) return 'Moderate thermal differential';
+                  return 'Low thermal differential';
+                })()}
+              </ThemedText>
+              
+              {/* Temperature Differential Calculation Explanation */}
+              <ThemedView style={[styles.calculationNote, { 
+                backgroundColor: 'rgba(33, 150, 243, 0.05)', 
+                borderRadius: 8, 
+                padding: 12, 
+                marginTop: 12,
+                borderLeftWidth: 3,
+                borderLeftColor: '#2196F3'
+              }]}>
+                <ThemedText style={[styles.calculationNoteTitle, { color: '#2196F3', fontWeight: '600', fontSize: 13, marginBottom: 6 }]}>
+                  📊 How Thermal Cycle Differential is Calculated
+                </ThemedText>
+                <ThemedText style={[styles.calculationNoteText, { color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }]}>
+                  <ThemedText style={{ fontWeight: '500' }}>When:</ThemedText> Combines historical and forecast data based on time of day{'\n'}
+                  <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison max (12-5 PM) - Evergreen min (3-7 AM) = Thermal differential{'\n'}
+                  <ThemedText style={{ fontWeight: '500' }}>Timeframe:</ThemedText> {(tempDiff as any)?.type === 'thermal_cycle' ? 
+                    `${(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')} approach` : 
+                    'Real-time snapshot, updated every 30 minutes'}
+                </ThemedText>
+                <ThemedText style={[styles.tempCalcExample, { color: textColor, opacity: 0.7, fontSize: 11, marginTop: 6, fontStyle: 'italic' }]}>
+                  {(tempDiff as any)?.type === 'thermal_cycle' ? 
+                    'Example: Morrison 95°F (afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential' :
+                    'Example: Morrison 90°F - Evergreen 83°F = 7°F current differential'
+                  }
                 </ThemedText>
               </ThemedView>
-              <ThemedText style={[styles.tempExplanation, { color: textColor, opacity: 0.7 }]}>
-                {tempDiff.differential > 5 
-                  ? 'Good temperature differential for katabatic winds'
-                  : tempDiff.differential > 2
-                  ? 'Moderate temperature differential'
-                  : 'Low temperature differential'
-                }
-              </ThemedText>
             </ThemedView>
           ) : (
             <ThemedView style={styles.chartPlaceholder}>
@@ -1963,5 +2063,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     marginBottom: 4,
+  },
+  // Temperature calculation note styles
+  calculationNote: {
+    marginTop: 12,
+  },
+  calculationNoteTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  calculationNoteText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  tempCalcExample: {
+    fontSize: 11,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  // Data quality indicator styles
+  dataQualityIndicator: {
+    marginTop: 8,
+  },
+  dataQualityText: {
+    fontSize: 11,
+    opacity: 0.8,
   },
 });

@@ -46,7 +46,7 @@ export interface KatabaticFactors {
     morrisonTemp: number;
     mountainTemp: number;
     confidence: number;
-    dataSource: 'noaa' | 'openweather';
+    dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
   };
   wavePattern: {
     meets: boolean;
@@ -86,7 +86,7 @@ export class KatabaticAnalyzer {
     maxPrecipitationProbability: 25,
     minCloudCoverClearPeriod: 45,
     minPressureChange: 1.0,
-    minTemperatureDifferential: 3.5,
+    minTemperatureDifferential: 3.2,
     minWavePatternScore: 50,
     clearSkyWindow: { start: '02:00', end: '05:00' },
     predictionWindow: { start: '06:00', end: '08:00' },
@@ -217,22 +217,109 @@ export class KatabaticAnalyzer {
   }
 
   private analyzeTemperatureDifferential(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
-    const morrisonTemp = this.getAverageTemperatureForWindow(
-      weatherData.morrison.hourlyForecast,
-      criteria.predictionWindow
-    );
+    // Enhanced thermal cycle approach: Use afternoon max vs pre-dawn min
+    // This models the actual physics of katabatic wind formation
     
-    const mountainTemp = this.getAverageTemperatureForWindow(
-      weatherData.mountain.hourlyForecast,
-      criteria.predictionWindow
-    );
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Helper function to find max temperature in afternoon heating window for a specific day
+    const findAfternoonMax = (forecast: WeatherDataPoint[], targetDate?: Date): number | null => {
+      const today = targetDate || new Date();
+      const todayDateStr = today.toDateString();
+      
+      const afternoonData = forecast.filter(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        const pointDateStr = pointDate.toDateString();
+        
+        // Only use data from the target date and within afternoon hours
+        return pointDateStr === todayDateStr && pointHour >= 12 && pointHour <= 17;
+      });
+      
+      if (afternoonData.length === 0) return null;
+      return Math.max(...afternoonData.map(p => p.temperature));
+    };
+    
+    // Helper function to find min temperature in pre-dawn cooling window for the following night
+    const findPreDawnMin = (forecast: WeatherDataPoint[], targetDate?: Date): number | null => {
+      const today = targetDate || new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDateStr = tomorrow.toDateString();
+      
+      const preDawnData = forecast.filter(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        const pointDateStr = pointDate.toDateString();
+        
+        // Use tomorrow's pre-dawn hours (the following night after the afternoon heating)
+        return pointDateStr === tomorrowDateStr && pointHour >= 3 && pointHour <= 7;
+      });
+      
+      if (preDawnData.length === 0) {
+        // Fallback: try tonight's pre-dawn if tomorrow's isn't available
+        const tonightData = forecast.filter(point => {
+          const pointDate = new Date(point.timestamp);
+          const pointHour = pointDate.getHours();
+          const pointDateStr = pointDate.toDateString();
+          
+          return pointDateStr === today.toDateString() && pointHour >= 3 && pointHour <= 7;
+        });
+        
+        if (tonightData.length === 0) return null;
+        return Math.min(...tonightData.map(p => p.temperature));
+      }
+      
+      return Math.min(...preDawnData.map(p => p.temperature));
+    };
+    
+    // Get thermal cycle temperatures for today's cycle
+    const morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, now);
+    const evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
+    
+    // Fallback to prediction window averages if thermal cycle data unavailable
+    let morrisonTemp: number;
+    let mountainTemp: number;
+    let analysisType: 'thermal_cycle' | 'fallback_average';
+    
+    if (morrisonMaxTemp !== null && evergreenMinTemp !== null) {
+      morrisonTemp = morrisonMaxTemp;
+      mountainTemp = evergreenMinTemp;
+      analysisType = 'thermal_cycle';
+    } else {
+      // Fallback to original approach
+      morrisonTemp = this.getAverageTemperatureForWindow(
+        weatherData.morrison.hourlyForecast,
+        criteria.predictionWindow
+      );
+      
+      mountainTemp = this.getAverageTemperatureForWindow(
+        weatherData.mountain.hourlyForecast,
+        criteria.predictionWindow
+      );
+      analysisType = 'fallback_average';
+    }
     
     const differential = morrisonTemp - mountainTemp;
-    const meets = differential >= criteria.minTemperatureDifferential;
     
-    const confidence = meets 
-      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 65)
-      : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
+    // Adjust threshold based on analysis type
+    // Thermal cycle differentials are typically larger but not 2.5x larger
+    const adjustedThreshold = analysisType === 'thermal_cycle' 
+      ? criteria.minTemperatureDifferential * 1.8  // More realistic scale (expect ~5.8°C vs 3.2°C)
+      : criteria.minTemperatureDifferential;
+    
+    const meets = differential >= adjustedThreshold;
+    
+    // Confidence calculation adjusted for analysis type
+    const baseConfidence = meets 
+      ? Math.min(100, (differential / adjustedThreshold) * 65)
+      : Math.max(30, (differential / adjustedThreshold) * 55);
+    
+    // Boost confidence for thermal cycle analysis (more accurate)
+    const confidence = analysisType === 'thermal_cycle' 
+      ? Math.min(100, baseConfidence + 10)
+      : baseConfidence;
 
     return {
       meets,
@@ -240,7 +327,12 @@ export class KatabaticAnalyzer {
       morrisonTemp,
       mountainTemp,
       confidence,
-      dataSource: 'noaa' as const,
+      dataSource: 'hybrid_thermal_cycle' as const,
+      analysisType,
+      thermalWindow: analysisType === 'thermal_cycle' ? {
+        morrisonMax: '12:00-17:00 (Afternoon heating)',
+        evergreenMin: '03:00-07:00 (Pre-dawn cooling)'
+      } : undefined
     };
   }
 

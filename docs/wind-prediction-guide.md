@@ -99,7 +99,7 @@ Beyond the basic 4-factor system, advanced prediction considers:
 ### Data Sources
 
 - **Primary**: OpenWeatherMap API (real meteorological data)
-- **Elevation Points**: Morrison (5,709 ft) and Nederland (8,236 ft)
+- **Elevation Points**: Morrison (5,709 ft) and Evergreen (7,220 ft)
 - **Secondary**: Ecowitt Standley Lake monitoring station
 - **Historical**: Pattern recognition from previous predictions
 

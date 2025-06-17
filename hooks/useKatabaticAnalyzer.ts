@@ -34,7 +34,7 @@ const defaultSettings: KatabaticSettings = {
   maxPrecipitationProbability: 25,  // Increased from 20% - light precip chance doesn't always kill katabatic
   minCloudCoverClearPeriod: 45,     // Reduced from 60% - mountain weather often has some clouds
   minPressureChange: 1.0,           // Reduced from 1.5 - smaller changes can still indicate good conditions
-  minTemperatureDifferential: 3.5,  // Reduced from 4.0°C - more sensitive to temperature differences
+  minTemperatureDifferential: 3.2,  // Adjusted for Evergreen (lower elevation difference than Nederland)
   clearSkyWindow: { start: '02:00', end: '05:00' },
   predictionWindow: { start: '06:00', end: '08:00' },
   minimumConfidence: 50,            // Reduced from 60 - be less conservative overall

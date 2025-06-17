@@ -4,7 +4,7 @@ module.exports = {
   expo: {
     name: "Dawn Patrol Alarm",
     slug: "dp-soda",
-    version: "1.0.5",
+    version: "1.0.6",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dpsoda",
@@ -12,7 +12,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.samqbush.dpsoda",
-      buildNumber: "9",
+      buildNumber: "10",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
       },
@@ -42,7 +42,7 @@ module.exports = {
       ],
       softwareKeyboardLayoutMode: "pan",
       allowBackup: true,
-      versionCode: 9,
+      versionCode: 10,
       theme: "@style/Theme.App.SplashScreen",
       jsEngine: "jsc",
       enableHermes: false,
