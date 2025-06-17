@@ -75,6 +75,58 @@ export interface EcowittHistoricResponse {
   };
 }
 
+export interface EcowittRealTimeWindData {
+  wind_speed: {
+    time: string;
+    unit: string;
+    value: string;
+  };
+  wind_gust: {
+    time: string;
+    unit: string;
+    value: string;
+  };
+  wind_direction: {
+    time: string;
+    unit: string;
+    value: string;
+  };
+}
+
+export interface EcowittRealTimeResponse {
+  code: number;
+  msg: string;
+  time: string;
+  data: {
+    wind?: EcowittRealTimeWindData;
+    outdoor?: {
+      temperature?: {
+        time: string;
+        unit: string;
+        value: string;
+      };
+      humidity?: {
+        time: string;
+        unit: string;
+        value: string;
+      };
+    };
+    // Add other sections as needed
+  };
+}
+
+export interface EcowittCurrentWindConditions {
+  windSpeed: number; // in m/s from API
+  windSpeedMph: number; // converted to mph
+  windGust: number; // in m/s from API
+  windGustMph: number; // converted to mph
+  windDirection: number; // degrees
+  timestamp: number; // Unix timestamp
+  time: string; // ISO string
+  temperature?: number; // optional temperature data
+  humidity?: number; // optional humidity data
+}
+
 // Storage keys
 const ECOWITT_CONFIG_KEY = 'ecowitt_config';
 const ECOWITT_CACHE_KEY = 'ecowitt_wind_data_cache';
@@ -663,6 +715,91 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     }
     
     throw error;
+  }
+}
+
+/**
+ * Fetch real-time wind data from Ecowitt API for specific device
+ * This provides more current data (within 2 hours) compared to historical data
+ */
+export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<EcowittCurrentWindConditions | null> {
+  console.log(`⚡ Fetching real-time Ecowitt wind data for ${deviceName}...`);
+  
+  try {
+    const config = await getAutoEcowittConfigForDevice(deviceName);
+    
+    const params = {
+      application_key: config.applicationKey,
+      api_key: config.apiKey,
+      mac: config.macAddress,
+      call_back: 'wind,outdoor', // Request wind and outdoor data
+      wind_speed_unitid: '6', // m/s
+      temp_unitid: '1', // Celsius
+    };
+
+    console.log(`📡 Making Ecowitt real-time API request for ${deviceName}`);
+
+    const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
+      params,
+      timeout: 10000, // Shorter timeout for real-time data
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    if (response.data.code !== 0) {
+      throw new Error(`Ecowitt real-time API error: ${response.data.msg}`);
+    }
+
+    // Handle empty data response gracefully
+    if (!response.data.data || !response.data.data.wind) {
+      console.warn(`⚠️ No real-time wind data available from ${deviceName}`);
+      return null;
+    }
+
+    const windData = response.data.data.wind;
+    const outdoorData = response.data.data.outdoor;
+
+    // Parse wind data
+    const windSpeedMs = parseFloat(windData.wind_speed.value);
+    const windGustMs = parseFloat(windData.wind_gust.value);
+    const windDirection = parseFloat(windData.wind_direction.value);
+    const timestamp = parseInt(windData.wind_speed.time);
+
+    // Convert to our format
+    const currentConditions: EcowittCurrentWindConditions = {
+      windSpeed: windSpeedMs,
+      windSpeedMph: msToMph(windSpeedMs),
+      windGust: windGustMs,
+      windGustMph: msToMph(windGustMs), 
+      windDirection: windDirection,
+      timestamp: timestamp * 1000, // Convert to milliseconds
+      time: new Date(timestamp * 1000).toISOString(),
+      temperature: outdoorData?.temperature ? parseFloat(outdoorData.temperature.value) : undefined,
+      humidity: outdoorData?.humidity ? parseFloat(outdoorData.humidity.value) : undefined,
+    };
+
+    console.log(`✅ Retrieved real-time wind data for ${deviceName}:`, {
+      windSpeed: currentConditions.windSpeedMph,
+      direction: currentConditions.windDirection,
+      timestamp: new Date(currentConditions.timestamp).toLocaleString()
+    });
+
+    return currentConditions;
+
+  } catch (error) {
+    console.error(`❌ Error fetching real-time wind data for ${deviceName}:`, error);
+    
+    // Don't throw - allow fallback to historical data
+    if (axios.isAxiosError(error)) {
+      console.error('Real-time API request failed:', error.response?.data || error.message);
+    }
+    
+    return null;
   }
 }
 

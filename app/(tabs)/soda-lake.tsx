@@ -20,11 +20,15 @@ export default function SodaLakeScreen() {
   const {
     windData,
     chartData,
+    currentConditions,
     analysis,
     isLoading,
+    isLoadingCurrent,
     error,
     lastUpdated,
+    currentConditionsUpdated,
     refreshData,
+    refreshCurrentConditions,
     clearCache
   } = useSodaLakeWind();
 
@@ -36,7 +40,9 @@ export default function SodaLakeScreen() {
     React.useCallback(() => {
       console.log('🏔️ Soda Lake tab focused - refreshing data...');
       refreshData();
-    }, [refreshData])
+      // Also refresh current conditions separately for faster updates
+      refreshCurrentConditions();
+    }, [refreshData, refreshCurrentConditions])
   );
 
   const handleRefresh = async () => {
@@ -58,12 +64,30 @@ export default function SodaLakeScreen() {
   };
 
   const getCurrentWindSpeed = () => {
+    // Use real-time data if available and recent (within 10 minutes)
+    if (currentConditions && currentConditionsUpdated) {
+      const age = Date.now() - currentConditionsUpdated.getTime();
+      if (age < 10 * 60 * 1000) { // 10 minutes
+        return currentConditions.windSpeedMph;
+      }
+    }
+    
+    // Fall back to latest historical data
     if (windData.length === 0) return null;
     const latest = windData[windData.length - 1];
     return latest.windSpeedMph;
   };
 
   const getCurrentWindDirection = () => {
+    // Use real-time data if available and recent (within 10 minutes)
+    if (currentConditions && currentConditionsUpdated) {
+      const age = Date.now() - currentConditionsUpdated.getTime();
+      if (age < 10 * 60 * 1000) { // 10 minutes
+        return currentConditions.windDirection;
+      }
+    }
+    
+    // Fall back to latest historical data
     if (windData.length === 0) return null;
     const latest = windData[windData.length - 1];
     return latest.windDirection;
@@ -77,8 +101,19 @@ export default function SodaLakeScreen() {
     return directions[index];
   };
 
-  // Check if data is stale (no data in last 2 hours)
+  // Check if data is stale - prioritize real-time data for current conditions
   const isDataStale = () => {
+    // Check real-time data first
+    if (currentConditions && currentConditionsUpdated) {
+      const now = new Date();
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+      
+      if (currentConditionsUpdated > tenMinutesAgo) {
+        return false; // Real-time data is fresh
+      }
+    }
+    
+    // Fall back to historical data check  
     if (windData.length === 0) return true;
     
     const latest = windData[windData.length - 1];
@@ -90,6 +125,16 @@ export default function SodaLakeScreen() {
   };
 
   const getDataFreshnessMessage = () => {
+    // Check real-time data first
+    if (currentConditions && currentConditionsUpdated) {
+      const now = new Date();
+      const diffMinutes = Math.floor((now.getTime() - currentConditionsUpdated.getTime()) / 60000);
+      
+      if (diffMinutes < 5) return '⚡ Live data - very current';
+      if (diffMinutes < 15) return `⚡ Real-time data from ${diffMinutes} minutes ago`;
+    }
+    
+    // Fall back to historical data messaging
     if (windData.length === 0) return 'No data available';
     
     const latest = windData[windData.length - 1];
@@ -141,6 +186,13 @@ export default function SodaLakeScreen() {
           </View>
         )}
 
+        {isLoadingCurrent && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={tintColor} />
+            <ThemedText style={styles.loadingText}>Updating current conditions...</ThemedText>
+          </View>
+        )}
+
         {/* Data Freshness Alert */}
         {windData.length > 0 && isDataStale() && (
           <View style={styles.staleDataContainer}>
@@ -155,7 +207,18 @@ export default function SodaLakeScreen() {
 
         {/* Current Conditions */}
         <View style={[styles.currentConditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+          <View style={styles.cardHeader}>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+            <TouchableOpacity
+              style={[styles.refreshButton, { borderColor: tintColor }]}
+              onPress={refreshCurrentConditions}
+              disabled={isLoadingCurrent}
+            >
+              <ThemedText style={[styles.refreshButtonText, { color: tintColor }]}>
+                {isLoadingCurrent ? '⏳' : '⚡'}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
           <View style={styles.currentConditionsGrid}>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
@@ -178,7 +241,18 @@ export default function SodaLakeScreen() {
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
               <ThemedText style={styles.conditionValue}>
-                {formatLastUpdated()}
+                {(() => {
+                  // Show real-time data timestamp if available and recent
+                  if (currentConditions && currentConditionsUpdated) {
+                    const age = Date.now() - currentConditionsUpdated.getTime();
+                    if (age < 10 * 60 * 1000) { // 10 minutes
+                      const minutes = Math.floor(age / 60000);
+                      return minutes < 1 ? 'Live ⚡' : `${minutes}m ago ⚡`;
+                    }
+                  }
+                  // Fall back to historical data timestamp
+                  return formatLastUpdated();
+                })()}
               </ThemedText>
             </View>
           </View>
@@ -243,6 +317,14 @@ export default function SodaLakeScreen() {
             >
               <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
                 Clear Cache
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.debugButton, { borderColor: tintColor, marginTop: 8 }]}
+              onPress={refreshCurrentConditions}
+            >
+              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
+                Test Real-Time API
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -321,6 +403,23 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  refreshButton: {
+    padding: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   currentConditionsGrid: {
     flexDirection: 'row',
