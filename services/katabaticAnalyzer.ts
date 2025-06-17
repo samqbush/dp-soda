@@ -552,11 +552,11 @@ export class KatabaticAnalyzer {
 
     const confidenceScore = Math.round(adjustedConfidence);
 
-    // Convert numeric confidence to string categories (adjusted thresholds)
+    // Convert numeric confidence to string categories (realistic thresholds)
     let confidence: 'low' | 'medium' | 'high';
-    if (adjustedConfidence >= 60) {
+    if (adjustedConfidence >= 80) {
       confidence = 'high';
-    } else if (adjustedConfidence >= 40) {
+    } else if (adjustedConfidence >= 60) {
       confidence = 'medium';
     } else {
       confidence = 'low';
@@ -566,11 +566,11 @@ export class KatabaticAnalyzer {
   }
 
   private generateRecommendation(probability: number, confidence: 'low' | 'medium' | 'high'): 'go' | 'maybe' | 'skip' {
-    if (probability >= 70 && confidence !== 'low') {
+    if (probability >= 75 && confidence === 'high') {
       return 'go';
-    } else if (probability >= 50 && confidence === 'high') {
+    } else if (probability >= 65 && confidence !== 'low') {
       return 'go';
-    } else if (probability >= 40) {
+    } else if (probability >= 45) {
       return 'maybe';
     } else {
       return 'skip';
