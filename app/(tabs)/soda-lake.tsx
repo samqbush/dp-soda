@@ -51,16 +51,13 @@ export default function SodaLakeScreen() {
 
   const formatLastUpdated = () => {
     if (!lastUpdated) return 'Never';
-    const now = new Date();
-    const diff = now.getTime() - lastUpdated.getTime();
-    const minutes = Math.floor(diff / 60000);
     
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    // Format as time (e.g., "2:45 PM")
+    return lastUpdated.toLocaleTimeString([], { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
   };
 
   const getCurrentWindSpeed = () => {
@@ -130,8 +127,7 @@ export default function SodaLakeScreen() {
       const now = new Date();
       const diffMinutes = Math.floor((now.getTime() - currentConditionsUpdated.getTime()) / 60000);
       
-      if (diffMinutes < 5) return '⚡ Live data - very current';
-      if (diffMinutes < 15) return `⚡ Real-time data from ${diffMinutes} minutes ago`;
+      if (diffMinutes < 15) return `Real-time data from ${diffMinutes} minutes ago`;
     }
     
     // Fall back to historical data messaging
@@ -215,7 +211,7 @@ export default function SodaLakeScreen() {
               disabled={isLoadingCurrent}
             >
               <ThemedText style={[styles.refreshButtonText, { color: tintColor }]}>
-                {isLoadingCurrent ? '⏳' : '⚡'}
+                {isLoadingCurrent ? '⏳' : '🔄'}
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -233,26 +229,9 @@ export default function SodaLakeScreen() {
               </ThemedText>
             </View>
             <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Data Points</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {windData.length}
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
               <ThemedText style={styles.conditionValue}>
-                {(() => {
-                  // Show real-time data timestamp if available and recent
-                  if (currentConditions && currentConditionsUpdated) {
-                    const age = Date.now() - currentConditionsUpdated.getTime();
-                    if (age < 10 * 60 * 1000) { // 10 minutes
-                      const minutes = Math.floor(age / 60000);
-                      return minutes < 1 ? 'Live ⚡' : `${minutes}m ago ⚡`;
-                    }
-                  }
-                  // Fall back to historical data timestamp
-                  return formatLastUpdated();
-                })()}
+                {formatLastUpdated()}
               </ThemedText>
             </View>
           </View>
@@ -267,7 +246,7 @@ export default function SodaLakeScreen() {
           <View style={[styles.chartCard, { backgroundColor: cardColor }]}>
             <WindChart
               data={chartData}
-              title="Today's Wind Speed - All Data"
+              title="Today's Wind Speed"
               timeWindow={getWindChartTimeWindow()}
             />
           </View>
@@ -279,14 +258,40 @@ export default function SodaLakeScreen() {
           </View>
         )}
 
-        {/* Analysis */}
+        {/* Historic Data Points */}
+        {windData.length > 0 && (
+          <View style={[styles.dataPointsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.dataPointsText}>
+              Historic Data Points: {windData.length}
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Recent Wind Analysis */}
         {analysis && (
           <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
-            <ThemedText style={styles.analysisText}>
-              Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
-              Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}
-              Consecutive Good Points: {analysis.consecutiveGoodPoints}{'\n'}
+            <View style={styles.analysisGrid}>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.averageSpeed.toFixed(1)} mph
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Avg Speed</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.directionConsistency.toFixed(0)}%
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Direction Consistency</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.consecutiveGoodPoints}
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Good Points</ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.analysisDescription}>
               {analysis.analysis}
             </ThemedText>
           </View>
@@ -450,6 +455,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  dataPointsCard: {
+    margin: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dataPointsText: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
   noDataCard: {
     margin: 16,
     padding: 32,
@@ -465,9 +481,32 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
-  analysisText: {
+  analysisGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  analysisItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  analysisValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  analysisLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  analysisDescription: {
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.3)',
   },
   linkCard: {
     margin: 16,
