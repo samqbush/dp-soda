@@ -43,7 +43,6 @@ export default function WindGuruScreen() {
     error,
     lastUpdated,
     refreshData,
-    getKatabaticTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
     katabaticAnalysis,
@@ -172,7 +171,7 @@ export default function WindGuruScreen() {
   }
 
   // Get current analysis data - Using hybrid thermal cycle temperature differential
-  const tempDiff = getKatabaticTemperatureDifferential();
+  const tempDiff = katabaticAnalysis.prediction?.factors?.temperatureDifferential || null;
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
@@ -188,40 +187,6 @@ export default function WindGuruScreen() {
     return '#F44336'; // Red
   };
 
-  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high'): string => {
-    switch (confidence) {
-      case 'high': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'low': return '#F44336';
-    }
-  };
-
-  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number): string => {
-    const baseLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
-    if (confidenceScore !== undefined) {
-      return `${baseLabel} (${confidenceScore}%)`;
-    }
-    return baseLabel;
-  };
-
-  const getConfidenceExplanation = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number, favorableFactors?: number): string => {
-    if (favorableFactors !== undefined) {
-      if (favorableFactors === 0) {
-        return `Low confidence due to 0/5 favorable factors despite good data quality`;
-      } else if (favorableFactors <= 2) {
-        return `${confidence} confidence - ${favorableFactors}/5 factors support prediction`;
-      } else {
-        return `${confidence} confidence - ${favorableFactors}/5 factors strongly support prediction`;
-      }
-    }
-    
-    switch (confidence) {
-      case 'high': return 'High confidence - data quality excellent and factors align well';
-      case 'medium': return 'Medium confidence - mixed signals from prediction factors';
-      case 'low': return 'Low confidence - factors indicate poor conditions';
-    }
-  };
-
   // Helper to count favorable factors from prediction
   const countFavorableFactors = (prediction: any): number => {
     if (!prediction?.factors) return 0;
@@ -235,14 +200,6 @@ export default function WindGuruScreen() {
     ];
     
     return factors.filter(Boolean).length;
-  };
-
-  const getRecommendationText = (recommendation: 'go' | 'maybe' | 'skip'): string => {
-    switch (recommendation) {
-      case 'go': return 'GO! 🎯';
-      case 'maybe': return 'MAYBE 🤔';
-      case 'skip': return 'SKIP ❌';
-    }
   };
 
   const handleRefresh = async () => {
@@ -650,29 +607,18 @@ export default function WindGuruScreen() {
                 <ThemedText style={styles.probabilityText}>
                   {katabaticAnalysis.prediction.probability}% Chance of Good Winds
                 </ThemedText>
-                <ThemedText style={[
-                  styles.confidenceText,
-                  { color: getConfidenceColor(katabaticAnalysis.prediction.confidence) }
-                ]}>
-                  Prediction Reliability: {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
+                <ThemedText style={[styles.confidenceText, { color: textColor, opacity: 0.9 }]}>
+                  ✅ {countFavorableFactors(katabaticAnalysis.prediction)} of 5 factors favorable
                 </ThemedText>
-                
-                {/* Clear explanation of the two metrics */}
-                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
-                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
-                  </ThemedText>
-                </ThemedView>
-                
-                {/* Confidence Explanation */}
-                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
-                  {getConfidenceExplanation(
-                    katabaticAnalysis.prediction.confidence, 
-                    katabaticAnalysis.prediction.confidenceScore,
-                    countFavorableFactors(katabaticAnalysis.prediction)
-                  )}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12 }]}>
+                  📊 Based on {(() => {
+                    if (!lastUpdated) return 'weather data';
+                    const now = new Date();
+                    const ageMinutes = (now.getTime() - lastUpdated.getTime()) / (1000 * 60);
+                    if (ageMinutes < 30) return 'fresh weather data';
+                    if (ageMinutes < 60) return 'recent weather data';
+                    return 'older weather data';
+                  })()} (updated {formatLastUpdated()})
                 </ThemedText>
                 
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
@@ -779,29 +725,11 @@ export default function WindGuruScreen() {
                 <ThemedText style={styles.probabilityText}>
                   {tomorrowPrediction.prediction.probability}% Chance of Good Winds
                 </ThemedText>
-                <ThemedText style={[
-                  styles.confidenceText,
-                  { color: getConfidenceColor(tomorrowPrediction.prediction.confidence) }
-                ]}>
-                  Prediction Reliability: {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
+                <ThemedText style={[styles.confidenceText, { color: textColor, opacity: 0.9 }]}>
+                  ✅ {countFavorableFactors(tomorrowPrediction.prediction)} of 5 factors favorable
                 </ThemedText>
-                
-                {/* Clear explanation of the two metrics */}
-                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
-                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
-                  </ThemedText>
-                </ThemedView>
-                
-                {/* Confidence Explanation */}
-                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
-                  {getConfidenceExplanation(
-                    tomorrowPrediction.prediction.confidence, 
-                    tomorrowPrediction.prediction.confidenceScore,
-                    countFavorableFactors(tomorrowPrediction.prediction)
-                  )}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12 }]}>
+                  📊 Based on {tomorrowPrediction.dataQuality} forecast data
                 </ThemedText>
                 
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
@@ -1160,11 +1088,11 @@ export default function WindGuruScreen() {
                 <>
                   <ThemedView style={styles.tempLocationRow}>
                     <ThemedText style={styles.tempLocationLabel}>Morrison Max (Day):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrisonTemp)}</ThemedText>
                   </ThemedView>
                   <ThemedView style={styles.tempLocationRow}>
                     <ThemedText style={styles.tempLocationLabel}>Evergreen Min (Night):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountainTemp)}</ThemedText>
                   </ThemedView>
                   <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
                     <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Thermal Differential:</ThemedText>
@@ -1208,11 +1136,11 @@ export default function WindGuruScreen() {
                   {/* Fallback to current temperature display */}
                   <ThemedView style={styles.tempLocationRow}>
                     <ThemedText style={styles.tempLocationLabel}>Morrison (Current):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrisonTemp)}</ThemedText>
                   </ThemedView>
                   <ThemedView style={styles.tempLocationRow}>
                     <ThemedText style={styles.tempLocationLabel}>Evergreen (Current):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
+                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountainTemp)}</ThemedText>
                   </ThemedView>
                   <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
                     <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Current Differential:</ThemedText>
