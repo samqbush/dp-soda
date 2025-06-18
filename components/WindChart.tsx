@@ -229,14 +229,6 @@ function WindChartContent({ data, title, highlightGoodPoints = false, criteria, 
     return isNaN(gust) ? 0 : Math.max(0, gust);
   });
 
-  const directions = recentData.map(point => {
-    // Handle both string and number types for windDirection
-    const dir = typeof point.windDirection === 'string' 
-      ? parseFloat(point.windDirection) 
-      : point.windDirection;
-    return isNaN(dir) ? null : dir;
-  });
-
   // Ensure we have valid data before proceeding
   if (speeds.length === 0 || gusts.length === 0) {
     return (
