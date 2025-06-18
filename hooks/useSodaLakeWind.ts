@@ -10,7 +10,7 @@ import {
     type EcowittCurrentWindConditions,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
-import { analyzeRecentWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
+import { analyzeRecentWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface UseSodaLakeWindReturn {
@@ -46,9 +46,25 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [currentConditionsUpdated, setCurrentConditionsUpdated] = useState<Date | null>(null);
+  const [userMinimumSpeed, setUserMinimumSpeed] = useState<number>(15); // Default fallback
 
   // Convert data for chart compatibility
   const chartData = convertToWindDataPoint(windData);
+
+  // Load user's minimum speed setting from storage
+  useEffect(() => {
+    const loadUserCriteria = async () => {
+      try {
+        const criteria = await getAlarmCriteria();
+        setUserMinimumSpeed(criteria.minimumAverageSpeed);
+      } catch (error) {
+        console.error('❌ Error loading user criteria:', error);
+        // Keep default fallback value
+      }
+    };
+    
+    loadUserCriteria();
+  }, []);
 
   /**
    * Load cached data from storage
@@ -65,9 +81,9 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
         // Analyze the cached data
         const converted = convertToWindDataPoint(cachedData.data);
         if (converted.length > 0) {
-          // Use Soda Lake specific criteria for analysis
+          // Use Soda Lake specific criteria for analysis with user-configured minimum speed
           const defaultCriteria: AlarmCriteria = {
-            minimumAverageSpeed: 10, // Soda Lake typically needs 10+ mph
+            minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
             directionConsistencyThreshold: 70,
             minimumConsecutivePoints: 4,
             directionDeviationThreshold: 45,
@@ -163,7 +179,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
       if (freshData.length > 0) {
         const converted = convertToWindDataPoint(freshData);
         const defaultCriteria: AlarmCriteria = {
-          minimumAverageSpeed: 10,
+          minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
           directionConsistencyThreshold: 70,
           minimumConsecutivePoints: 4,
           directionDeviationThreshold: 45,

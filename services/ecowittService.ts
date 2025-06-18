@@ -210,13 +210,34 @@ export async function debugDeviceListAPI(): Promise<void> {
   }
 }
 
+// In-memory cache for device list to prevent rapid API calls
+let deviceListCache: {
+  data: EcowittDevice[] | null;
+  timestamp: number;
+  promise: Promise<EcowittDevice[]> | null;
+} = {
+  data: null,
+  timestamp: 0,
+  promise: null
+};
+
+const DEVICE_LIST_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for in-memory cache
+
 /**
  * Fetch device list from Ecowitt API to get MAC address automatically
+ * Includes throttling and caching to prevent rate limiting
  */
 export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
   console.log('📱 Fetching Ecowitt device list...');
   
   try {
+    // Check in-memory cache first
+    const now = Date.now();
+    if (deviceListCache.data && (now - deviceListCache.timestamp) < DEVICE_LIST_CACHE_DURATION) {
+      console.log('📱 Using cached device list');
+      return deviceListCache.data;
+    }
+
     const params = {
       application_key: ECOWITT_CONFIG.applicationKey,
       api_key: ECOWITT_CONFIG.apiKey,
@@ -225,47 +246,71 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
 
     console.log('📡 Making Ecowitt device list API request');
 
-    const response = await axios.get<EcowittDeviceListResponse>(`${BASE_URL}/device/list`, {
-      params,
-      timeout: 10000,
-      headers: {
-        'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
-        })
-      }
-    });
+    // Use a promise to handle the API request
+    if (!deviceListCache.promise) {
+      deviceListCache.promise = axios.get<EcowittDeviceListResponse>(`${BASE_URL}/device/list`, {
+        params,
+        timeout: 10000,
+        headers: {
+          'User-Agent': Platform.select({
+            ios: 'DawnPatrol/1.0 (iOS)',
+            android: 'DawnPatrol/1.0 (Android)',
+            default: 'DawnPatrol/1.0'
+          })
+        }
+      }).then(response => {
+        if (response.data.code !== 0) {
+          throw new Error(`Ecowitt device list API error: ${response.data.msg}`);
+        }
 
-    if (response.data.code !== 0) {
-      throw new Error(`Ecowitt device list API error: ${response.data.msg}`);
+        // Validate response structure - the API returns 'list' not 'device_list'
+        if (!response.data.data || !Array.isArray(response.data.data.list)) {
+          console.error('❌ Invalid device list response structure:', response.data);
+          throw new Error('Invalid device list response from Ecowitt API');
+        }
+
+        const deviceList = response.data.data.list;
+        console.log('📊 Received Ecowitt devices:', deviceList.length);
+
+        // Update in-memory cache
+        deviceListCache = {
+          data: deviceList,
+          timestamp: Date.now(),
+          promise: null // Reset promise
+        };
+
+        return deviceList;
+
+      }).catch(error => {
+        deviceListCache.promise = null; // Reset promise on error
+        console.error('❌ Error fetching Ecowitt device list:', error);
+        
+        if (axios.isAxiosError(error)) {
+          if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+            throw new Error('Network connection failed. Please check your internet connection.');
+          } else if (error.response?.status === 401) {
+            throw new Error('Invalid API credentials for device list.');
+          } else if (error.response?.status === 429) {
+            throw new Error('API rate limit exceeded. Please try again later.');
+          } else if (error.response && error.response.status >= 500) {
+            throw new Error('Ecowitt server error. Please try again later.');
+          }
+        }
+        
+        // Check for specific Ecowitt "Operation too frequent" error
+        if (error instanceof Error && error.message.includes('Operation too frequent')) {
+          throw new Error('Ecowitt API rate limit exceeded. Please wait a moment and try again.');
+        }
+        
+        throw error;
+      });
     }
 
-    // Validate response structure - the API returns 'list' not 'device_list'
-    if (!response.data.data || !Array.isArray(response.data.data.list)) {
-      console.error('❌ Invalid device list response structure:', response.data);
-      throw new Error('Invalid device list response from Ecowitt API');
-    }
-
-    const deviceList = response.data.data.list;
-    console.log('📊 Received Ecowitt devices:', deviceList.length);
-    return deviceList;
+    // Wait for the ongoing request to complete
+    return await deviceListCache.promise;
 
   } catch (error) {
     console.error('❌ Error fetching Ecowitt device list:', error);
-    
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new Error('Network connection failed. Please check your internet connection.');
-      } else if (error.response?.status === 401) {
-        throw new Error('Invalid API credentials for device list.');
-      } else if (error.response?.status === 429) {
-        throw new Error('API rate limit exceeded. Please try again later.');
-      } else if (error.response && error.response.status >= 500) {
-        throw new Error('Ecowitt server error. Please try again later.');
-      }
-    }
-    
     throw error;
   }
 }
@@ -372,7 +417,21 @@ export function selectDeviceByName(devices: EcowittDevice[], deviceName: string)
  */
 export async function getDeviceMacAddressForDevice(deviceName: string): Promise<string> {
   try {
-    // For device-specific requests, we need fresh device list (no caching)
+    // Check if we have a cached MAC address for this specific device
+    const deviceCacheKey = `${DEVICE_MAC_STORAGE_KEY}_${deviceName.replace(/\s+/g, '_')}`;
+    const cachedMacData = await AsyncStorage.getItem(deviceCacheKey);
+    
+    if (cachedMacData) {
+      const parsed = JSON.parse(cachedMacData);
+      const now = Date.now();
+      
+      // Use cached MAC if it's still valid (within cache duration)
+      if (parsed.timestamp && (now - parsed.timestamp) < MAC_ADDRESS_CACHE_DURATION && parsed.macAddress) {
+        console.log(`📱 Using cached device MAC address for ${deviceName}`);
+        return parsed.macAddress;
+      }
+    }
+
     console.log(`🔍 Fetching device MAC address for: ${deviceName}...`);
     const devices = await fetchEcowittDeviceList();
     
@@ -393,11 +452,39 @@ export async function getDeviceMacAddressForDevice(deviceName: string): Promise<
       throw new Error(`Selected device "${deviceName}" does not have a MAC address.`);
     }
 
+    // Cache the MAC address for this specific device
+    const cacheData = {
+      macAddress: selectedDevice.mac,
+      timestamp: Date.now(),
+      deviceName: selectedDevice.name || 'Unknown Device',
+      deviceModel: selectedDevice.stationtype || 'Unknown Model'
+    };
+    
+    await AsyncStorage.setItem(deviceCacheKey, JSON.stringify(cacheData));
+    console.log(`💾 Cached device MAC address for ${deviceName}:`, selectedDevice.name || 'Unknown');
+
     console.log(`✅ Using device "${deviceName}":`, selectedDevice.name || 'Unknown');
     return selectedDevice.mac;
 
   } catch (error) {
     console.error(`❌ Error getting device MAC address for ${deviceName}:`, error);
+    
+    // If we get a rate limit error, try to return a cached value even if it's older
+    if (error instanceof Error && error.message.includes('Operation too frequent')) {
+      console.log(`⚠️ Rate limited, attempting to use any cached MAC for ${deviceName}...`);
+      
+      const deviceCacheKey = `${DEVICE_MAC_STORAGE_KEY}_${deviceName.replace(/\s+/g, '_')}`;
+      const cachedMacData = await AsyncStorage.getItem(deviceCacheKey);
+      
+      if (cachedMacData) {
+        const parsed = JSON.parse(cachedMacData);
+        if (parsed.macAddress) {
+          console.log(`📱 Using older cached MAC for ${deviceName} due to rate limiting`);
+          return parsed.macAddress;
+        }
+      }
+    }
+    
     throw error;
   }
 }

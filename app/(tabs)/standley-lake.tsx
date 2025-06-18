@@ -19,11 +19,15 @@ export default function StandleyLakeScreen() {
   const {
     windData,
     chartData,
+    currentConditions,
     analysis,
     isLoading,
+    isLoadingCurrent,
     error,
     lastUpdated,
+    currentConditionsUpdated,
     refreshData,
+    refreshCurrentConditions,
     clearCache
   } = useStandleyLakeWind();
 
@@ -37,7 +41,9 @@ export default function StandleyLakeScreen() {
     React.useCallback(() => {
       console.log('🏔️ Standley Lake tab focused - refreshing data...');
       refreshData();
-    }, [refreshData])
+      // Also refresh current conditions separately for faster updates
+      refreshCurrentConditions();
+    }, [refreshData, refreshCurrentConditions])
   );
 
   const handleRefresh = async () => {
@@ -55,24 +61,32 @@ export default function StandleyLakeScreen() {
     });
   };
 
+  // Helper functions for current conditions
   const getCurrentWindSpeed = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windSpeedMph;
+    return currentConditions?.windSpeed ? 
+      currentConditions.windSpeed * 2.237 : // Convert m/s to mph, return number
+      null;
   };
 
   const getCurrentWindDirection = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windDirection;
+    return currentConditions?.windDirection;
   };
 
-  const getWindDirectionText = (degrees: number | null) => {
-    if (degrees === null) return 'N/A';
+  const getWindDirectionText = (degrees: number | undefined): string => {
+    if (degrees === undefined || degrees === null) return '--';
     
     const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     const index = Math.round(degrees / 22.5) % 16;
     return directions[index];
+  };
+
+  const formatCurrentConditionsUpdated = () => {
+    if (!currentConditionsUpdated) return 'Never';
+    return currentConditionsUpdated.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
   };
 
   // Check if data is stale (no data in last 2 hours)
@@ -88,18 +102,16 @@ export default function StandleyLakeScreen() {
   };
 
   const getDataFreshnessMessage = () => {
-    if (windData.length === 0) return 'No data available';
+    if (!currentConditions || !currentConditionsUpdated) {
+      return 'Real-time data unavailable';
+    }
     
-    const latest = windData[windData.length - 1];
-    const latestTime = new Date(latest.time);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - latestTime.getTime()) / 60000);
+    const diffMinutes = Math.floor((now.getTime() - currentConditionsUpdated.getTime()) / 60000);
     
-    if (diffMinutes < 30) return 'Data is current';
-    if (diffMinutes < 120) return `Last reading ${diffMinutes} minutes ago`;
-    
-    const diffHours = Math.floor(diffMinutes / 60);
-    return `⚠️ Station may be offline - last reading ${diffHours} hours ago`;
+    if (diffMinutes < 5) return '🟢 Real-time data current';
+    if (diffMinutes < 15) return '🟡 Real-time data slightly delayed';
+    return '🔴 Real-time data may be stale';
   };
 
   return (
@@ -153,7 +165,18 @@ export default function StandleyLakeScreen() {
 
         {/* Current Conditions */}
         <View style={[styles.currentConditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+          <View style={styles.cardHeader}>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+            <TouchableOpacity
+              style={[styles.refreshButton, { borderColor: tintColor }]}
+              onPress={refreshCurrentConditions}
+              disabled={isLoadingCurrent}
+            >
+              <ThemedText style={[styles.refreshButtonText, { color: tintColor }]}>
+                {isLoadingCurrent ? '⏳' : '🔄'}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
           <View style={styles.currentConditionsGrid}>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
@@ -170,10 +193,14 @@ export default function StandleyLakeScreen() {
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
               <ThemedText style={styles.conditionValue}>
-                {formatLastUpdated()}
+                {formatCurrentConditionsUpdated()}
               </ThemedText>
             </View>
           </View>
+          {/* Data freshness message */}
+          <ThemedText style={styles.freshnessMessage}>
+            {getDataFreshnessMessage()}
+          </ThemedText>
         </View>
 
         {/* Wind Chart */}
@@ -241,6 +268,14 @@ export default function StandleyLakeScreen() {
             >
               <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
                 Clear Cache
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.debugButton, { borderColor: tintColor, marginTop: 8 }]}
+              onPress={refreshCurrentConditions}
+            >
+              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
+                Test Real-Time API
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -408,5 +443,28 @@ const styles = StyleSheet.create({
   staleDataSubtext: {
     fontSize: 14,
     opacity: 0.8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  refreshButton: {
+    padding: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  freshnessMessage: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });

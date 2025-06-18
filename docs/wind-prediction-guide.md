@@ -396,3 +396,67 @@ While the app provides excellent general guidance, **Mountain Wave-Katabatic Int
 This advanced understanding enables you to make more sophisticated decisions about when MKI conditions might create opportunities that basic predictions miss, or when apparent good conditions might be disrupted by unfavorable wave interactions.
 
 This technical guide provides the foundation for understanding how Dawn Patrol Alarm's predictions work, enabling you to make the most informed decisions possible for your wind sport activities.
+
+### Wind Analysis: Consecutive Good Points
+
+The wind analysis system evaluates recent wind data to determine if conditions are favorable for wind sports. A key metric is **"consecutive good points"** - the maximum number of consecutive data points that meet all alarm criteria.
+
+#### What Constitutes a "Good Point"
+
+A data point is considered "good" if it meets ALL of the following criteria:
+
+**Wind Speed Criteria:**
+- **Both Lakes**: Uses the minimum wind speed configured in Settings (default: 15 mph)
+  - User can adjust this in the Settings tab under "Minimum Average Speed"
+  - This same threshold is used for both the alarm system and consecutive good points analysis
+
+**Wind Direction Criteria** (if enabled):
+- **Soda Lake**: Northwest wind (315° ±45°, so 270° to 360°)
+- **Standley Lake**: West wind (270° ±45°, so 225° to 315°)
+
+**Additional Requirements:**
+- Direction consistency ≥70% within the analysis window
+- Minimum 4 consecutive good points required for alarm worthiness
+
+#### Consecutive Good Points Calculation
+
+The system uses a streak-counting algorithm:
+
+1. **Iterate through data points** in chronological order (typically last hour)
+2. **Check each point** against speed and direction criteria
+3. **Count consecutive passes** - reset counter when any point fails
+4. **Track maximum streak** - the highest consecutive count found
+
+**Example:**
+```
+Data points: [8mph, 12mph, 15mph, 14mph, 9mph, 13mph, 16mph]
+Minimum speed: 10mph
+Results: [❌, ✅, ✅, ✅, ❌, ✅, ✅]
+Consecutive streaks: [0, 1, 2, 3, 0, 1, 2]
+Maximum consecutive: 3 good points
+```
+
+#### Analysis Time Windows
+
+- **Default Analysis**: Last 1 hour of data
+- **Fallback**: If no data in last hour, use last 10 data points
+- **Alarm Window**: 3am-5am for morning wind analysis (dawn patrol prediction)
+- **Verification Window**: 6am-8am for real-time conditions
+
+#### Lake-Specific Criteria
+
+**Soda Lake (Dawn Patrol):**
+- Minimum speed: User-configured (set in Settings tab)
+- Preferred direction: 315° (Northwest) ±45°
+- Minimum consecutive points: 4
+- Analysis focuses on 3am-5am window
+
+**Standley Lake:**
+- Minimum speed: User-configured (set in Settings tab)
+- Preferred direction: 270° (West) ±45°
+- Minimum consecutive points: 4
+- Analysis focuses on 6am-8am window
+
+The consecutive good points metric helps identify **sustained favorable conditions** rather than just brief wind gusts, providing more reliable predictions for wind sports activities.
+
+**Configuration:** The minimum wind speed threshold used for "consecutive good points" can be adjusted in the Settings tab under "Minimum Average Speed". This same setting is used for both the dawn patrol alarm system and the wind analysis on the lake tabs.
