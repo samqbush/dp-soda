@@ -403,7 +403,10 @@ export default function WindGuruScreen() {
                   <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
                   <ThemedView style={styles.factorContent}>
                     <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (15% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥5.8°F Morrison (valley, 1740m) vs Evergreen (mountain, 2200m) - drives density-driven flow</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>
+                      ≥5.8°F Morrison (valley, 1740m) vs Evergreen (mountain, 2200m) - drives density-driven flow{'\n'}
+                      <ThemedText style={{ fontWeight: '500', color: tintColor }}>Enhanced Thermal Cycle Analysis:</ThemedText> Uses afternoon max vs pre-dawn min temperatures when available for more accurate predictions. Falls back to current readings when thermal cycle data is unavailable.
+                    </ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -850,6 +853,19 @@ export default function WindGuruScreen() {
                   {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
+              {/* Show thermal cycle status in conditions analysis */}
+              {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason && (
+                <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
+                  <ThemedText style={[styles.conditionLabel, { 
+                    fontSize: 10, 
+                    opacity: 0.7, 
+                    fontStyle: 'italic',
+                    color: '#F44336'
+                  }]}>
+                    ⚠️ Using current temps: {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
+                  </ThemedText>
+                </ThemedView>
+              )}
               
               <ThemedView style={styles.conditionRow}>
                 <ThemedText style={styles.conditionLabel}>
@@ -952,6 +968,19 @@ export default function WindGuruScreen() {
                   {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
                 </ThemedText>
               </ThemedView>
+              {/* Show thermal cycle status for tomorrow's prediction */}
+              {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason && (
+                <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
+                  <ThemedText style={[styles.conditionLabel, { 
+                    fontSize: 10, 
+                    opacity: 0.7, 
+                    fontStyle: 'italic',
+                    color: '#F44336'
+                  }]}>
+                    ⚠️ Using forecast temps: {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
+                  </ThemedText>
+                </ThemedView>
+              )}
               
               <ThemedView style={styles.conditionRow}>
                 <ThemedText style={styles.conditionLabel}>
@@ -1160,6 +1189,19 @@ export default function WindGuruScreen() {
                     <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
                       ⚠️ Using current temps (thermal cycle data unavailable)
                     </ThemedText>
+                    {/* Show specific reason for thermal cycle failure */}
+                    {(tempDiff as any)?.thermalCycleFailureReason && (
+                      <ThemedText style={[styles.dataQualityText, { 
+                        color: textColor, 
+                        fontSize: 10, 
+                        opacity: 0.7, 
+                        marginTop: 6,
+                        fontStyle: 'italic',
+                        lineHeight: 14
+                      }]}>
+                        Reason: {(tempDiff as any).thermalCycleFailureReason}
+                      </ThemedText>
+                    )}
                   </ThemedView>
                 </>
               )}
@@ -1188,19 +1230,27 @@ export default function WindGuruScreen() {
                 borderLeftColor: '#2196F3'
               }]}>
                 <ThemedText style={[styles.calculationNoteTitle, { color: '#2196F3', fontWeight: '600', fontSize: 13, marginBottom: 6 }]}>
-                  📊 How Thermal Cycle Differential is Calculated
+                  📊 {(tempDiff as any)?.type === 'thermal_cycle' ? 'Thermal Cycle Analysis (Enhanced)' : 'Current Temperature Analysis (Fallback)'}
                 </ThemedText>
                 <ThemedText style={[styles.calculationNoteText, { color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }]}>
-                  <ThemedText style={{ fontWeight: '500' }}>When:</ThemedText> Combines historical and forecast data based on time of day{'\n'}
-                  <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison max (12-5 PM) - Evergreen min (3-7 AM) = Thermal differential{'\n'}
-                  <ThemedText style={{ fontWeight: '500' }}>Timeframe:</ThemedText> {(tempDiff as any)?.type === 'thermal_cycle' ? 
-                    `${(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')} approach` : 
-                    'Real-time snapshot, updated every 30 minutes'}
+                  {(tempDiff as any)?.type === 'thermal_cycle' ? (
+                    <>
+                      <ThemedText style={{ fontWeight: '500' }}>Method:</ThemedText> Uses thermal cycle peaks for maximum accuracy{'\n'}
+                      <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison max (12-5 PM) - Evergreen min (3-7 AM) = Thermal differential{'\n'}
+                      <ThemedText style={{ fontWeight: '500' }}>Data Quality:</ThemedText> {(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')} approach ({(tempDiff as any)?.confidence} confidence)
+                    </>
+                  ) : (
+                    <>
+                      <ThemedText style={{ fontWeight: '500' }}>Method:</ThemedText> Current temperature comparison (fallback mode){'\n'}
+                      <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison current - Evergreen current = Temperature differential{'\n'}
+                      <ThemedText style={{ fontWeight: '500' }}>Limitation:</ThemedText> Does not capture full thermal cycle - less accurate for katabatic prediction
+                    </>
+                  )}
                 </ThemedText>
                 <ThemedText style={[styles.tempCalcExample, { color: textColor, opacity: 0.7, fontSize: 11, marginTop: 6, fontStyle: 'italic' }]}>
                   {(tempDiff as any)?.type === 'thermal_cycle' ? 
                     'Example: Morrison 95°F (afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential' :
-                    'Example: Morrison 90°F - Evergreen 83°F = 7°F current differential'
+                    'Example: Morrison 90°F - Evergreen 83°F = 7°F current differential (may not reflect katabatic potential)'
                   }
                 </ThemedText>
               </ThemedView>

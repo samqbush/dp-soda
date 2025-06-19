@@ -50,17 +50,6 @@ export default function StandleyLakeScreen() {
     await refreshData();
   };
 
-  const formatLastUpdated = () => {
-    if (!lastUpdated) return 'Never';
-    
-    // Format as time (e.g., "2:45 PM")
-    return lastUpdated.toLocaleTimeString([], { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
   // Helper functions for current conditions
   const getCurrentWindSpeed = () => {
     return currentConditions?.windSpeed ? 

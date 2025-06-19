@@ -47,6 +47,7 @@ export interface KatabaticFactors {
     mountainTemp: number;
     confidence: number;
     dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
+    thermalCycleFailureReason?: string; // Specific reason why thermal cycle data is unavailable
   };
   wavePattern: {
     meets: boolean;
@@ -278,6 +279,29 @@ export class KatabaticAnalyzer {
     const morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, now);
     const evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
     
+    // Determine specific failure reasons for thermal cycle data
+    let thermalCycleFailureReason: string | null = null;
+    if (morrisonMaxTemp === null || evergreenMinTemp === null) {
+      const reasons: string[] = [];
+      if (morrisonMaxTemp === null) {
+        reasons.push('afternoon heating data (12-5 PM)');
+      }
+      if (evergreenMinTemp === null) {
+        reasons.push('pre-dawn cooling data (3-7 AM tomorrow)');
+      }
+      
+      // Determine likely cause
+      const morrisonForecastHours = weatherData.morrison.hourlyForecast.length;
+      const mountainForecastHours = weatherData.mountain.hourlyForecast.length;
+      const minHoursNeeded = currentHour < 12 ? 24 : 15; // Need more hours if before afternoon heating
+      
+      if (morrisonForecastHours < minHoursNeeded || mountainForecastHours < minHoursNeeded) {
+        thermalCycleFailureReason = `Insufficient forecast data - missing ${reasons.join(' and ')}. Weather models provide only ${Math.min(morrisonForecastHours, mountainForecastHours)} hours of data, but ${minHoursNeeded}+ hours needed for thermal cycle analysis.`;
+      } else {
+        thermalCycleFailureReason = `Weather API data gaps during critical periods - missing ${reasons.join(' and ')}. This typically occurs with incomplete NOAA or OpenWeather forecast coverage.`;
+      }
+    }
+    
     // Fallback to prediction window averages if thermal cycle data unavailable
     let morrisonTemp: number;
     let mountainTemp: number;
@@ -329,6 +353,7 @@ export class KatabaticAnalyzer {
       confidence,
       dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
+      thermalCycleFailureReason: thermalCycleFailureReason || undefined, // Convert null to undefined for TypeScript
       thermalWindow: analysisType === 'thermal_cycle' ? {
         morrisonMax: '12:00-17:00 (Afternoon heating)',
         evergreenMin: '03:00-07:00 (Pre-dawn cooling)'
