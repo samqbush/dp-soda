@@ -50,6 +50,89 @@ export default function WindGuruScreen() {
     // validatePastPredictions,
   } = useWeatherData();
 
+  // Helper function to calculate overnight temperature changes (evening to dawn)
+  // This matches the same thermal cycle timeframe as pressure analysis
+  const getOvernightTemperatureAnalysis = () => {
+    if (!weatherData) return null;
+    
+    const morrisonForecast = weatherData.morrison?.hourlyForecast || [];
+    const evergreenForecast = weatherData.mountain?.hourlyForecast || [];
+    if (morrisonForecast.length < 12 || evergreenForecast.length < 12) return null;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const eveningHour = 18; // 6 PM
+    const dawnHour = 6; // 6 AM
+    
+    // Find evening temperatures (start of cooling cycle)
+    const findEveningTemp = (forecast: any[]) => {
+      return forecast.find(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        
+        if (currentHour >= 18) {
+          return pointDate.toDateString() === now.toDateString() && pointHour === eveningHour;
+        } else {
+          const targetDate = currentHour <= 8 ? 
+            new Date(now.getTime() - 24 * 60 * 60 * 1000) : 
+            now;
+          return pointDate.toDateString() === targetDate.toDateString() && pointHour === eveningHour;
+        }
+      });
+    };
+    
+    // Find dawn temperatures (end of cooling cycle)
+    const findDawnTemp = (forecast: any[]) => {
+      return forecast.find(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        
+        if (currentHour >= 18) {
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          return pointDate.toDateString() === tomorrow.toDateString() && pointHour === dawnHour;
+        } else if (currentHour <= 8) {
+          return pointDate.toDateString() === now.toDateString() && pointHour === dawnHour;
+        } else {
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          return pointDate.toDateString() === tomorrow.toDateString() && pointHour === dawnHour;
+        }
+      });
+    };
+    
+    const morrisonEvening = findEveningTemp(morrisonForecast);
+    const morrisonDawn = findDawnTemp(morrisonForecast);
+    const evergreenEvening = findEveningTemp(evergreenForecast);
+    const evergreenDawn = findDawnTemp(evergreenForecast);
+    
+    if (!morrisonEvening || !morrisonDawn || !evergreenEvening || !evergreenDawn) return null;
+    
+    // Calculate overnight temperature changes
+    const morrisonOvernightChange = morrisonDawn.temperature - morrisonEvening.temperature;
+    const evergreenOvernightChange = evergreenDawn.temperature - evergreenEvening.temperature;
+    
+    // Calculate evening and dawn differentials
+    const eveningDifferential = morrisonEvening.temperature - evergreenEvening.temperature;
+    const dawnDifferential = morrisonDawn.temperature - evergreenDawn.temperature;
+    const overnightDifferentialChange = dawnDifferential - eveningDifferential;
+    
+    return {
+      morrisonEvening: morrisonEvening.temperature,
+      morrisonDawn: morrisonDawn.temperature,
+      morrisonOvernightChange,
+      evergreenEvening: evergreenEvening.temperature,
+      evergreenDawn: evergreenDawn.temperature,
+      evergreenOvernightChange,
+      eveningDifferential,
+      dawnDifferential,
+      overnightDifferentialChange,
+      timeframe: `${eveningHour}:00 PM → ${dawnHour}:00 AM`,
+      isKatabaticFavorable: dawnDifferential >= 3.2, // Dawn differential meets katabatic threshold
+      coolingEffective: Math.abs(morrisonOvernightChange) >= 2.0 || Math.abs(evergreenOvernightChange) >= 2.0,
+      eveningTime: new Date(morrisonEvening.timestamp),
+      dawnTime: new Date(morrisonDawn.timestamp)
+    };
+  };
+
   // REMOVED: Learning mode and prediction tracking for simplification
   // Import Soda Lake wind data for prediction validation
   // const { windData: sodaLakeWindData } = useSodaLakeWind();
@@ -88,6 +171,7 @@ export default function WindGuruScreen() {
   // Get current analysis data - Using hybrid thermal cycle temperature differential
   const tempDiff = katabaticAnalysis.prediction?.factors?.temperatureDifferential || null;
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
+  const overnightTemperature = getOvernightTemperatureAnalysis(); // NEW: Overnight temperature differential analysis
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
   
@@ -731,6 +815,62 @@ export default function WindGuruScreen() {
                     }
                   </ThemedText>
                 </ThemedView>
+                
+                {/* Overnight Temperature Analysis - Real-world katabatic prediction timeframe */}
+                {overnightTemperature && (
+                  <ThemedView style={[styles.conditionRow, { 
+                    backgroundColor: 'rgba(76, 175, 80, 0.08)', 
+                    padding: 10, 
+                    marginVertical: 6, 
+                    borderRadius: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: overnightTemperature.isKatabaticFavorable ? '#4CAF50' : '#FF9800'
+                  }]}>
+                    <ThemedView style={{ flex: 1 }}>
+                      <ThemedText style={[styles.conditionLabel, { 
+                        color: '#4CAF50', 
+                        fontWeight: '600',
+                        marginBottom: 2 
+                      }]}>
+                        🌡️ Overnight Temp Analysis ({overnightTemperature.timeframe}):
+                      </ThemedText>
+                      <ThemedText style={[styles.conditionValue, { 
+                        color: overnightTemperature.isKatabaticFavorable ? '#4CAF50' : '#FF9800',
+                        fontWeight: '600',
+                        fontSize: 14
+                      }]}>
+                        Dawn Δ: {formatTempDiffF(overnightTemperature.dawnDifferential)} 
+                        {overnightTemperature.isKatabaticFavorable ? ' ✅ Favorable' : ' ⚠️ Marginal'}
+                      </ThemedText>
+                      <ThemedView style={{ marginTop: 4 }}>
+                        <ThemedText style={[styles.conditionLabel, { 
+                          fontSize: 12, 
+                          opacity: 0.8,
+                          marginBottom: 1
+                        }]}>
+                          Morrison: {formatTempF(overnightTemperature.morrisonEvening)} → {formatTempF(overnightTemperature.morrisonDawn)} 
+                          ({overnightTemperature.morrisonOvernightChange > 0 ? '+' : ''}{(overnightTemperature.morrisonOvernightChange * 9/5).toFixed(1)}°F)
+                        </ThemedText>
+                        <ThemedText style={[styles.conditionLabel, { 
+                          fontSize: 12, 
+                          opacity: 0.8,
+                          marginBottom: 1
+                        }]}>
+                          Evergreen: {formatTempF(overnightTemperature.evergreenEvening)} → {formatTempF(overnightTemperature.evergreenDawn)} 
+                          ({overnightTemperature.evergreenOvernightChange > 0 ? '+' : ''}{(overnightTemperature.evergreenOvernightChange * 9/5).toFixed(1)}°F)
+                        </ThemedText>
+                      </ThemedView>
+                      <ThemedText style={[styles.conditionLabel, { 
+                        fontSize: 11, 
+                        opacity: 0.7,
+                        fontStyle: 'italic',
+                        marginTop: 2
+                      }]}>
+                        Evening-to-dawn temperature differential development
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
+                )}
                 
                 <ThemedView style={styles.conditionRow}>
                   <ThemedText style={styles.conditionLabel}>🌡️ Temp Differential:</ThemedText>

@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 function AlarmSystemTester() {
   const { testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
   const [testing, setTesting] = React.useState(false);
-  const tintColor = useThemeColor({}, 'tint');
 
   const handleTestAlarmSystem = async () => {
     setTesting(true);

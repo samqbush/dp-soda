@@ -2,10 +2,12 @@
 ## Development Guidelines
 - Edit files in place, do not create backups or copies of files unless necessary.
 - Never use mock data.  If data is not available, notify the user that we were unable to retrieve data and display a relevant error message.
+
 ## Build and Test Instructions
 - This app is not built locally, it is built using a GitHub Actions workflow. 
 - I always have the server running during development.  Do not run run `npm start`, `npm run dev`, or any other command that starts the server.  Instead tail the logs if you need to see what the problem is.  
 - Always monitor the background terminal output when running `npm run lint` to check for code style issues and compilation errors.
+- Always fix all linting errors and warnings before submitting code.
 - Install javascript libraries locally instead of globally with `-g`.
 
 ## Documentation - STRICT ANTI-SPRAWL POLICY

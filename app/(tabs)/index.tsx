@@ -7,7 +7,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { AlarmControlPanel } from '@/components/AlarmControlPanel';
 import { SafeImage } from '@/components/SafeImage';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
-import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useDPAlarm } from '@/hooks/useDPAlarm';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
@@ -29,7 +28,6 @@ export default function DPAlarmScreen() {
 
   // Get alarm settings
   const { criteria } = useDPAlarm();
-  const { alarmState } = useUnifiedAlarm();
 
   // Debug logging for threshold changes
   useEffect(() => {
