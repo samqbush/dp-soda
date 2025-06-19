@@ -6,6 +6,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useAppSettings } from '@/contexts/SettingsContext';
 import { PressureChart } from '@/components/PressureChart';
+import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
@@ -49,6 +50,90 @@ export default function WindGuruScreen() {
     // getPredictionAccuracy,
     // validatePastPredictions,
   } = useWeatherData();
+
+  // Import Soda Lake wind data for prediction validation
+  const { windData: sodaLakeWindData, refreshData: refreshSodaLakeData } = useSodaLakeWind();
+
+  // Helper function to determine if today's prediction should be frozen
+  const getTodayPredictionStatus = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 6) {
+      return {
+        status: 'prediction',
+        message: `Dawn patrol starts in ${6 - currentHour} hour${6 - currentHour !== 1 ? 's' : ''} - Prediction mode`,
+        canVerify: false
+      };
+    } else if (currentHour >= 6 && currentHour <= 8) {
+      return {
+        status: 'active',
+        message: '🔴 Active Dawn Patrol Window - Real-time verification mode',
+        canVerify: true
+      };
+    } else {
+      return {
+        status: 'frozen',
+        message: '🔒 Dawn patrol complete - Analysis frozen for accuracy tracking',
+        canVerify: true
+      };
+    }
+  };
+
+  // Helper function to get historical wind verification
+  const getHistoricalWindVerification = () => {
+    if (!sodaLakeWindData || sodaLakeWindData.length === 0) return null;
+    
+    const now = new Date();
+    const dawnStart = new Date(now);
+    dawnStart.setHours(6, 0, 0, 0);
+    const dawnEnd = new Date(now);
+    dawnEnd.setHours(8, 0, 0, 0);
+    
+    // Filter wind data for today's dawn patrol window (6-8am)
+    const todayDawnWindData = sodaLakeWindData.filter(point => {
+      const pointTime = new Date(point.time);
+      return pointTime >= dawnStart && pointTime <= dawnEnd;
+    });
+    
+    if (todayDawnWindData.length === 0) return null;
+    
+    // Calculate average wind speed during dawn patrol window
+    const avgWindSpeed = todayDawnWindData.reduce((sum, point) => sum + point.windSpeedMph, 0) / todayDawnWindData.length;
+    
+    // Determine if conditions were good (using 15+ mph as threshold)
+    const goodWindCount = todayDawnWindData.filter(point => point.windSpeedMph >= 15).length;
+    const goodWindPercentage = (goodWindCount / todayDawnWindData.length) * 100;
+    
+    return {
+      avgWindSpeed,
+      goodWindPercentage,
+      dataPoints: todayDawnWindData.length,
+      conditionsWereGood: goodWindPercentage >= 60 && avgWindSpeed >= 12,
+      maxWindSpeed: Math.max(...todayDawnWindData.map(p => p.windSpeedMph)),
+      minWindSpeed: Math.min(...todayDawnWindData.map(p => p.windSpeedMph))
+    };
+  };
+
+  // Helper function to determine tomorrow's prediction availability
+  const getTomorrowPredictionStatus = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 18) {
+      return {
+        status: 'pending',
+        message: 'Check back after 6 PM - cooling data and pressure trends need full day analysis',
+        showCheckBackMessage: true
+      };
+    } else {
+      return {
+        status: 'available',
+        message: 'Evening data available - overnight prediction ready',
+        showCheckBackMessage: false
+      };
+    }
+  };
 
   // Helper function to calculate overnight temperature changes (evening to dawn)
   // This matches the same thermal cycle timeframe as pressure analysis
@@ -205,6 +290,8 @@ export default function WindGuruScreen() {
     console.log('Wind Guru: Pull-to-refresh triggered');
     try {
       await refreshData();
+      // Also refresh Soda Lake data for verification
+      await refreshSodaLakeData();
       console.log('Wind Guru: Data refreshed successfully');
     } catch (error) {
       console.error('Wind Guru: Refresh failed:', error);
@@ -314,15 +401,14 @@ export default function WindGuruScreen() {
           
           {isHowItWorksExpanded && (
             <ThemedView style={styles.infoContent}>
-              <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>
-                Our advanced katabatic wind prediction uses <ThemedText style={styles.highlightText}>5-factor hybrid MKI analysis</ThemedText> combining NOAA and OpenWeather data to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
+              <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>                  Our advanced katabatic wind prediction uses <ThemedText style={styles.highlightText}>5-factor hybrid MKI analysis</ThemedText> combining NOAA and OpenWeather data to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
               </ThemedText>
               
               <ThemedView style={styles.factorsList}>
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>☔</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability 6pm-6am (25% weight)</ThemedText>
                     <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤25% rain chance - precipitation disrupts both katabatic flow and mountain wave patterns</ThemedText>
                   </ThemedView>
                 </ThemedView>
@@ -330,8 +416,8 @@ export default function WindGuruScreen() {
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>🌙</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 2-5am (25% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥45% clear - enables radiative cooling and organized wave development</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 6pm-6am (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥45% clear - enables radiative cooling and organized wave development throughout the night</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -514,30 +600,13 @@ export default function WindGuruScreen() {
                 🌅 Dawn Patrol Window: <ThemedText style={{ fontWeight: '500' }}>6:00 AM - 8:00 AM</ThemedText>
               </ThemedText>
               <ThemedText style={[styles.timeStatus, { color: textColor, opacity: 0.6, fontSize: 11 }]}>
-                {(() => {
-                  const now = new Date();
-                  const currentHour = now.getHours();
-                  
-                  if (currentHour >= 6 && currentHour <= 8) {
-                    return '🔴 Active Dawn Patrol Window - Real-time verification mode';
-                  } else if (currentHour < 6) {
-                    const hoursUntil = 6 - currentHour;
-                    return `⏰ Dawn patrol starts in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''} - Prediction mode`;
-                  } else {
-                    return '🔒 Dawn patrol complete - Analysis frozen for accuracy tracking';
-                  }
-                })()}
+                {getTodayPredictionStatus().message}
               </ThemedText>
-              {(() => {
-                if (katabaticAnalysis.analysisMode === 'post-dawn') {
-                  return (
-                    <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
-                      💡 Today&apos;s prediction is preserved for verification. Tomorrow&apos;s forecast available below.
-                    </ThemedText>
-                  );
-                }
-                return null;
-              })()}
+              {getTodayPredictionStatus().status === 'frozen' && (
+                <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
+                  💡 Today&apos;s prediction is preserved for verification. Tomorrow&apos;s forecast available below.
+                </ThemedText>
+              )}
             </ThemedView>
             
             {katabaticAnalysis.prediction ? (
@@ -618,6 +687,57 @@ export default function WindGuruScreen() {
                     )}
                   </ThemedView>
                 )}
+                
+                {/* Historical Wind Verification - Only show if we can verify */}
+                {getTodayPredictionStatus().canVerify && (() => {
+                  const windVerification = getHistoricalWindVerification();
+                  if (!windVerification) return null;
+                  
+                  const predictionAccuracy = katabaticAnalysis.prediction 
+                    ? (katabaticAnalysis.prediction.probability >= 50) === windVerification.conditionsWereGood
+                    : null;
+                  
+                  return (
+                    <ThemedView style={{
+                      backgroundColor: predictionAccuracy ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                      borderRadius: 8,
+                      padding: 12,
+                      marginTop: 8,
+                      borderLeftWidth: 3,
+                      borderLeftColor: predictionAccuracy ? '#4CAF50' : '#FF9800'
+                    }}>
+                      <ThemedText style={[styles.explanationText, { 
+                        color: predictionAccuracy ? '#4CAF50' : '#FF9800', 
+                        fontSize: 12,
+                        fontWeight: '600'
+                      }]}>
+                        🌊 Historical Wind Verification (6:00-8:00 AM Today)
+                      </ThemedText>
+                      <ThemedText style={[styles.explanationText, { 
+                        color: textColor, 
+                        opacity: 0.8,
+                        fontSize: 11,
+                        marginTop: 4
+                      }]}>
+                        Actual conditions: {windVerification.avgWindSpeed.toFixed(1)} mph average • {windVerification.goodWindPercentage.toFixed(0)}% good wind
+                        {'\n'}Peak: {windVerification.maxWindSpeed.toFixed(1)} mph • {windVerification.dataPoints} data points
+                        {'\n'}Result: {windVerification.conditionsWereGood ? '✅ Good conditions' : '❌ Poor conditions'}
+                      </ThemedText>
+                      {predictionAccuracy !== null && (
+                        <ThemedText style={[styles.explanationText, { 
+                          color: predictionAccuracy ? '#4CAF50' : '#FF9800', 
+                          fontSize: 10,
+                          marginTop: 4,
+                          fontStyle: 'italic'
+                        }]}>
+                          {predictionAccuracy 
+                            ? '🎯 Prediction was accurate!' 
+                            : '⚠️ Prediction needs improvement'}
+                        </ThemedText>
+                      )}
+                    </ThemedView>
+                  );
+                })()}
               </ThemedView>
             ) : katabaticAnalysis.isAnalyzing ? (
               <ThemedView style={styles.predictionDisplay}>
@@ -704,7 +824,7 @@ export default function WindGuruScreen() {
                 
                 <ThemedView style={styles.conditionRow}>
                   <ThemedText style={styles.conditionLabel}>
-                    {katabaticAnalysis.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (2-5am):
+                    {katabaticAnalysis.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (6pm-6am):
                   </ThemedText>
                   <ThemedText style={styles.conditionValue}>
                     {katabaticAnalysis.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
@@ -794,7 +914,7 @@ export default function WindGuruScreen() {
                 </ThemedView>
                 
                 <ThemedView style={styles.conditionRow}>
-                  <ThemedText style={styles.conditionLabel}>🌙 Clear Sky (2-5am):</ThemedText>
+                  <ThemedText style={styles.conditionLabel}>🌙 Clear Sky (6pm-6am):</ThemedText>
                   <ThemedText style={styles.conditionValue}>
                     {katabaticConditions 
                       ? `${(100 - katabaticConditions.cloudCover).toFixed(0)}% clear`
@@ -916,9 +1036,23 @@ export default function WindGuruScreen() {
               <ThemedText style={[styles.timeStatus, { color: textColor, opacity: 0.6, fontSize: 11 }]}>
                 📋 Plan your dawn patrol based on this forecast
               </ThemedText>
+
             </ThemedView>
             
-            {tomorrowPrediction ? (
+            {getTomorrowPredictionStatus().showCheckBackMessage ? (
+              <ThemedView style={styles.predictionDisplay}>
+                <ThemedView style={[styles.probabilityBar, { backgroundColor: '#FF9800', opacity: 0.3 }]}>
+                  <ThemedView style={[
+                    styles.probabilityFill, 
+                    { backgroundColor: '#FF9800', width: '25%', opacity: 0.7 }
+                  ]} />
+                </ThemedView>
+                <ThemedText style={styles.probabilityText}>Preliminary Forecast</ThemedText>
+                <ThemedText style={styles.confidenceText}>
+                  Enhanced prediction available after 6 PM today
+                </ThemedText>
+              </ThemedView>
+            ) : tomorrowPrediction ? (
               <ThemedView style={styles.predictionDisplay}>
                 <ThemedView style={[styles.probabilityBar, { backgroundColor: tintColor, opacity: 0.3 }]}>
                   <ThemedView style={[
@@ -946,14 +1080,20 @@ export default function WindGuruScreen() {
                 {/* Preliminary Prediction Notice */}
                 <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.1)', borderRadius: 8, padding: 12, marginTop: 12 }}>
                   <ThemedText style={{ color: '#2196F3', fontSize: 14, fontWeight: '600', marginBottom: 4 }}>
-                    📊 Preliminary Forecast
+                    📊 {getTomorrowPredictionStatus().showCheckBackMessage ? 'Preliminary Forecast' : 'Evening Forecast'}
                   </ThemedText>
                   <ThemedText style={{ color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }}>
-                    This prediction uses current weather models and will be refined with evening updates (after 6 PM). 
+                    {getTomorrowPredictionStatus().showCheckBackMessage 
+                      ? 'This prediction uses current weather models and will be refined with evening updates (after 6 PM).'
+                      : 'This prediction uses today\'s complete thermal cycle for enhanced accuracy.'
+                    }
                     Data quality: <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.dataQuality}</ThemedText>
                   </ThemedText>
                   <ThemedText style={{ color: '#2196F3', fontSize: 11, marginTop: 4, fontStyle: 'italic' }}>
-                    💡 More accurate prediction available after 6 PM with fresh weather models
+                    {getTomorrowPredictionStatus().showCheckBackMessage
+                      ? '💡 More accurate prediction available after 6 PM with fresh weather models'
+                      : '✅ Enhanced with today\'s complete weather patterns'
+                    }
                   </ThemedText>
                 </ThemedView>
               </ThemedView>
@@ -977,112 +1117,131 @@ export default function WindGuruScreen() {
           </ThemedView>
         </ThemedView>
 
-        {/* Tomorrow's Conditions Analysis */}
-        <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
-          
-          {tomorrowPrediction ? (
-            <>
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.precipitation.value.toFixed(1)}% 
-                  {` (${tomorrowPrediction.prediction.factors.precipitation.threshold}% max)`}
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (2-5am):
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.pressureChange.change > 0 ? '+' : ''}
-                  {tomorrowPrediction.prediction.factors.pressureChange.change.toFixed(1)} hPa 
-                  ({tomorrowPrediction.prediction.factors.pressureChange.trend})
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
-                </ThemedText>
-              </ThemedView>
-              {/* Show thermal cycle status for tomorrow's prediction */}
-              {/* Tomorrow's forecast data is naturally available - no guidance needed */}
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.wavePattern.waveEnhancement} 
-                  {tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData && 
-                    ` (${tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData}m)`}
-                </ThemedText>
-              </ThemedView>
+        {/* Tomorrow's Conditions Analysis - Only show after 6 PM */}
+        {getTomorrowPredictionStatus().status === 'available' ? (
+          <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
+            
+            {tomorrowPrediction ? (
+              <>
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.precipitation.value.toFixed(1)}% 
+                    {` (${tomorrowPrediction.prediction.factors.precipitation.threshold}% max)`}
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (6pm-6am):
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.pressureChange.change > 0 ? '+' : ''}
+                    {tomorrowPrediction.prediction.factors.pressureChange.change.toFixed(1)} hPa 
+                    ({tomorrowPrediction.prediction.factors.pressureChange.trend})
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
+                  </ThemedText>
+                </ThemedView>
+                {/* Show thermal cycle status for tomorrow's prediction */}
+                {/* Tomorrow's forecast data is naturally available - no guidance needed */}
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.wavePattern.waveEnhancement} 
+                    {tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData && 
+                      ` (${tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData}m)`}
+                  </ThemedText>
+                </ThemedView>
 
-              {/* Data Quality Note */}
-              <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                <ThemedText style={{ color: '#2196F3', fontSize: 12, fontWeight: '500', marginBottom: 4 }}>
-                  📊 Forecast Data Quality: {tomorrowPrediction.dataQuality}
+                {/* Data Quality Note */}
+                <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={{ color: '#2196F3', fontSize: 12, fontWeight: '500', marginBottom: 4 }}>
+                    📊 Forecast Data Quality: {tomorrowPrediction.dataQuality}
+                  </ThemedText>
+                  <ThemedText style={{ color: textColor, opacity: 0.7, fontSize: 11, lineHeight: 14 }}>
+                    Based on {tomorrowPrediction.dataQuality === 'good' ? '20+ hours' : 'limited hours'} of forecast data. 
+                    Enhanced accuracy with complete thermal cycle analysis.
+                  </ThemedText>
+                </ThemedView>
+              </>
+            ) : (
+              <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 16 }}>
+                <ThemedText style={{ color: '#2196F3', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                  🔄 Loading Tomorrow&apos;s Analysis
                 </ThemedText>
-                <ThemedText style={{ color: textColor, opacity: 0.7, fontSize: 11, lineHeight: 14 }}>
-                  Based on {tomorrowPrediction.dataQuality === 'good' ? '20+ hours' : 'limited hours'} of forecast data. 
-                  Check back after 6 PM for enhanced accuracy with updated weather models.
+                <ThemedText style={{ color: textColor, opacity: 0.7, lineHeight: 20 }}>
+                  Processing forecast data for tomorrow&apos;s 5-factor breakdown:{'\n'}
+                  • Rain probability analysis{'\n'}
+                  • Clear sky period assessment{'\n'}
+                  • Pressure change trends{'\n'}
+                  • Temperature differential calculation{'\n'}
+                  {'\n'}
+                </ThemedText>
+                <ThemedText style={{ color: textColor, opacity: 0.7, fontStyle: 'italic' }}>
+                  Forecast data loading...
                 </ThemedText>
               </ThemedView>
-            </>
-          ) : (
-            <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 16 }}>
-              <ThemedText style={{ color: '#2196F3', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
-                🔄 Loading Tomorrow&apos;s Analysis
+            )}
+          </ThemedView>
+        ) : (
+          <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
+            <ThemedView style={{ backgroundColor: 'rgba(255, 152, 0, 0.05)', borderRadius: 8, padding: 16 }}>
+              <ThemedText style={{ color: '#FF9800', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                ⏰ Check Back After 6 PM
               </ThemedText>
               <ThemedText style={{ color: textColor, opacity: 0.7, lineHeight: 20 }}>
-                Processing forecast data for tomorrow&apos;s 5-factor breakdown:{'\n'}
-                • Rain probability analysis{'\n'}
-                • Clear sky period assessment{'\n'}
-                • Pressure change trends{'\n'}
-                • Temperature differential calculation{'\n'}
-                {'\n'}
+                Tomorrow&apos;s detailed condition analysis will be available after 6 PM when today&apos;s complete thermal cycle data is processed.
               </ThemedText>
-              <ThemedText style={{ color: textColor, opacity: 0.7, fontStyle: 'italic' }}>
-                Forecast data loading...
+              <ThemedText style={{ color: textColor, opacity: 0.6, fontSize: 12, fontStyle: 'italic', marginTop: 8 }}>
+                The system needs full day cooling and pressure trends for accurate overnight predictions.
               </ThemedText>
             </ThemedView>
-          )}
-        </ThemedView>
+          </ThemedView>
+        )}
 
         {/* Optimal Timing Guidance */}
         <ThemedView style={[styles.infoCard, { backgroundColor: cardColor, borderLeftWidth: 4, borderLeftColor: '#FF9800' }]}>
           <ThemedText style={[styles.timingTitle, { color: '#FF9800', fontWeight: '600', fontSize: 16, marginBottom: 8 }]}>
-            ⏰ Best Prediction Timing
+            ⏰ Time-Based Prediction System
           </ThemedText>
           <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20, marginBottom: 8 }]}>
-            For most accurate overnight katabatic predictions:
+            Wind Guru adapts its behavior based on when you check it:
           </ThemedText>
           <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20 }]}>
-            🌅 <ThemedText style={{ fontWeight: '500' }}>Check after 6 PM</ThemedText> - Evening temperatures establish the starting point for overnight cooling analysis{'\n'}
-            🌙 <ThemedText style={{ fontWeight: '500' }}>Analyzes evening → dawn</ThemedText> - Complete 12-hour thermal cycle (6 PM to 6 AM){'\n'}
-            📊 <ThemedText style={{ fontWeight: '500' }}>Real-world workflow</ThemedText> - Matches how meteorologists analyze katabatic conditions
+            🌅 <ThemedText style={{ fontWeight: '500' }}>Before 6 AM</ThemedText> - Prediction mode only (dawn patrol window hasn&apos;t started){'\n'}
+            ⚡ <ThemedText style={{ fontWeight: '500' }}>6 AM - 8 AM</ThemedText> - Active verification with real-time wind data if available{'\n'}
+            🔒 <ThemedText style={{ fontWeight: '500' }}>After 8 AM</ThemedText> - Today&apos;s prediction frozen, verified against historical wind data{'\n'}
+            📊 <ThemedText style={{ fontWeight: '500' }}>Before 6 PM</ThemedText> - Tomorrow&apos;s forecast preliminary (check back after 6 PM for accuracy){'\n'}
+            🌙 <ThemedText style={{ fontWeight: '500' }}>After 6 PM</ThemedText> - Tomorrow&apos;s forecast enhanced with today&apos;s complete thermal cycle
           </ThemedText>
-          {new Date().getHours() < 18 && (
+          {new Date().getHours() < 18 && new Date().getHours() >= 8 && (
             <ThemedView style={[styles.waitingNote, { backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 6, padding: 8, marginTop: 8 }]}>
               <ThemedText style={[styles.waitingText, { color: '#FF9800', fontSize: 12, fontStyle: 'italic' }]}>
-                ⏳ Currently before 6 PM - overnight analysis will be available later today
+                ⏳ Currently after dawn patrol but before 6 PM - tomorrow&apos;s enhanced analysis available tonight
               </ThemedText>
             </ThemedView>
           )}

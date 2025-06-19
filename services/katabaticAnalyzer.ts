@@ -99,7 +99,7 @@ export class KatabaticAnalyzer {
     minPressureChange: 1.0,
     minTemperatureDifferential: 3.2,
     minWavePatternScore: 50,
-    clearSkyWindow: { start: '02:00', end: '05:00' },
+    clearSkyWindow: { start: '18:00', end: '06:00' }, // Updated: 6pm to 6am as requested
     predictionWindow: { start: '06:00', end: '08:00' },
     minimumConfidence: 50,
   };

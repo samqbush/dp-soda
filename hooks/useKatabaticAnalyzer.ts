@@ -28,14 +28,14 @@ interface UseKatabaticAnalyzerState {
 
 /**
  * Default settings for katabatic analysis
- * Further updated based on continued real-world feedback - Phase 2B improvements
+ * Updated to use 6pm-6am analysis window as requested by user
  */
 const defaultSettings: KatabaticSettings = {
   maxPrecipitationProbability: 25,  // Increased from 20% - light precip chance doesn't always kill katabatic
   minCloudCoverClearPeriod: 45,     // Reduced from 60% - mountain weather often has some clouds
   minPressureChange: 1.0,           // Reduced from 1.5 - smaller changes can still indicate good conditions
   minTemperatureDifferential: 3.2,  // Adjusted for Evergreen (lower elevation difference than Nederland)
-  clearSkyWindow: { start: '02:00', end: '05:00' },
+  clearSkyWindow: { start: '18:00', end: '06:00' }, // Updated: 6pm to 6am as requested
   predictionWindow: { start: '06:00', end: '08:00' },
   minimumConfidence: 50,            // Reduced from 60 - be less conservative overall
   autoRefresh: true,

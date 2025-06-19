@@ -10,6 +10,7 @@ Technical guide to understanding the katabatic wind prediction system used in Da
 4. [Confidence Calculation](#confidence-calculation)
 5. [Verification & Accuracy](#verification--accuracy)
 6. [Advanced Understanding](#advanced-understanding)
+7. [Time-Based Operation System](#time-based-operation-system)
 
 ## Katabatic Wind Theory
 
@@ -492,3 +493,74 @@ Maximum consecutive: 3 good points
 The consecutive good points metric helps identify **sustained favorable conditions** rather than just brief wind gusts, providing more reliable predictions for wind sports activities.
 
 **Configuration:** The minimum wind speed threshold used for "consecutive good points" can be adjusted in the Settings tab under "Minimum Average Speed". This same setting is used for both the dawn patrol alarm system and the wind analysis on the lake tabs.
+
+## Time-Based Operation System
+
+The Wind Guru feature operates differently based on the time of day to provide the most accurate and relevant information for dawn patrol planning.
+
+### Daily Timeline and Behavior
+
+#### 🌙 Before 6 AM - Prediction Mode Only
+- **Today's prediction**: Full 5-factor analysis available
+- **Tomorrow's conditions**: Not shown (check back after 6 PM)
+- **Status**: Dawn patrol window hasn't started yet
+- **Purpose**: Late-night/early morning prediction checking
+
+#### ⚡ 6 AM - 8 AM - Active Dawn Patrol Window
+- **Today's prediction**: Still active, can be verified with real-time data
+- **Real-time verification**: Uses Soda Lake wind data if available
+- **Tomorrow's conditions**: Not shown (check back after 6 PM)
+- **Status**: Active monitoring period
+- **Purpose**: Real-time confirmation during dawn patrol
+
+#### 🔒 After 8 AM - Verification Mode
+- **Today's prediction**: **FROZEN** - no longer changes
+- **Historical verification**: Uses actual Soda Lake wind data from 6-8 AM window
+- **Verification display**: Shows if prediction was accurate
+  - Average wind speed during dawn patrol
+  - Percentage of time with good conditions (15+ mph)
+  - Whether conditions met the 60% threshold for "good"
+- **Tomorrow's conditions**: Not shown until after 6 PM
+- **Status**: Today's window has passed, learning from results
+
+#### 🌅 Before 6 PM - Tomorrow Preparation Period
+- **Today's status**: Frozen with historical verification
+- **Tomorrow's conditions**: **Hidden with "Check back after 6 PM" message**
+- **Reason**: Full thermal cycle data needed for accurate overnight analysis
+- **Message**: "Cooling data and pressure trends need full day analysis"
+
+#### 🌙 After 6 PM - Complete Analysis Available
+- **Today's status**: Frozen with historical verification
+- **Tomorrow's conditions**: **Full 5-factor analysis shown**
+- **Enhanced accuracy**: Uses complete thermal cycle from today
+- **Analysis windows**: Rain/clear sky analysis uses 6 PM-6 AM timeframe
+- **Purpose**: Most accurate tomorrow prediction with full day's data
+
+### Time-Based Analysis Windows
+
+#### Rain and Clear Sky Analysis (6 PM - 6 AM)
+- **Rationale**: Overnight period when katabatic conditions develop
+- **Rain analysis**: Precipitation during this window disrupts katabatic flow
+- **Clear sky analysis**: Percentage of clear sky needed for radiational cooling
+- **Enhanced at night**: Most accurate after 6 PM with updated weather models
+
+#### Pressure and Temperature Analysis (Full 24-hour)
+- **Pressure trends**: Analyzed over complete forecast period
+- **Temperature differential**: Evening-to-dawn temperature changes
+- **Thermal cycle**: Complete daily heating/cooling cycle considered
+
+### User Experience Benefits
+
+1. **Prevents premature checking**: Tomorrow's analysis hidden until most accurate
+2. **Historical learning**: Shows how well today's prediction performed
+3. **Time-appropriate guidance**: Different information based on when you check
+4. **Data quality transparency**: Explains why certain information isn't available yet
+
+### Technical Implementation
+
+- **Time detection**: Uses device local time to determine current phase
+- **Conditional rendering**: UI sections shown/hidden based on time rules
+- **Data source switching**: Live monitoring vs. historical verification
+- **Progressive enhancement**: Analysis becomes more accurate as more data becomes available
+
+This time-based system ensures users get the most relevant and accurate information for their dawn patrol planning while the system continues to learn and improve from each day's results.
