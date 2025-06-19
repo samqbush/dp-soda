@@ -51,9 +51,7 @@ export default function StandleyLakeScreen() {
 
   // Helper functions for current conditions
   const getCurrentWindSpeed = () => {
-    return currentConditions?.windSpeed ? 
-      currentConditions.windSpeed * 2.237 : // Convert m/s to mph, return number
-      null;
+    return currentConditions?.windSpeedMph || null;
   };
 
   const getCurrentWindDirection = () => {

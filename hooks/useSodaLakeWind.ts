@@ -108,7 +108,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
       setError('Failed to load cached data');
       return false;
     }
-  }, []);
+  }, [userMinimumSpeed]);
 
   /**
    * Refresh current conditions using real-time API
@@ -208,7 +208,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadCachedData, refreshCurrentConditions]);
+  }, [loadCachedData, refreshCurrentConditions, userMinimumSpeed]);
 
   /**
    * Clear cached data

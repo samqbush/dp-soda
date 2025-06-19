@@ -5,7 +5,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useAppSettings } from '@/contexts/SettingsContext';
-import { PressureChart } from '@/components/PressureChart';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 
 export default function WindGuruScreen() {
@@ -44,7 +43,6 @@ export default function WindGuruScreen() {
     getBasicKatabaticConditions,
     katabaticAnalysis,
     getTomorrowPrediction,
-    getDataSourceInfo,
     // Phase 3: Prediction tracking (June 14, 2025) - REMOVED
     // logCurrentPrediction,
     // getPredictionAccuracy,

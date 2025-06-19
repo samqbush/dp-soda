@@ -50,7 +50,6 @@ export interface KatabaticFactors {
     dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
     analysisType: 'thermal_cycle' | 'unavailable'; // Type of analysis performed
     thermalCycleFailureReason?: string; // Specific reason why overnight analysis isn't available
-    usedTomorrowFallback?: boolean; // Legacy field, now always false
   };
   wavePattern: {
     meets: boolean;
@@ -285,10 +284,9 @@ export class KatabaticAnalyzer {
       return Math.min(...preDawnData.map(p => p.temperature));
     };
     
-    // Get thermal cycle temperatures - use smart date selection with fallback logic
+    // Get thermal cycle temperatures - use smart date selection
     let morrisonMaxTemp: number | null = null;
     let evergreenMinTemp: number | null = null;
-    let usedTomorrowFallback = false;
     
     // Determine which day to look for overnight analysis data
     // Real-world workflow: Only provide reliable analysis after 6 PM
@@ -296,7 +294,6 @@ export class KatabaticAnalyzer {
       // Before 6 PM: Don't use fallback data, indicate when proper analysis will be available
       morrisonMaxTemp = null;
       evergreenMinTemp = null;
-      usedTomorrowFallback = false;
     } else {
       // After 6 PM: Look for today's evening data (6 PM) and tomorrow's dawn data (6 AM)
       // This aligns with real-world prediction workflow
@@ -310,9 +307,6 @@ export class KatabaticAnalyzer {
       // Look for tomorrow's dawn minimum (3-7 AM - end of cooling cycle)
       evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
     }
-    
-    // Always look for tomorrow's pre-dawn minimum (3-7 AM following the heating cycle)
-    evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
     
     // 🔍 DEBUG: Log what forecast data we actually have
     if (__DEV__) {
@@ -330,9 +324,6 @@ export class KatabaticAnalyzer {
       })() : now;
       
       console.log(`  Primary search for afternoon heating data on: ${afternoonSearchDate.toDateString()} (${currentHour >= 17 ? 'tomorrow' : 'today'})`);
-      if (usedTomorrowFallback) {
-        console.log(`  📅 FALLBACK USED: Today's afternoon data missing, using tomorrow's data instead`);
-      }
       
       // Log available timestamps
       const morrisonTimes = weatherData.morrison.hourlyForecast.slice(0, 5).map(p => 
@@ -349,20 +340,6 @@ export class KatabaticAnalyzer {
         return pointDateStr === afternoonSearchDateStr && pointHour >= 12 && pointHour <= 17;
       });
       console.log(`  Target afternoon data points found: ${targetAfternoonData.length}`);
-      
-      // If using fallback, also show tomorrow's data
-      if (usedTomorrowFallback) {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowDateStr = tomorrow.toDateString();
-        const tomorrowAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
-          const pointDate = new Date(point.timestamp);
-          const pointHour = pointDate.getHours();
-          const pointDateStr = pointDate.toDateString();
-          return pointDateStr === tomorrowDateStr && pointHour >= 12 && pointHour <= 17;
-        });
-        console.log(`  Tomorrow's afternoon data points found: ${tomorrowAfternoonData.length}`);
-      }
       
       if (targetAfternoonData.length > 0) {
         console.log(`  Target afternoon temps: ${targetAfternoonData.map(p => `${p.temperature.toFixed(1)}°C at ${new Date(p.timestamp).getHours()}h`).join(', ')}`);
@@ -431,7 +408,6 @@ export class KatabaticAnalyzer {
       dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
       thermalCycleFailureReason: thermalCycleFailureReason || undefined,
-      usedTomorrowFallback: false, // No longer using fallback logic
       thermalWindow: analysisType === 'thermal_cycle' ? {
         morrisonMax: '18:00 (Evening - start of cooling cycle)',
         evergreenMin: '06:00 (Dawn - end of cooling cycle)'

@@ -108,7 +108,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       setError('Failed to load cached data');
       return false;
     }
-  }, []);
+  }, [userMinimumSpeed]);
 
   /**
    * Refresh current conditions (real-time data)
@@ -201,7 +201,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadCachedData]);
+  }, [loadCachedData, userMinimumSpeed]);
 
   /**
    * Clear cached data
