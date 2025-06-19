@@ -730,19 +730,16 @@ export default function WindGuruScreen() {
                     {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
                   </ThemedText>
                 </ThemedView>
-                {/* Show thermal cycle status in conditions analysis */}
-                {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason && (
+                {/* Guide users to check back at 6 PM for optimal overnight analysis */}
+                {(!overnightTemperature || new Date().getHours() < 18) && (
                   <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
                     <ThemedText style={[styles.conditionLabel, { 
                       fontSize: 10, 
                       opacity: 0.7, 
                       fontStyle: 'italic',
-                      color: katabaticAnalysis.prediction.factors.temperatureDifferential.usedTomorrowFallback ? '#FF9800' : '#F44336'
+                      color: '#FF9800'
                     }]}>
-                      {katabaticAnalysis.prediction.factors.temperatureDifferential.usedTomorrowFallback ? 
-                        '📅 Using tomorrow\'s data:' : 
-                        '⚠️ Using current temps:'
-                      } {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
+                      ⏰ Check back at 6 PM for most accurate overnight prediction analysis
                     </ThemedText>
                   </ThemedView>
                 )}
@@ -1025,21 +1022,7 @@ export default function WindGuruScreen() {
                 </ThemedText>
               </ThemedView>
               {/* Show thermal cycle status for tomorrow's prediction */}
-              {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason && (
-                <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
-                  <ThemedText style={[styles.conditionLabel, { 
-                    fontSize: 10, 
-                    opacity: 0.7, 
-                    fontStyle: 'italic',
-                    color: tomorrowPrediction.prediction.factors.temperatureDifferential.usedTomorrowFallback ? '#FF9800' : '#F44336'
-                  }]}>
-                    {tomorrowPrediction.prediction.factors.temperatureDifferential.usedTomorrowFallback ? 
-                      '📅 Using next day\'s data:' : 
-                      '⚠️ Using forecast temps:'
-                    } {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
-                  </ThemedText>
-                </ThemedView>
-              )}
+              {/* Tomorrow's forecast data is naturally available - no guidance needed */}
               
               <ThemedView style={styles.conditionRow}>
                 <ThemedText style={styles.conditionLabel}>
@@ -1083,280 +1066,23 @@ export default function WindGuruScreen() {
           )}
         </ThemedView>
 
-        {/* Data Source Status Indicator */}
-        <ThemedView style={[styles.dataSourceStatus, { 
-          backgroundColor: (() => {
-            const sourceInfo = getDataSourceInfo();
-            if (!sourceInfo) return 'rgba(128, 128, 128, 0.1)'; // Gray for unknown
-            switch (sourceInfo.source) {
-              case 'api': return 'rgba(76, 175, 80, 0.1)'; // Green for API
-              case 'cache': return 'rgba(255, 152, 0, 0.1)'; // Orange for cache
-              case 'mock': return 'rgba(244, 67, 54, 0.1)'; // Red for mock
-              default: return 'rgba(128, 128, 128, 0.1)';
-            }
-          })(),
-          borderRadius: 8, 
-          padding: 12,
-          marginBottom: 16,
-          borderWidth: 1,
-          borderColor: (() => {
-            const sourceInfo = getDataSourceInfo();
-            if (!sourceInfo) return 'rgba(128, 128, 128, 0.3)';
-            switch (sourceInfo.source) {
-              case 'api': return 'rgba(76, 175, 80, 0.3)';
-              case 'cache': return 'rgba(255, 152, 0, 0.3)';
-              case 'mock': return 'rgba(244, 67, 54, 0.3)';
-              default: return 'rgba(128, 128, 128, 0.3)';
-            }
-          })()
-        }]}>
-          <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>
-            {(() => {
-              const sourceInfo = getDataSourceInfo();
-              if (!sourceInfo) return '❓ Data Status: Unknown';
-              switch (sourceInfo.source) {
-                case 'api': return '🌐 Data Status: Live API Data';
-                case 'cache': return '💾 Data Status: Cached Data';
-                case 'mock': return '⚠️ Data Status: DEMO DATA (NOT REAL)';
-                default: return '❓ Data Status: Unknown';
-              }
-            })()}
+        {/* Optimal Timing Guidance */}
+        <ThemedView style={[styles.infoCard, { backgroundColor: cardColor, borderLeftWidth: 4, borderLeftColor: '#FF9800' }]}>
+          <ThemedText style={[styles.timingTitle, { color: '#FF9800', fontWeight: '600', fontSize: 16, marginBottom: 8 }]}>
+            ⏰ Best Prediction Timing
           </ThemedText>
-          <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
-            {(() => {
-              const sourceInfo = getDataSourceInfo();
-              if (!sourceInfo) return 'Unable to determine data source status.';
-              
-              switch (sourceInfo.source) {
-                case 'api':
-                  return '✅ Receiving real-time weather data from OpenWeatherMap API. Predictions are based on current meteorological conditions.';
-                case 'cache':
-                  return `📱 Using recent weather data from cache (fetched ${sourceInfo.lastFetch ? new Date(sourceInfo.lastFetch).toLocaleTimeString() : 'recently'}). Predictions may be slightly outdated but still reliable.`;
-                case 'mock':
-                  return '🚨 WARNING: This is DEMO DATA for testing purposes only. These are NOT real weather conditions! Configure your OpenWeatherMap API key in settings to see real data.';
-                default:
-                  return 'Data source status unclear. Check your internet connection and API configuration.';
-              }
-            })()}
+          <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20, marginBottom: 8 }]}>
+            For most accurate overnight katabatic predictions:
           </ThemedText>
-          {(() => {
-            const sourceInfo = getDataSourceInfo();
-            if (sourceInfo?.source === 'mock') {
-              return (
-                <ThemedText style={[styles.mockDataWarning, { 
-                  color: '#F44336', 
-                  fontWeight: 'bold',
-                  marginTop: 8,
-                  fontSize: 14
-                }]}>
-                  🔧 To fix: Add your OpenWeatherMap API key to .env file{'\n'}
-                  📖 See: docs/OPENWEATHERMAP_SETUP.md for setup instructions
-                </ThemedText>
-              );
-            }
-            return null;
-          })()}
-        </ThemedView>
-        
-        {/* Pressure Trend Chart */}
-        <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <PressureChart 
-            pressureTrend={pressureTrend} 
-            title="📈 Pressure Trend (24h)"
-            location="Morrison, CO"
-          />
-        </ThemedView>
-
-        <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>🌡️ Thermal Cycle Temperature Analysis</ThemedText>
-          {tempDiff ? (
-            <ThemedView style={styles.temperatureComparison}>
-              {/* Show thermal cycle data if available, otherwise current temps */}
-              {(tempDiff as any)?.type === 'thermal_cycle' ? (
-                <>
-                  <ThemedView style={styles.tempLocationRow}>
-                    <ThemedText style={styles.tempLocationLabel}>Morrison Max (Day):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrisonTemp)}</ThemedText>
-                  </ThemedView>
-                  <ThemedView style={styles.tempLocationRow}>
-                    <ThemedText style={styles.tempLocationLabel}>Evergreen Min (Night):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountainTemp)}</ThemedText>
-                  </ThemedView>
-                  <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
-                    <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Thermal Differential:</ThemedText>
-                    <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
-                      {formatTempDiffF(tempDiff.differential)}
-                    </ThemedText>
-                  </ThemedView>
-                  
-                  {/* Data quality indicator */}
-                  <ThemedView style={[styles.dataQualityIndicator, { 
-                    backgroundColor: (() => {
-                      const confidence = (tempDiff as any)?.confidence;
-                      switch(confidence) {
-                        case 'high': return 'rgba(76, 175, 80, 0.1)';
-                        case 'medium': return 'rgba(255, 152, 0, 0.1)';
-                        case 'low': return 'rgba(244, 67, 54, 0.1)';
-                        default: return 'rgba(128, 128, 128, 0.1)';
-                      }
-                    })(),
-                    borderRadius: 6,
-                    padding: 8,
-                    marginTop: 8,
-                    borderLeftWidth: 3,
-                    borderLeftColor: (() => {
-                      const confidence = (tempDiff as any)?.confidence;
-                      switch(confidence) {
-                        case 'high': return '#4CAF50';
-                        case 'medium': return '#FF9800';
-                        case 'low': return '#F44336';
-                        default: return '#999';
-                      }
-                    })()
-                  }]}>
-                    <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
-                      Data Quality: <ThemedText style={{ fontWeight: '500', textTransform: 'capitalize' }}>{(tempDiff as any)?.confidence}</ThemedText> • Strategy: {(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')}
-                    </ThemedText>
-                  </ThemedView>
-                </>
-              ) : (
-                <>
-                  {/* Fallback to current temperature display */}
-                  <ThemedView style={styles.tempLocationRow}>
-                    <ThemedText style={styles.tempLocationLabel}>Morrison (Current):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrisonTemp)}</ThemedText>
-                  </ThemedView>
-                  <ThemedView style={styles.tempLocationRow}>
-                    <ThemedText style={styles.tempLocationLabel}>Evergreen (Current):</ThemedText>
-                    <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountainTemp)}</ThemedText>
-                  </ThemedView>
-                  <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
-                    <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Current Differential:</ThemedText>
-                    <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
-                      {formatTempDiffF(tempDiff.differential)}
-                    </ThemedText>
-                  </ThemedView>
-                  
-                  <ThemedView style={[styles.dataQualityIndicator, { 
-                    backgroundColor: (tempDiff as any)?.usedTomorrowFallback ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)',
-                    borderRadius: 6,
-                    padding: 8,
-                    marginTop: 8,
-                    borderLeftWidth: 3,
-                    borderLeftColor: (tempDiff as any)?.usedTomorrowFallback ? '#FF9800' : '#F44336'
-                  }]}>
-                    <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
-                      {(tempDiff as any)?.usedTomorrowFallback ? 
-                        '📅 Using tomorrow\'s thermal data (preferred method)' : 
-                        '⚠️ Using current temps (thermal cycle data unavailable)'
-                      }
-                    </ThemedText>
-                    {/* Show specific reason for thermal cycle failure */}
-                    {(tempDiff as any)?.thermalCycleFailureReason && (
-                      <ThemedText style={[styles.dataQualityText, { 
-                        color: textColor, 
-                        fontSize: 10, 
-                        opacity: 0.7, 
-                        marginTop: 6,
-                        fontStyle: 'italic',
-                        lineHeight: 14
-                      }]}>
-                        {(tempDiff as any)?.usedTomorrowFallback ? 'Info:' : 'Reason:'} {(tempDiff as any).thermalCycleFailureReason}
-                      </ThemedText>
-                    )}
-                    
-                    {/* Show enhanced historical analysis status */}
-                    {katabaticAnalysis.prediction?.enhancedAnalysis && (
-                      <ThemedView style={{ marginTop: 6 }}>
-                        {katabaticAnalysis.prediction.enhancedAnalysis.hasHistoricalData ? (
-                          <ThemedText style={[styles.dataQualityText, { 
-                            color: '#4CAF50', 
-                            fontSize: 10, 
-                            opacity: 0.9, 
-                            fontStyle: 'italic',
-                            lineHeight: 14
-                          }]}>
-                            🆓 FREE Enhancement: Using actual observed thermal data from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource}
-                          </ThemedText>
-                        ) : katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason && (
-                          <ThemedText style={[styles.dataQualityText, { 
-                            color: textColor, 
-                            fontSize: 10, 
-                            opacity: 0.6, 
-                            fontStyle: 'italic',
-                            lineHeight: 14
-                          }]}>
-                            📊 Historical Enhancement: {katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason}
-                          </ThemedText>
-                        )}
-                      </ThemedView>
-                    )}
-                  </ThemedView>
-                </>
-              )}
-              
-              <ThemedText style={[styles.tempExplanation, { color: textColor, opacity: 0.7 }]}>
-                {(() => {
-                  const fahrenheitDiff = tempDiff.differential * 9/5; // Convert to Fahrenheit for comparison
-                  // Adjust thresholds for thermal cycle (higher differentials expected)
-                  const thresholds = (tempDiff as any)?.type === 'thermal_cycle' ? 
-                    { good: 20, moderate: 12 } : 
-                    { good: 9, moderate: 3.6 };
-                  
-                  if (fahrenheitDiff > thresholds.good) return 'Excellent thermal differential for katabatic winds';
-                  if (fahrenheitDiff > thresholds.moderate) return 'Moderate thermal differential';
-                  return 'Low thermal differential';
-                })()}
-              </ThemedText>
-              
-              {/* Temperature Differential Calculation Explanation */}
-              <ThemedView style={[styles.calculationNote, { 
-                backgroundColor: 'rgba(33, 150, 243, 0.05)', 
-                borderRadius: 8, 
-                padding: 12, 
-                marginTop: 12,
-                borderLeftWidth: 3,
-                borderLeftColor: '#2196F3'
-              }]}>
-                <ThemedText style={[styles.calculationNoteTitle, { color: '#2196F3', fontWeight: '600', fontSize: 13, marginBottom: 6 }]}>
-                  📊 {(tempDiff as any)?.type === 'thermal_cycle' ? 
-                      ((tempDiff as any)?.usedTomorrowFallback ? 'Thermal Cycle Analysis (Tomorrow\'s Data)' : 'Thermal Cycle Analysis (Enhanced)') : 
-                      'Current Temperature Analysis (Fallback)'
-                    }
-                </ThemedText>
-                <ThemedText style={[styles.calculationNoteText, { color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }]}>
-                  {(tempDiff as any)?.type === 'thermal_cycle' ? (
-                    <>
-                      <ThemedText style={{ fontWeight: '500' }}>Method:</ThemedText> Uses thermal cycle peaks for maximum accuracy{'\n'}
-                      <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison max (12-5 PM) - Evergreen min (3-7 AM) = Thermal differential{'\n'}
-                      {(tempDiff as any)?.usedTomorrowFallback && (
-                        <ThemedText style={{ fontWeight: '500', color: '#FF9800' }}>Fallback:</ThemedText>
-                      )} {(tempDiff as any)?.usedTomorrowFallback ? 'Using tomorrow\'s afternoon data (today\'s unavailable){\'\\n\'}' : ''}
-                      <ThemedText style={{ fontWeight: '500' }}>Data Quality:</ThemedText> {(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')} approach ({(tempDiff as any)?.confidence} confidence)
-                    </>
-                  ) : (
-                    <>
-                      <ThemedText style={{ fontWeight: '500' }}>Method:</ThemedText> Current temperature comparison (fallback mode){'\n'}
-                      <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison current - Evergreen current = Temperature differential{'\n'}
-                      <ThemedText style={{ fontWeight: '500' }}>Limitation:</ThemedText> Does not capture full thermal cycle - less accurate for katabatic prediction
-                    </>
-                  )}
-                </ThemedText>
-                <ThemedText style={[styles.tempCalcExample, { color: textColor, opacity: 0.7, fontSize: 11, marginTop: 6, fontStyle: 'italic' }]}>
-                  {(tempDiff as any)?.type === 'thermal_cycle' ? 
-                    ((tempDiff as any)?.usedTomorrowFallback ? 
-                      'Example: Morrison 95°F (tomorrow afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential' :
-                      'Example: Morrison 95°F (afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential'
-                    ) :
-                    'Example: Morrison 90°F - Evergreen 83°F = 7°F current differential (may not reflect katabatic potential)'
-                  }
-                </ThemedText>
-              </ThemedView>
-            </ThemedView>
-          ) : (
-            <ThemedView style={styles.chartPlaceholder}>
-              <ThemedText style={[styles.placeholderText, { color: textColor, opacity: 0.5 }]}>
-                Loading temperature data...
+          <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20 }]}>
+            🌅 <ThemedText style={{ fontWeight: '500' }}>Check after 6 PM</ThemedText> - Evening temperatures establish the starting point for overnight cooling analysis{'\n'}
+            🌙 <ThemedText style={{ fontWeight: '500' }}>Analyzes evening → dawn</ThemedText> - Complete 12-hour thermal cycle (6 PM to 6 AM){'\n'}
+            📊 <ThemedText style={{ fontWeight: '500' }}>Real-world workflow</ThemedText> - Matches how meteorologists analyze katabatic conditions
+          </ThemedText>
+          {new Date().getHours() < 18 && (
+            <ThemedView style={[styles.waitingNote, { backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 6, padding: 8, marginTop: 8 }]}>
+              <ThemedText style={[styles.waitingText, { color: '#FF9800', fontSize: 12, fontStyle: 'italic' }]}>
+                ⏳ Currently before 6 PM - overnight analysis will be available later today
               </ThemedText>
             </ThemedView>
           )}
@@ -1805,7 +1531,7 @@ const styles = StyleSheet.create({
   // New styles for data source status indicator
   dataSourceStatus: {
     marginVertical: 8,
-  },
+   },
   mockDataWarning: {
     textAlign: 'left',
   },
@@ -1923,5 +1649,27 @@ const styles = StyleSheet.create({
   dataQualityText: {
     fontSize: 11,
     opacity: 0.8,
+  },
+  // New styles for optimal timing guidance
+  timingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  timingText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  waitingNote: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 8,
+  },
+  waitingText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

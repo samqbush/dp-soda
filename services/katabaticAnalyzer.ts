@@ -48,8 +48,9 @@ export interface KatabaticFactors {
     mountainTemp: number;
     confidence: number;
     dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
-    thermalCycleFailureReason?: string; // Specific reason why thermal cycle data is unavailable
-    usedTomorrowFallback?: boolean; // Whether tomorrow's data was used as fallback for today's missing data
+    analysisType: 'thermal_cycle' | 'unavailable'; // Type of analysis performed
+    thermalCycleFailureReason?: string; // Specific reason why overnight analysis isn't available
+    usedTomorrowFallback?: boolean; // Legacy field, now always false
   };
   wavePattern: {
     meets: boolean;
@@ -289,25 +290,25 @@ export class KatabaticAnalyzer {
     let evergreenMinTemp: number | null = null;
     let usedTomorrowFallback = false;
     
-    // Determine which day to look for afternoon heating data
-    if (currentHour >= 17) {
-      // After 5 PM: Look for tomorrow's afternoon heating (since today's is past)
+    // Determine which day to look for overnight analysis data
+    // Real-world workflow: Only provide reliable analysis after 6 PM
+    if (currentHour < 18) {
+      // Before 6 PM: Don't use fallback data, indicate when proper analysis will be available
+      morrisonMaxTemp = null;
+      evergreenMinTemp = null;
+      usedTomorrowFallback = false;
+    } else {
+      // After 6 PM: Look for today's evening data (6 PM) and tomorrow's dawn data (6 AM)
+      // This aligns with real-world prediction workflow
+      const today = new Date(now);
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, tomorrow);
-    } else {
-      // Before 5 PM: Look for today's afternoon heating (future or current)
-      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, now);
       
-      // ENHANCED FALLBACK LOGIC: If today's afternoon data is missing, try tomorrow's
-      if (morrisonMaxTemp === null) {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, tomorrow);
-        if (morrisonMaxTemp !== null) {
-          usedTomorrowFallback = true;
-        }
-      }
+      // Look for today's evening temperature (6 PM - start of cooling cycle)
+      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, today);
+      
+      // Look for tomorrow's dawn minimum (3-7 AM - end of cooling cycle)
+      evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
     }
     
     // Always look for tomorrow's pre-dawn minimum (3-7 AM following the heating cycle)
@@ -371,87 +372,55 @@ export class KatabaticAnalyzer {
       console.log(`  Evergreen min temp found: ${evergreenMinTemp ? evergreenMinTemp.toFixed(1) + '°C' : 'null'}`);
     }
     
-    // Determine specific failure reasons for thermal cycle data
+    // Determine specific failure reasons for overnight analysis
     let thermalCycleFailureReason: string | null = null;
-    if (morrisonMaxTemp === null || evergreenMinTemp === null) {
+    if (currentHour < 18) {
+      // Before 6 PM: Guide user to optimal prediction timing
+      thermalCycleFailureReason = `Overnight analysis available after 6 PM. For most accurate katabatic predictions, check back when evening temperatures are established.`;
+    } else if (morrisonMaxTemp === null || evergreenMinTemp === null) {
+      // After 6 PM but data missing: Indicate data availability issues
       const reasons: string[] = [];
       if (morrisonMaxTemp === null) {
-        const afternoonDay = currentHour >= 17 ? 'tomorrow' : 'today';
-        if (currentHour < 17 && !usedTomorrowFallback) {
-          reasons.push(`afternoon heating data for both today and tomorrow (12-5 PM)`);
-        } else {
-          reasons.push(`afternoon heating data (12-5 PM ${afternoonDay})`);
-        }
+        reasons.push('evening temperature data (6 PM)');
       }
       if (evergreenMinTemp === null) {
-        reasons.push('pre-dawn cooling data (3-7 AM tomorrow)');
+        reasons.push('dawn temperature data (6 AM tomorrow)');
       }
       
-      // Enhanced failure reason messages
-      const morrisonForecastHours = weatherData.morrison.hourlyForecast.length;
-      const mountainForecastHours = weatherData.mountain.hourlyForecast.length;
-      const minHoursNeeded = currentHour >= 17 ? 18 : 15;
-      
-      if (morrisonForecastHours < minHoursNeeded || mountainForecastHours < minHoursNeeded) {
-        thermalCycleFailureReason = `Insufficient forecast data - missing ${reasons.join(' and ')}. Weather models provide only ${Math.min(morrisonForecastHours, mountainForecastHours)} hours of data, but ${minHoursNeeded}+ hours needed for thermal cycle analysis.`;
-      } else {
-        // Check if forecast starts from midnight (common API limitation)
-        const firstForecastTime = new Date(weatherData.morrison.hourlyForecast[0]?.timestamp);
-        const isStartingFromMidnight = firstForecastTime.getHours() === 0 && firstForecastTime.getDate() > now.getDate();
-        
-        if (isStartingFromMidnight && currentHour < 17) {
-          thermalCycleFailureReason = `Weather API limitation - forecast starts from midnight of next day, missing today's afternoon heating data. ${usedTomorrowFallback ? 'Using tomorrow\'s afternoon data as fallback.' : 'Unable to use fallback data.'}`;
-        } else {
-          thermalCycleFailureReason = `Weather API data gaps during critical periods - missing ${reasons.join(' and ')}. This typically occurs with incomplete NOAA or OpenWeather forecast coverage.`;
-        }
-      }
-    } else if (usedTomorrowFallback) {
-      // Special message when using fallback successfully
-      thermalCycleFailureReason = `Using tomorrow's afternoon heating data as fallback (today's data unavailable). This is common with weather APIs that start forecasts from midnight.`;
+      thermalCycleFailureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}. This may indicate weather API data gaps or insufficient forecast coverage.`;
     }
     
-    // Fallback to prediction window averages if thermal cycle data unavailable
+    // Use overnight analysis when available, otherwise indicate unavailability
     let morrisonTemp: number;
     let mountainTemp: number;
-    let analysisType: 'thermal_cycle' | 'fallback_average';
+    let analysisType: 'thermal_cycle' | 'unavailable';
     
-    if (morrisonMaxTemp !== null && evergreenMinTemp !== null) {
+    if (currentHour >= 18 && morrisonMaxTemp !== null && evergreenMinTemp !== null) {
+      // Proper overnight analysis available
       morrisonTemp = morrisonMaxTemp;
       mountainTemp = evergreenMinTemp;
       analysisType = 'thermal_cycle';
     } else {
-      // Fallback to original approach
-      morrisonTemp = this.getAverageTemperatureForWindow(
-        weatherData.morrison.hourlyForecast,
-        criteria.predictionWindow
-      );
-      
-      mountainTemp = this.getAverageTemperatureForWindow(
-        weatherData.mountain.hourlyForecast,
-        criteria.predictionWindow
-      );
-      analysisType = 'fallback_average';
+      // Overnight analysis not available - return minimal confidence
+      morrisonTemp = 0; // Placeholder values
+      mountainTemp = 0;
+      analysisType = 'unavailable';
     }
     
     const differential = morrisonTemp - mountainTemp;
     
-    // Adjust threshold based on analysis type
-    // Thermal cycle differentials are typically larger but not 2.5x larger
-    const adjustedThreshold = analysisType === 'thermal_cycle' 
-      ? criteria.minTemperatureDifferential * 1.8  // More realistic scale (expect ~5.8°C vs 3.2°C)
-      : criteria.minTemperatureDifferential;
+    // Analysis quality based on timing
+    const meets = analysisType === 'thermal_cycle' && differential >= criteria.minTemperatureDifferential;
     
-    const meets = differential >= adjustedThreshold;
-    
-    // Confidence calculation adjusted for analysis type
-    const baseConfidence = meets 
-      ? Math.min(100, (differential / adjustedThreshold) * 65)
-      : Math.max(30, (differential / adjustedThreshold) * 55);
-    
-    // Boost confidence for thermal cycle analysis (more accurate)
-    const confidence = analysisType === 'thermal_cycle' 
-      ? Math.min(100, baseConfidence + 10)
-      : baseConfidence;
+    // Confidence calculation based on data availability
+    let confidence: number;
+    if (analysisType === 'unavailable') {
+      confidence = 0; // No confidence when proper data isn't available
+    } else {
+      confidence = meets 
+        ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 75)
+        : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
+    }
 
     return {
       meets,
@@ -461,11 +430,11 @@ export class KatabaticAnalyzer {
       confidence,
       dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
-      thermalCycleFailureReason: thermalCycleFailureReason || undefined, // Convert null to undefined for TypeScript
-      usedTomorrowFallback,
+      thermalCycleFailureReason: thermalCycleFailureReason || undefined,
+      usedTomorrowFallback: false, // No longer using fallback logic
       thermalWindow: analysisType === 'thermal_cycle' ? {
-        morrisonMax: usedTomorrowFallback ? '12:00-17:00 (Tomorrow\'s afternoon heating - fallback)' : '12:00-17:00 (Afternoon heating)',
-        evergreenMin: '03:00-07:00 (Pre-dawn cooling)'
+        morrisonMax: '18:00 (Evening - start of cooling cycle)',
+        evergreenMin: '06:00 (Dawn - end of cooling cycle)'
       } : undefined
     };
   }
