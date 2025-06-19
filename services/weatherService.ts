@@ -15,11 +15,11 @@ export const LOCATIONS = {
     lon: -105.1942,
     elevation: 1740, // meters
   },
-  nederland: {
-    name: 'Nederland, CO', 
-    lat: 39.9614,
-    lon: -105.5111,
-    elevation: 2540, // meters
+  evergreen: {
+    name: 'Evergreen, CO', 
+    lat: 39.6364,
+    lon: -105.3283,
+    elevation: 2200, // meters (7,220 ft)
   },
 } as const;
 
@@ -254,8 +254,8 @@ export class WeatherService {
       const [morrisonCurrent, morrisonForecast, mountainCurrent, mountainForecast] = await Promise.all([
         this.fetchCurrentWeather(LOCATIONS.morrison.lat, LOCATIONS.morrison.lon),
         this.fetchHourlyForecast(LOCATIONS.morrison.lat, LOCATIONS.morrison.lon),
-        this.fetchCurrentWeather(LOCATIONS.nederland.lat, LOCATIONS.nederland.lon),
-        this.fetchHourlyForecast(LOCATIONS.nederland.lat, LOCATIONS.nederland.lon)
+        this.fetchCurrentWeather(LOCATIONS.evergreen.lat, LOCATIONS.evergreen.lon),
+        this.fetchHourlyForecast(LOCATIONS.evergreen.lat, LOCATIONS.evergreen.lon)
       ]);
 
       const now = Date.now();
@@ -268,7 +268,7 @@ export class WeatherService {
           lastUpdated: now,
         },
         mountain: {
-          location: LOCATIONS.nederland.name,
+          location: LOCATIONS.evergreen.name,
           current: this.transformCurrentWeather(mountainCurrent),
           hourlyForecast: this.transformHourlyForecast(mountainForecast),
           lastUpdated: now,
@@ -475,7 +475,7 @@ export class WeatherService {
         lastUpdated: now,
       },
       mountain: {
-        location: LOCATIONS.nederland.name,
+        location: LOCATIONS.evergreen.name,
         current: mountainCurrent,
         hourlyForecast: generateHourlyForecast(2),
         lastUpdated: now,

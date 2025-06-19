@@ -10,6 +10,7 @@ Technical guide to understanding the katabatic wind prediction system used in Da
 4. [Confidence Calculation](#confidence-calculation)
 5. [Verification & Accuracy](#verification--accuracy)
 6. [Advanced Understanding](#advanced-understanding)
+7. [Time-Based Operation System](#time-based-operation-system)
 
 ## Katabatic Wind Theory
 
@@ -47,7 +48,39 @@ Soda Lake sits in an ideal position to receive katabatic flow:
 
 ### Enhanced Analysis Approach
 
-The prediction system combines **meteorological modeling** with **local pattern recognition** and **mountain wave interaction analysis**:
+The prediction system combines **meteorological modeling** with **local pattern recognition**, **mountain wave interaction analysis**, and **free historical data enhancement**:
+
+#### Core Analysis Engine
+- **Multi-source data fusion**: NOAA, OpenWeather, and local sensor integration
+- **Real-time factor evaluation**: 5-factor hybrid analysis system
+- **Dynamic confidence scoring**: Based on data quality and consistency
+- **Time-aware analysis**: Different strategies for pre-dawn vs post-dawn predictions
+
+#### FREE Historical Enhancement (NEW)
+Starting in late 2024, the system includes a **completely free** enhancement using [Open-Meteo](https://open-meteo.com/) historical weather data:
+
+**What it provides:**
+- **Actual observed temperatures** from Morrison and Evergreen, CO for today
+- **Precise thermal cycle analysis** using real afternoon heating vs morning cooling
+- **95% confidence data** replacing forecast estimates when available
+- **No API costs** - Open-Meteo provides free access to historical hourly data back to 1940
+
+**How it works:**
+1. **Morning Mode** (before noon): Uses standard forecast-based analysis
+2. **Afternoon Mode** (after noon): Attempts to fetch actual observed thermal data
+3. **Thermal Enhancement**: If today's thermal cycle is complete, replaces forecast estimates with observed data
+4. **Seamless Fallback**: If historical data unavailable, falls back to standard forecast analysis
+
+**Benefits:**
+- **Higher accuracy** for afternoon/evening predictions using actual vs forecast data
+- **Cost-free enhancement** - no additional API expenses
+- **Real-time thermal validation** - know exactly how much heating occurred today
+- **Improved confidence scores** when actual thermal data is available
+
+**UI Indicators:**
+- 🆓 **FREE Historical Enhancement Active** - when using actual observed data
+- 📊 **Historical Enhancement: [reason]** - explains why enhancement unavailable
+- Green highlight in temperature analysis when historical data improves prediction accuracy
 
 1. **Synoptic Pattern Assessment** (Large-scale conditions)
    - Evaluate Froude number (Fr = U/NH) to determine mountain wave behavior
@@ -99,7 +132,7 @@ Beyond the basic 4-factor system, advanced prediction considers:
 ### Data Sources
 
 - **Primary**: OpenWeatherMap API (real meteorological data)
-- **Elevation Points**: Morrison (5,709 ft) and Nederland (8,236 ft)
+- **Elevation Points**: Morrison (5,709 ft) and Evergreen (7,220 ft)
 - **Secondary**: Ecowitt Standley Lake monitoring station
 - **Historical**: Pattern recognition from previous predictions
 
@@ -396,3 +429,138 @@ While the app provides excellent general guidance, **Mountain Wave-Katabatic Int
 This advanced understanding enables you to make more sophisticated decisions about when MKI conditions might create opportunities that basic predictions miss, or when apparent good conditions might be disrupted by unfavorable wave interactions.
 
 This technical guide provides the foundation for understanding how Dawn Patrol Alarm's predictions work, enabling you to make the most informed decisions possible for your wind sport activities.
+
+### Wind Analysis: Consecutive Good Points
+
+The wind analysis system evaluates recent wind data to determine if conditions are favorable for wind sports. A key metric is **"consecutive good points"** - the maximum number of consecutive data points that meet all alarm criteria.
+
+#### What Constitutes a "Good Point"
+
+A data point is considered "good" if it meets ALL of the following criteria:
+
+**Wind Speed Criteria:**
+- **Both Lakes**: Uses the minimum wind speed configured in Settings (default: 15 mph)
+  - User can adjust this in the Settings tab under "Minimum Average Speed"
+  - This same threshold is used for both the alarm system and consecutive good points analysis
+
+**Wind Direction Criteria** (if enabled):
+- **Soda Lake**: Northwest wind (315° ±45°, so 270° to 360°)
+- **Standley Lake**: West wind (270° ±45°, so 225° to 315°)
+
+**Additional Requirements:**
+- Direction consistency ≥70% within the analysis window
+- Minimum 4 consecutive good points required for alarm worthiness
+
+#### Consecutive Good Points Calculation
+
+The system uses a streak-counting algorithm:
+
+1. **Iterate through data points** in chronological order (typically last hour)
+2. **Check each point** against speed and direction criteria
+3. **Count consecutive passes** - reset counter when any point fails
+4. **Track maximum streak** - the highest consecutive count found
+
+**Example:**
+```
+Data points: [8mph, 12mph, 15mph, 14mph, 9mph, 13mph, 16mph]
+Minimum speed: 10mph
+Results: [❌, ✅, ✅, ✅, ❌, ✅, ✅]
+Consecutive streaks: [0, 1, 2, 3, 0, 1, 2]
+Maximum consecutive: 3 good points
+```
+
+#### Analysis Time Windows
+
+- **Default Analysis**: Last 1 hour of data
+- **Fallback**: If no data in last hour, use last 10 data points
+- **Alarm Window**: 3am-5am for morning wind analysis (dawn patrol prediction)
+- **Verification Window**: 6am-8am for real-time conditions
+
+#### Lake-Specific Criteria
+
+**Soda Lake (Dawn Patrol):**
+- Minimum speed: User-configured (set in Settings tab)
+- Preferred direction: 315° (Northwest) ±45°
+- Minimum consecutive points: 4
+- Analysis focuses on 3am-5am window
+
+**Standley Lake:**
+- Minimum speed: User-configured (set in Settings tab)
+- Preferred direction: 270° (West) ±45°
+- Minimum consecutive points: 4
+- Analysis focuses on 6am-8am window
+
+The consecutive good points metric helps identify **sustained favorable conditions** rather than just brief wind gusts, providing more reliable predictions for wind sports activities.
+
+**Configuration:** The minimum wind speed threshold used for "consecutive good points" can be adjusted in the Settings tab under "Minimum Average Speed". This same setting is used for both the dawn patrol alarm system and the wind analysis on the lake tabs.
+
+## Time-Based Operation System
+
+The Wind Guru feature operates differently based on the time of day to provide the most accurate and relevant information for dawn patrol planning.
+
+### Daily Timeline and Behavior
+
+#### 🌙 Before 6 AM - Prediction Mode Only
+- **Today's prediction**: Full 5-factor analysis available
+- **Tomorrow's conditions**: Not shown (check back after 6 PM)
+- **Status**: Dawn patrol window hasn't started yet
+- **Purpose**: Late-night/early morning prediction checking
+
+#### ⚡ 6 AM - 8 AM - Active Dawn Patrol Window
+- **Today's prediction**: Still active, can be verified with real-time data
+- **Real-time verification**: Uses Soda Lake wind data if available
+- **Tomorrow's conditions**: Not shown (check back after 6 PM)
+- **Status**: Active monitoring period
+- **Purpose**: Real-time confirmation during dawn patrol
+
+#### 🔒 After 8 AM - Verification Mode
+- **Today's prediction**: **FROZEN** - no longer changes
+- **Historical verification**: Uses actual Soda Lake wind data from 6-8 AM window
+- **Verification display**: Shows if prediction was accurate
+  - Average wind speed during dawn patrol
+  - Percentage of time with good conditions (15+ mph)
+  - Whether conditions met the 60% threshold for "good"
+- **Tomorrow's conditions**: Not shown until after 6 PM
+- **Status**: Today's window has passed, learning from results
+
+#### 🌅 Before 6 PM - Tomorrow Preparation Period
+- **Today's status**: Frozen with historical verification
+- **Tomorrow's conditions**: **Hidden with "Check back after 6 PM" message**
+- **Reason**: Full thermal cycle data needed for accurate overnight analysis
+- **Message**: "Cooling data and pressure trends need full day analysis"
+
+#### 🌙 After 6 PM - Complete Analysis Available
+- **Today's status**: Frozen with historical verification
+- **Tomorrow's conditions**: **Full 5-factor analysis shown**
+- **Enhanced accuracy**: Uses complete thermal cycle from today
+- **Analysis windows**: Rain/clear sky analysis uses 6 PM-6 AM timeframe
+- **Purpose**: Most accurate tomorrow prediction with full day's data
+
+### Time-Based Analysis Windows
+
+#### Rain and Clear Sky Analysis (6 PM - 6 AM)
+- **Rationale**: Overnight period when katabatic conditions develop
+- **Rain analysis**: Precipitation during this window disrupts katabatic flow
+- **Clear sky analysis**: Percentage of clear sky needed for radiational cooling
+- **Enhanced at night**: Most accurate after 6 PM with updated weather models
+
+#### Pressure and Temperature Analysis (Full 24-hour)
+- **Pressure trends**: Analyzed over complete forecast period
+- **Temperature differential**: Evening-to-dawn temperature changes
+- **Thermal cycle**: Complete daily heating/cooling cycle considered
+
+### User Experience Benefits
+
+1. **Prevents premature checking**: Tomorrow's analysis hidden until most accurate
+2. **Historical learning**: Shows how well today's prediction performed
+3. **Time-appropriate guidance**: Different information based on when you check
+4. **Data quality transparency**: Explains why certain information isn't available yet
+
+### Technical Implementation
+
+- **Time detection**: Uses device local time to determine current phase
+- **Conditional rendering**: UI sections shown/hidden based on time rules
+- **Data source switching**: Live monitoring vs. historical verification
+- **Progressive enhancement**: Analysis becomes more accurate as more data becomes available
+
+This time-based system ensures users get the most relevant and accurate information for their dawn patrol planning while the system continues to learn and improve from each day's results.

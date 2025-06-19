@@ -2,28 +2,34 @@ import {
     clearEnhancedDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
+    fetchEcowittRealTimeWindData,
     fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
     getEnhancedCachedData,
     smartRefreshEcowittData,
+    type EcowittCurrentWindConditions,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
-import { analyzeRecentWindData, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
+import { analyzeRecentWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface UseStandleyLakeWindReturn {
   // Data state
   windData: EcowittWindDataPoint[];
   chartData: WindDataPoint[]; // Converted for chart compatibility
+  currentConditions: EcowittCurrentWindConditions | null; // Real-time current conditions
   analysis: WindAnalysis | null;
   
   // Loading and error states
   isLoading: boolean;
+  isLoadingCurrent: boolean; // Separate loading state for real-time data
   error: string | null;
   lastUpdated: Date | null;
+  currentConditionsUpdated: Date | null;
   
   // Actions
   refreshData: () => Promise<void>;
+  refreshCurrentConditions: () => Promise<void>;
   loadCachedData: () => Promise<boolean>;
   clearCache: () => Promise<void>;
   debugAPI: () => Promise<void>;
@@ -33,13 +39,32 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   console.log('🏔️ useStandleyLakeWind hook initializing...');
   
   const [windData, setWindData] = useState<EcowittWindDataPoint[]>([]);
+  const [currentConditions, setCurrentConditions] = useState<EcowittCurrentWindConditions | null>(null);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCurrent, setIsLoadingCurrent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [currentConditionsUpdated, setCurrentConditionsUpdated] = useState<Date | null>(null);
+  const [userMinimumSpeed, setUserMinimumSpeed] = useState<number>(15); // Default fallback
 
   // Convert data for chart compatibility
   const chartData = convertToWindDataPoint(windData);
+
+  // Load user's minimum speed setting from storage
+  useEffect(() => {
+    const loadUserCriteria = async () => {
+      try {
+        const criteria = await getAlarmCriteria();
+        setUserMinimumSpeed(criteria.minimumAverageSpeed);
+      } catch (error) {
+        console.error('❌ Error loading user criteria:', error);
+        // Keep default fallback value
+      }
+    };
+    
+    loadUserCriteria();
+  }, []);
 
   /**
    * Load cached data from storage
@@ -56,9 +81,9 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
         // Analyze the cached data
         const converted = convertToWindDataPoint(cachedData.data);
         if (converted.length > 0) {
-          // Use default criteria for analysis - these could be made configurable later
+          // Use Standley Lake specific criteria with user-configured minimum speed
           const defaultCriteria: AlarmCriteria = {
-            minimumAverageSpeed: 12, // Standley Lake might need different thresholds
+            minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
             directionConsistencyThreshold: 70,
             minimumConsecutivePoints: 4,
             directionDeviationThreshold: 45,
@@ -82,6 +107,27 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       console.error('❌ Error loading cached Standley Lake data:', error);
       setError('Failed to load cached data');
       return false;
+    }
+  }, [userMinimumSpeed]);
+
+  /**
+   * Refresh current conditions (real-time data)
+   */
+  const refreshCurrentConditions = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoadingCurrent(true);
+      console.log('🏔️ Refreshing Standley Lake current conditions...');
+      
+      const freshConditions = await fetchEcowittRealTimeWindData('DP Standley West');
+      setCurrentConditions(freshConditions);
+      setCurrentConditionsUpdated(new Date());
+      
+      console.log('✅ Standley Lake current conditions refreshed');
+    } catch (error) {
+      console.error('❌ Error refreshing Standley Lake current conditions:', error);
+      // Don't set error state for current conditions failures - just log it
+    } finally {
+      setIsLoadingCurrent(false);
     }
   }, []);
 
@@ -126,7 +172,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       if (freshData.length > 0) {
         const converted = convertToWindDataPoint(freshData);
         const defaultCriteria: AlarmCriteria = {
-          minimumAverageSpeed: 12,
+          minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
           directionConsistencyThreshold: 70,
           minimumConsecutivePoints: 4,
           directionDeviationThreshold: 45,
@@ -143,6 +189,9 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       
       console.log('✅ Smart refreshed Standley Lake wind data:', freshData.length, 'points');
       
+      // Also refresh current conditions from real-time API
+      await refreshCurrentConditions();
+      
     } catch (error) {
       console.error('❌ Error refreshing Standley Lake wind data:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch wind data');
@@ -152,7 +201,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadCachedData]);
+  }, [loadCachedData, userMinimumSpeed]);
 
   /**
    * Clear cached data
@@ -205,14 +254,18 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     windData,
     chartData,
     analysis,
+    currentConditions,
     
     // Loading and error states
     isLoading,
+    isLoadingCurrent,
     error,
     lastUpdated,
+    currentConditionsUpdated,
     
     // Actions
     refreshData,
+    refreshCurrentConditions,
     loadCachedData,
     clearCache,
     debugAPI

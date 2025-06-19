@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
-import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 import { useAppSettings } from '@/contexts/SettingsContext';
-import { PressureChart } from '@/components/PressureChart';
-import { WeeklyForecast } from '@/components/WeeklyForecast';
-import { PredictionTrackingService } from '@/services/predictionTrackingService';
+import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
@@ -30,8 +26,9 @@ export default function WindGuruScreen() {
     return `${celsiusToFahrenheit(celsius).toFixed(1)}°F`;
   };
 
-  // Helper to format temperature differential (already in Fahrenheit)
-  const formatTempDiffF = (fahrenheitDiff: number): string => {
+  // Helper to format temperature differential (convert from Celsius to Fahrenheit)
+  const formatTempDiffF = (celsiusDiff: number): string => {
+    const fahrenheitDiff = celsiusDiff * 9/5; // Convert temperature difference from C to F
     return `${fahrenheitDiff.toFixed(1)}°F`;
   };
 
@@ -42,102 +39,186 @@ export default function WindGuruScreen() {
     error,
     lastUpdated,
     refreshData,
-    getTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
     katabaticAnalysis,
     getTomorrowPrediction,
-    getDataSourceInfo,
-    // Phase 2.5: Extended predictions
-    getWeeklyPredictions,
-    getForecastAvailability,
-    // Phase 3: Prediction tracking (June 14, 2025)
-    logCurrentPrediction,
-    getPredictionAccuracy,
-    validatePastPredictions,
+    // Phase 3: Prediction tracking (June 14, 2025) - REMOVED
+    // logCurrentPrediction,
+    // getPredictionAccuracy,
+    // validatePastPredictions,
   } = useWeatherData();
 
   // Import Soda Lake wind data for prediction validation
-  const { windData: sodaLakeWindData } = useSodaLakeWind();
+  const { windData: sodaLakeWindData, refreshData: refreshSodaLakeData } = useSodaLakeWind();
 
-  // State for prediction accuracy tracking
-  const [predictionAccuracy, setPredictionAccuracy] = React.useState<any>(null);
-  const [cleanupStatus, setCleanupStatus] = React.useState<string>('');
-  const [validationResults, setValidationResults] = React.useState<any>(null);
+  // Helper function to determine if today's prediction should be frozen
+  const getTodayPredictionStatus = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 6) {
+      return {
+        status: 'prediction',
+        message: `Dawn patrol starts in ${6 - currentHour} hour${6 - currentHour !== 1 ? 's' : ''} - Prediction mode`,
+        canVerify: false
+      };
+    } else if (currentHour >= 6 && currentHour <= 8) {
+      return {
+        status: 'active',
+        message: '🔴 Active Dawn Patrol Window - Real-time verification mode',
+        canVerify: true
+      };
+    } else {
+      return {
+        status: 'frozen',
+        message: '🔒 Dawn patrol complete - Analysis frozen for accuracy tracking',
+        canVerify: true
+      };
+    }
+  };
 
-  // Load prediction accuracy on component mount and when predictions change
-  React.useEffect(() => {
-    const loadAccuracy = async () => {
-      try {
-        const accuracy = await getPredictionAccuracy();
-        setPredictionAccuracy(accuracy);
-      } catch (error) {
-        console.error('❌ Failed to load prediction accuracy:', error);
-      }
+  // Helper function to get historical wind verification
+  const getHistoricalWindVerification = () => {
+    if (!sodaLakeWindData || sodaLakeWindData.length === 0) return null;
+    
+    const now = new Date();
+    const dawnStart = new Date(now);
+    dawnStart.setHours(6, 0, 0, 0);
+    const dawnEnd = new Date(now);
+    dawnEnd.setHours(8, 0, 0, 0);
+    
+    // Filter wind data for today's dawn patrol window (6-8am)
+    const todayDawnWindData = sodaLakeWindData.filter(point => {
+      const pointTime = new Date(point.time);
+      return pointTime >= dawnStart && pointTime <= dawnEnd;
+    });
+    
+    if (todayDawnWindData.length === 0) return null;
+    
+    // Calculate average wind speed during dawn patrol window
+    const avgWindSpeed = todayDawnWindData.reduce((sum, point) => sum + point.windSpeedMph, 0) / todayDawnWindData.length;
+    
+    // Determine if conditions were good (using 15+ mph as threshold)
+    const goodWindCount = todayDawnWindData.filter(point => point.windSpeedMph >= 15).length;
+    const goodWindPercentage = (goodWindCount / todayDawnWindData.length) * 100;
+    
+    return {
+      avgWindSpeed,
+      goodWindPercentage,
+      dataPoints: todayDawnWindData.length,
+      conditionsWereGood: goodWindPercentage >= 60 && avgWindSpeed >= 12,
+      maxWindSpeed: Math.max(...todayDawnWindData.map(p => p.windSpeedMph)),
+      minWindSpeed: Math.min(...todayDawnWindData.map(p => p.windSpeedMph))
     };
+  };
 
-    loadAccuracy();
-  }, [getPredictionAccuracy, katabaticAnalysis.prediction]);
-
-  // Auto-log predictions when they're generated (for tracking)
-  React.useEffect(() => {
-    if (katabaticAnalysis.prediction && weatherData) {
-      logCurrentPrediction().catch(error => {
-        console.error('❌ Failed to log prediction:', error);
-      });
+  // Helper function to determine tomorrow's prediction availability
+  const getTomorrowPredictionStatus = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 18) {
+      return {
+        status: 'pending',
+        message: 'Check back after 6 PM - cooling data and pressure trends need full day analysis',
+        showCheckBackMessage: true
+      };
+    } else {
+      return {
+        status: 'available',
+        message: 'Evening data available - overnight prediction ready',
+        showCheckBackMessage: false
+      };
     }
-  }, [katabaticAnalysis.prediction, weatherData, logCurrentPrediction]);
+  };
 
-  // Auto-validate predictions using Soda Lake wind data after 8 AM
-  React.useEffect(() => {
-    // Only log once per session to reduce noise
-    const shouldLog = sodaLakeWindData.length > 0 && new Date().getHours() >= 8;
-    if (shouldLog) {
-      console.log('🔍 Wind Guru validation check:', {
-        sodaLakeDataPoints: sodaLakeWindData.length,
-        currentTime: new Date().toLocaleTimeString(),
-        validationReady: true
-      });
-    }
-
-    if (sodaLakeWindData.length > 0) {
-      // Check if we're past dawn patrol time (8 AM) and have wind data
-      const now = new Date();
-      const eightAM = new Date();
-      eightAM.setHours(8, 0, 0, 0);
-      
-      if (now > eightAM) {
-        if (shouldLog) console.log('✅ Starting validation process...');
+  // Helper function to calculate overnight temperature changes (evening to dawn)
+  // This matches the same thermal cycle timeframe as pressure analysis
+  const getOvernightTemperatureAnalysis = () => {
+    if (!weatherData) return null;
+    
+    const morrisonForecast = weatherData.morrison?.hourlyForecast || [];
+    const evergreenForecast = weatherData.mountain?.hourlyForecast || [];
+    if (morrisonForecast.length < 12 || evergreenForecast.length < 12) return null;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const eveningHour = 18; // 6 PM
+    const dawnHour = 6; // 6 AM
+    
+    // Find evening temperatures (start of cooling cycle)
+    const findEveningTemp = (forecast: any[]) => {
+      return forecast.find(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
         
-        // Convert wind data for validation
-        const validationData = sodaLakeWindData.map(point => ({
-          time: new Date(point.time),
-          windSpeedMph: point.windSpeedMph,
-          windDirection: point.windDirection
-        }));
+        if (currentHour >= 18) {
+          return pointDate.toDateString() === now.toDateString() && pointHour === eveningHour;
+        } else {
+          const targetDate = currentHour <= 8 ? 
+            new Date(now.getTime() - 24 * 60 * 60 * 1000) : 
+            now;
+          return pointDate.toDateString() === targetDate.toDateString() && pointHour === eveningHour;
+        }
+      });
+    };
+    
+    // Find dawn temperatures (end of cooling cycle)
+    const findDawnTemp = (forecast: any[]) => {
+      return forecast.find(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
         
-        // Validate predictions and store results for display
-        validatePastPredictions(validationData)
-          .then(result => {
-            if (result) {
-              console.log('✅ Validation completed - setting results for display');
-              setValidationResults(result);
-              // Reload accuracy stats after validation
-              getPredictionAccuracy().then(accuracy => {
-                setPredictionAccuracy(accuracy);
-              }).catch(error => {
-                console.error('❌ Failed to reload accuracy after validation:', error);
-              });
-            } else {
-              console.log('⚠️ No validation result (no pending predictions)');
-            }
-          })
-          .catch(error => {
-            console.error('❌ Prediction validation failed:', error);
-          });
-      }
-    }
-  }, [sodaLakeWindData, validatePastPredictions, getPredictionAccuracy]);
+        if (currentHour >= 18) {
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          return pointDate.toDateString() === tomorrow.toDateString() && pointHour === dawnHour;
+        } else if (currentHour <= 8) {
+          return pointDate.toDateString() === now.toDateString() && pointHour === dawnHour;
+        } else {
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          return pointDate.toDateString() === tomorrow.toDateString() && pointHour === dawnHour;
+        }
+      });
+    };
+    
+    const morrisonEvening = findEveningTemp(morrisonForecast);
+    const morrisonDawn = findDawnTemp(morrisonForecast);
+    const evergreenEvening = findEveningTemp(evergreenForecast);
+    const evergreenDawn = findDawnTemp(evergreenForecast);
+    
+    if (!morrisonEvening || !morrisonDawn || !evergreenEvening || !evergreenDawn) return null;
+    
+    // Calculate overnight temperature changes
+    const morrisonOvernightChange = morrisonDawn.temperature - morrisonEvening.temperature;
+    const evergreenOvernightChange = evergreenDawn.temperature - evergreenEvening.temperature;
+    
+    // Calculate evening and dawn differentials
+    const eveningDifferential = morrisonEvening.temperature - evergreenEvening.temperature;
+    const dawnDifferential = morrisonDawn.temperature - evergreenDawn.temperature;
+    const overnightDifferentialChange = dawnDifferential - eveningDifferential;
+    
+    return {
+      morrisonEvening: morrisonEvening.temperature,
+      morrisonDawn: morrisonDawn.temperature,
+      morrisonOvernightChange,
+      evergreenEvening: evergreenEvening.temperature,
+      evergreenDawn: evergreenDawn.temperature,
+      evergreenOvernightChange,
+      eveningDifferential,
+      dawnDifferential,
+      overnightDifferentialChange,
+      timeframe: `${eveningHour}:00 PM → ${dawnHour}:00 AM`,
+      isKatabaticFavorable: dawnDifferential >= 3.2, // Dawn differential meets katabatic threshold
+      coolingEffective: Math.abs(morrisonOvernightChange) >= 2.0 || Math.abs(evergreenOvernightChange) >= 2.0,
+      eveningTime: new Date(morrisonEvening.timestamp),
+      dawnTime: new Date(morrisonDawn.timestamp)
+    };
+  };
+
+  // REMOVED: Learning mode and prediction tracking for simplification
+  // Import Soda Lake wind data for prediction validation
+  // const { windData: sodaLakeWindData } = useSodaLakeWind();
 
   // Show disabled message if Wind Guru is not enabled
   if (!settings.windGuruEnabled) {
@@ -170,55 +251,22 @@ export default function WindGuruScreen() {
     );
   }
 
-  // Get current analysis data
-  const tempDiff = getTemperatureDifferential();
+  // Get current analysis data - Using hybrid thermal cycle temperature differential
+  const tempDiff = katabaticAnalysis.prediction?.factors?.temperatureDifferential || null;
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
+  const overnightTemperature = getOvernightTemperatureAnalysis(); // NEW: Overnight temperature differential analysis
   const katabaticConditions = getBasicKatabaticConditions();
   const tomorrowPrediction = getTomorrowPrediction();
   
-  // Phase 2.5: Extended forecast data
-  const weeklyPredictions = getWeeklyPredictions();
-  const forecastAvailability = getForecastAvailability();
+  // REMOVED: Phase 2.5 Extended forecast data and Phase 3 prediction tracking
+  // const weeklyPredictions = getWeeklyPredictions();
+  // const forecastAvailability = getForecastAvailability();
 
   // Helper functions for Phase 2 UI
   const getProbabilityColor = (probability: number): string => {
     if (probability >= 75) return '#4CAF50'; // Green
     if (probability >= 50) return '#FF9800'; // Orange
     return '#F44336'; // Red
-  };
-
-  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high'): string => {
-    switch (confidence) {
-      case 'high': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'low': return '#F44336';
-    }
-  };
-
-  const getConfidenceLabel = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number): string => {
-    const baseLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
-    if (confidenceScore !== undefined) {
-      return `${baseLabel} (${confidenceScore}%)`;
-    }
-    return baseLabel;
-  };
-
-  const getConfidenceExplanation = (confidence: 'low' | 'medium' | 'high', confidenceScore?: number, favorableFactors?: number): string => {
-    if (favorableFactors !== undefined) {
-      if (favorableFactors === 0) {
-        return `Low confidence due to 0/5 favorable factors despite good data quality`;
-      } else if (favorableFactors <= 2) {
-        return `${confidence} confidence - ${favorableFactors}/5 factors support prediction`;
-      } else {
-        return `${confidence} confidence - ${favorableFactors}/5 factors strongly support prediction`;
-      }
-    }
-    
-    switch (confidence) {
-      case 'high': return 'High confidence - data quality excellent and factors align well';
-      case 'medium': return 'Medium confidence - mixed signals from prediction factors';
-      case 'low': return 'Low confidence - factors indicate poor conditions';
-    }
   };
 
   // Helper to count favorable factors from prediction
@@ -236,81 +284,20 @@ export default function WindGuruScreen() {
     return factors.filter(Boolean).length;
   };
 
-  const getRecommendationText = (recommendation: 'go' | 'maybe' | 'skip'): string => {
-    switch (recommendation) {
-      case 'go': return 'GO! 🎯';
-      case 'maybe': return 'MAYBE 🤔';
-      case 'skip': return 'SKIP ❌';
-    }
-  };
-
   const handleRefresh = async () => {
     console.log('Wind Guru: Pull-to-refresh triggered');
     try {
       await refreshData();
+      // Also refresh Soda Lake data for verification
+      await refreshSodaLakeData();
       console.log('Wind Guru: Data refreshed successfully');
     } catch (error) {
       console.error('Wind Guru: Refresh failed:', error);
     }
   };
 
-  // 🧹 TEMPORARY: Cleanup function for removing duplicate predictions
-  const handleCleanupDuplicates = async () => {
-    try {
-      setCleanupStatus('🔄 Cleaning up duplicates...');
-      
-      const service = PredictionTrackingService.getInstance();
-      
-      // Get stats before cleanup
-      const statsBefore = await service.getDebugStats();
-      console.log('📊 Before cleanup:', statsBefore);
-      
-      // Perform cleanup
-      const result = await service.cleanupDuplicates();
-      
-      // Get stats after cleanup
-      const statsAfter = await service.getDebugStats();
-      console.log('📊 After cleanup:', statsAfter);
-      
-      // Refresh prediction accuracy
-      const accuracy = await getPredictionAccuracy();
-      setPredictionAccuracy(accuracy);
-      
-      setCleanupStatus(`✅ Cleaned up ${result.removed} duplicates! Now have ${result.kept} unique predictions.`);
-      
-      // Clear status after 5 seconds
-      setTimeout(() => setCleanupStatus(''), 5000);
-      
-    } catch (error) {
-      console.error('❌ Cleanup failed:', error);
-      setCleanupStatus(`❌ Cleanup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setTimeout(() => setCleanupStatus(''), 5000);
-    }
-  };
-
-  // 🗑️ NUCLEAR OPTION: Clear all predictions (for testing)
-  const handleClearAllPredictions = async () => {
-    try {
-      setCleanupStatus('🗑️ Clearing all predictions...');
-      
-      // This is the nuclear option - clear everything
-      await AsyncStorage.removeItem('wind_predictions');
-      
-      // Refresh prediction accuracy (should be empty now)
-      const accuracy = await getPredictionAccuracy();
-      setPredictionAccuracy(accuracy);
-      
-      setCleanupStatus('🗑️ All predictions cleared! Fresh start.');
-      
-      // Clear status after 5 seconds
-      setTimeout(() => setCleanupStatus(''), 5000);
-      
-    } catch (error) {
-      console.error('❌ Clear all failed:', error);
-      setCleanupStatus(`❌ Clear failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setTimeout(() => setCleanupStatus(''), 5000);
-    }
-  };
+  // REMOVED: Cleanup functions for prediction tracking (part of learning mode)
+  // handleCleanupDuplicates and handleClearAllPredictions functions removed
 
   const formatLastUpdated = () => {
     if (!lastUpdated) return 'Never';
@@ -412,15 +399,14 @@ export default function WindGuruScreen() {
           
           {isHowItWorksExpanded && (
             <ThemedView style={styles.infoContent}>
-              <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>
-                Our advanced katabatic wind prediction uses <ThemedText style={styles.highlightText}>5-factor hybrid MKI analysis</ThemedText> combining NOAA and OpenWeather data to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
+              <ThemedText style={[styles.infoText, { color: textColor, opacity: 0.9 }]}>                  Our advanced katabatic wind prediction uses <ThemedText style={styles.highlightText}>5-factor hybrid MKI analysis</ThemedText> combining NOAA and OpenWeather data to calculate probability for <ThemedText style={styles.highlightText}>today AND tomorrow</ThemedText>:
               </ThemedText>
               
               <ThemedView style={styles.factorsList}>
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>☔</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Rain Probability 6pm-6am (25% weight)</ThemedText>
                     <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≤25% rain chance - precipitation disrupts both katabatic flow and mountain wave patterns</ThemedText>
                   </ThemedView>
                 </ThemedView>
@@ -428,8 +414,8 @@ export default function WindGuruScreen() {
                 <ThemedView style={styles.factorItem}>
                   <ThemedText style={styles.factorEmoji}>🌙</ThemedText>
                   <ThemedView style={styles.factorContent}>
-                    <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 2-5am (25% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥45% clear - enables radiative cooling and organized wave development</ThemedText>
+                    <ThemedText style={[styles.factorName, { color: textColor }]}>Clear Sky 6pm-6am (25% weight)</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥45% clear - enables radiative cooling and organized wave development throughout the night</ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -445,7 +431,10 @@ export default function WindGuruScreen() {
                   <ThemedText style={styles.factorEmoji}>🌡️</ThemedText>
                   <ThemedView style={styles.factorContent}>
                     <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (15% weight)</ThemedText>
-                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>≥6.3°F Morrison (valley, 1740m) vs Nederland (mountain, 2540m) - drives density-driven flow</ThemedText>
+                    <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>
+                      ≥5.8°F Morrison (valley, 1740m) vs Evergreen (mountain, 2200m) - drives density-driven flow{'\n'}
+                      <ThemedText style={{ fontWeight: '500', color: tintColor }}>Enhanced Thermal Cycle Analysis:</ThemedText> Uses afternoon max vs pre-dawn min temperatures when available for more accurate predictions. If today&apos;s afternoon data is missing, uses tomorrow&apos;s data as fallback. Falls back to current readings only when thermal cycle data is completely unavailable.
+                    </ThemedText>
                   </ThemedView>
                 </ThemedView>
                 
@@ -482,7 +471,7 @@ export default function WindGuruScreen() {
                   {'\n'}
                   📍 <ThemedText style={{ fontWeight: '500' }}>Locations:</ThemedText>{'\n'}
                   • <ThemedText style={{ fontWeight: '500' }}>Morrison, CO</ThemedText> (5,709ft) - Valley reference for katabatic flow formation{'\n'}
-                  • <ThemedText style={{ fontWeight: '500' }}>Nederland, CO</ThemedText> (8,236ft) - Mountain reference for temperature gradient{'\n'}
+                  • <ThemedText style={{ fontWeight: '500' }}>Evergreen, CO</ThemedText> (7,220ft) - Mountain reference for temperature gradient{'\n'}
                   • <ThemedText style={{ fontStyle: 'italic' }}>2,527ft elevation difference</ThemedText> creates ideal conditions for analyzing katabatic potential at Soda Lake area
                 </ThemedText>
               </ThemedView>
@@ -609,30 +598,13 @@ export default function WindGuruScreen() {
                 🌅 Dawn Patrol Window: <ThemedText style={{ fontWeight: '500' }}>6:00 AM - 8:00 AM</ThemedText>
               </ThemedText>
               <ThemedText style={[styles.timeStatus, { color: textColor, opacity: 0.6, fontSize: 11 }]}>
-                {(() => {
-                  const now = new Date();
-                  const currentHour = now.getHours();
-                  
-                  if (currentHour >= 6 && currentHour <= 8) {
-                    return '🔴 Active Dawn Patrol Window - Real-time verification mode';
-                  } else if (currentHour < 6) {
-                    const hoursUntil = 6 - currentHour;
-                    return `⏰ Dawn patrol starts in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''} - Prediction mode`;
-                  } else {
-                    return '🔒 Dawn patrol complete - Analysis frozen for accuracy tracking';
-                  }
-                })()}
+                {getTodayPredictionStatus().message}
               </ThemedText>
-              {(() => {
-                if (katabaticAnalysis.analysisMode === 'post-dawn') {
-                  return (
-                    <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
-                      💡 Today&apos;s prediction is preserved for verification. Tomorrow&apos;s forecast available below.
-                    </ThemedText>
-                  );
-                }
-                return null;
-              })()}
+              {getTodayPredictionStatus().status === 'frozen' && (
+                <ThemedText style={[styles.timeStatus, { color: '#4CAF50', opacity: 0.8, fontSize: 10, marginTop: 4, fontStyle: 'italic' }]}>
+                  💡 Today&apos;s prediction is preserved for verification. Tomorrow&apos;s forecast available below.
+                </ThemedText>
+              )}
             </ThemedView>
             
             {katabaticAnalysis.prediction ? (
@@ -649,34 +621,51 @@ export default function WindGuruScreen() {
                 <ThemedText style={styles.probabilityText}>
                   {katabaticAnalysis.prediction.probability}% Chance of Good Winds
                 </ThemedText>
-                <ThemedText style={[
-                  styles.confidenceText,
-                  { color: getConfidenceColor(katabaticAnalysis.prediction.confidence) }
-                ]}>
-                  Prediction Reliability: {getConfidenceLabel(katabaticAnalysis.prediction.confidence, katabaticAnalysis.prediction.confidenceScore)} - {getRecommendationText(katabaticAnalysis.prediction.recommendation)}
+                <ThemedText style={[styles.confidenceText, { color: textColor, opacity: 0.9 }]}>
+                  ✅ {countFavorableFactors(katabaticAnalysis.prediction)} of 5 factors favorable
                 </ThemedText>
-                
-                {/* Clear explanation of the two metrics */}
-                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
-                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{katabaticAnalysis.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
-                  </ThemedText>
-                </ThemedView>
-                
-                {/* Confidence Explanation */}
-                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
-                  {getConfidenceExplanation(
-                    katabaticAnalysis.prediction.confidence, 
-                    katabaticAnalysis.prediction.confidenceScore,
-                    countFavorableFactors(katabaticAnalysis.prediction)
-                  )}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12 }]}>
+                  📊 Based on {(() => {
+                    if (!lastUpdated) return 'weather data';
+                    const now = new Date();
+                    const ageMinutes = (now.getTime() - lastUpdated.getTime()) / (1000 * 60);
+                    if (ageMinutes < 30) return 'fresh weather data';
+                    if (ageMinutes < 60) return 'recent weather data';
+                    return 'older weather data';
+                  })()} (updated {formatLastUpdated()})
                 </ThemedText>
                 
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
                   {katabaticAnalysis.prediction.explanation}
                 </ThemedText>
+                
+                {/* Enhanced Historical Analysis Indicator */}
+                {katabaticAnalysis.prediction.enhancedAnalysis?.hasHistoricalData && (
+                  <ThemedView style={{
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginTop: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#4CAF50'
+                  }}>
+                    <ThemedText style={[styles.explanationText, { 
+                      color: '#4CAF50', 
+                      fontSize: 12,
+                      fontWeight: '600'
+                    }]}>
+                      🆓 FREE Historical Enhancement Active
+                    </ThemedText>
+                    <ThemedText style={[styles.explanationText, { 
+                      color: textColor, 
+                      opacity: 0.8,
+                      fontSize: 11,
+                      marginTop: 4
+                    }]}>
+                      Using actual observed thermal data from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource} for improved accuracy
+                    </ThemedText>
+                  </ThemedView>
+                )}
                 
                 {/* Enhanced Analysis Summary */}
                 {katabaticAnalysis.analysisSummary && (
@@ -696,6 +685,57 @@ export default function WindGuruScreen() {
                     )}
                   </ThemedView>
                 )}
+                
+                {/* Historical Wind Verification - Only show if we can verify */}
+                {getTodayPredictionStatus().canVerify && (() => {
+                  const windVerification = getHistoricalWindVerification();
+                  if (!windVerification) return null;
+                  
+                  const predictionAccuracy = katabaticAnalysis.prediction 
+                    ? (katabaticAnalysis.prediction.probability >= 50) === windVerification.conditionsWereGood
+                    : null;
+                  
+                  return (
+                    <ThemedView style={{
+                      backgroundColor: predictionAccuracy ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                      borderRadius: 8,
+                      padding: 12,
+                      marginTop: 8,
+                      borderLeftWidth: 3,
+                      borderLeftColor: predictionAccuracy ? '#4CAF50' : '#FF9800'
+                    }}>
+                      <ThemedText style={[styles.explanationText, { 
+                        color: predictionAccuracy ? '#4CAF50' : '#FF9800', 
+                        fontSize: 12,
+                        fontWeight: '600'
+                      }]}>
+                        🌊 Historical Wind Verification (6:00-8:00 AM Today)
+                      </ThemedText>
+                      <ThemedText style={[styles.explanationText, { 
+                        color: textColor, 
+                        opacity: 0.8,
+                        fontSize: 11,
+                        marginTop: 4
+                      }]}>
+                        Actual conditions: {windVerification.avgWindSpeed.toFixed(1)} mph average • {windVerification.goodWindPercentage.toFixed(0)}% good wind
+                        {'\n'}Peak: {windVerification.maxWindSpeed.toFixed(1)} mph • {windVerification.dataPoints} data points
+                        {'\n'}Result: {windVerification.conditionsWereGood ? '✅ Good conditions' : '❌ Poor conditions'}
+                      </ThemedText>
+                      {predictionAccuracy !== null && (
+                        <ThemedText style={[styles.explanationText, { 
+                          color: predictionAccuracy ? '#4CAF50' : '#FF9800', 
+                          fontSize: 10,
+                          marginTop: 4,
+                          fontStyle: 'italic'
+                        }]}>
+                          {predictionAccuracy 
+                            ? '🎯 Prediction was accurate!' 
+                            : '⚠️ Prediction needs improvement'}
+                        </ThemedText>
+                      )}
+                    </ThemedView>
+                  );
+                })()}
               </ThemedView>
             ) : katabaticAnalysis.isAnalyzing ? (
               <ThemedView style={styles.predictionDisplay}>
@@ -725,6 +765,238 @@ export default function WindGuruScreen() {
                   {weatherData ? 'Waiting for today&apos;s weather data analysis' : 'Fetching weather data...'}
                 </ThemedText>
               </ThemedView>
+            )}
+          </ThemedView>
+
+          {/* Today's Conditions Analysis - positioned directly under today's prediction */}
+          <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+            <ThemedView style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <ThemedText style={styles.sectionTitle}>📊 Today&apos;s Conditions Analysis</ThemedText>
+              {katabaticAnalysis.analysisMode && (
+                <ThemedText style={[{
+                  fontSize: 11,
+                  fontWeight: '500',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: (() => {
+                    switch (katabaticAnalysis.analysisMode) {
+                      case 'prediction': return 'rgba(33, 150, 243, 0.1)';
+                      case 'verification': return 'rgba(255, 152, 0, 0.1)';
+                      case 'post-dawn': return 'rgba(76, 175, 80, 0.1)';
+                      default: return 'rgba(128, 128, 128, 0.1)';
+                    }
+                  })(),
+                  color: (() => {
+                    switch (katabaticAnalysis.analysisMode) {
+                      case 'prediction': return '#2196F3';
+                      case 'verification': return '#FF9800';
+                      case 'post-dawn': return '#4CAF50';
+                      default: return '#666';
+                    }
+                  })()
+                }]}>
+                  {(() => {
+                    switch (katabaticAnalysis.analysisMode) {
+                      case 'prediction': return '🔮 PREDICTION';
+                      case 'verification': return '⚡ LIVE';
+                      case 'post-dawn': return '🔒 FROZEN';
+                      default: return 'UNKNOWN';
+                    }
+                  })()}
+                </ThemedText>
+              )}
+            </ThemedView>
+            
+            {katabaticAnalysis.prediction ? (
+              <>
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {katabaticAnalysis.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticAnalysis.prediction.factors.precipitation.value.toFixed(1)}% 
+                    {` (${katabaticAnalysis.prediction.factors.precipitation.threshold}% max)`}
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {katabaticAnalysis.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (6pm-6am):
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticAnalysis.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {katabaticAnalysis.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticAnalysis.prediction.factors.pressureChange.change > 0 ? '+' : ''}
+                    {katabaticAnalysis.prediction.factors.pressureChange.change.toFixed(1)} hPa 
+                    ({katabaticAnalysis.prediction.factors.pressureChange.trend})
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {katabaticAnalysis.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
+                  </ThemedText>
+                </ThemedView>
+                {/* Guide users to check back at 6 PM for optimal overnight analysis */}
+                {(!overnightTemperature || new Date().getHours() < 18) && (
+                  <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
+                    <ThemedText style={[styles.conditionLabel, { 
+                      fontSize: 10, 
+                      opacity: 0.7, 
+                      fontStyle: 'italic',
+                      color: '#FF9800'
+                    }]}>
+                      ⏰ Check back at 6 PM for most accurate overnight prediction analysis
+                    </ThemedText>
+                  </ThemedView>
+                )}
+                
+                {/* Show enhanced historical analysis status */}
+                {katabaticAnalysis.prediction.enhancedAnalysis && (
+                  <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
+                    {katabaticAnalysis.prediction.enhancedAnalysis.hasHistoricalData ? (
+                      <ThemedText style={[styles.conditionLabel, { 
+                        fontSize: 10, 
+                        opacity: 0.8, 
+                        fontStyle: 'italic',
+                        color: '#4CAF50'
+                      }]}>
+                        🆓 FREE Historical Data: Using actual observed temperatures from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource}
+                      </ThemedText>
+                    ) : katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason && (
+                      <ThemedText style={[styles.conditionLabel, { 
+                        fontSize: 10, 
+                        opacity: 0.6, 
+                        fontStyle: 'italic',
+                        color: '#9E9E9E'
+                      }]}>
+                        📊 Historical Enhancement: {katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason}
+                      </ThemedText>
+                    )}
+                  </ThemedView>
+                )}
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {katabaticAnalysis.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticAnalysis.prediction.factors.wavePattern.waveEnhancement} 
+                    {katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData && 
+                      ` (${katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData}m)`}
+                  </ThemedText>
+                </ThemedView>
+
+              </>
+            ) : (
+              <>
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>⏸️ Rain Probability:</ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticConditions 
+                      ? `${katabaticConditions.precipitationProbability.toFixed(0)}%`
+                      : 'Loading...'
+                    }
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>🌙 Clear Sky (6pm-6am):</ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {katabaticConditions 
+                      ? `${(100 - katabaticConditions.cloudCover).toFixed(0)}% clear`
+                      : 'Loading...'
+                    }
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>📈 Pressure Change:</ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {pressureTrend 
+                      ? `${pressureTrend.change > 0 ? '+' : ''}${pressureTrend.change.toFixed(1)} hPa`
+                      : 'Loading...'
+                    }
+                  </ThemedText>
+                </ThemedView>
+                
+                {/* Overnight Temperature Analysis - Real-world katabatic prediction timeframe */}
+                {overnightTemperature && (
+                  <ThemedView style={[styles.conditionRow, { 
+                    backgroundColor: 'rgba(76, 175, 80, 0.08)', 
+                    padding: 10, 
+                    marginVertical: 6, 
+                    borderRadius: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: overnightTemperature.isKatabaticFavorable ? '#4CAF50' : '#FF9800'
+                  }]}>
+                    <ThemedView style={{ flex: 1 }}>
+                      <ThemedText style={[styles.conditionLabel, { 
+                        color: '#4CAF50', 
+                        fontWeight: '600',
+                        marginBottom: 2 
+                      }]}>
+                        🌡️ Overnight Temp Analysis ({overnightTemperature.timeframe}):
+                      </ThemedText>
+                      <ThemedText style={[styles.conditionValue, { 
+                        color: overnightTemperature.isKatabaticFavorable ? '#4CAF50' : '#FF9800',
+                        fontWeight: '600',
+                        fontSize: 14
+                      }]}>
+                        Dawn Δ: {formatTempDiffF(overnightTemperature.dawnDifferential)} 
+                        {overnightTemperature.isKatabaticFavorable ? ' ✅ Favorable' : ' ⚠️ Marginal'}
+                      </ThemedText>
+                      <ThemedView style={{ marginTop: 4 }}>
+                        <ThemedText style={[styles.conditionLabel, { 
+                          fontSize: 12, 
+                          opacity: 0.8,
+                          marginBottom: 1
+                        }]}>
+                          Morrison: {formatTempF(overnightTemperature.morrisonEvening)} → {formatTempF(overnightTemperature.morrisonDawn)} 
+                          ({overnightTemperature.morrisonOvernightChange > 0 ? '+' : ''}{(overnightTemperature.morrisonOvernightChange * 9/5).toFixed(1)}°F)
+                        </ThemedText>
+                        <ThemedText style={[styles.conditionLabel, { 
+                          fontSize: 12, 
+                          opacity: 0.8,
+                          marginBottom: 1
+                        }]}>
+                          Evergreen: {formatTempF(overnightTemperature.evergreenEvening)} → {formatTempF(overnightTemperature.evergreenDawn)} 
+                          ({overnightTemperature.evergreenOvernightChange > 0 ? '+' : ''}{(overnightTemperature.evergreenOvernightChange * 9/5).toFixed(1)}°F)
+                        </ThemedText>
+                      </ThemedView>
+                      <ThemedText style={[styles.conditionLabel, { 
+                        fontSize: 11, 
+                        opacity: 0.7,
+                        fontStyle: 'italic',
+                        marginTop: 2
+                      }]}>
+                        Evening-to-dawn temperature differential development
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
+                )}
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>🌡️ Temp Differential:</ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tempDiff 
+                      ? formatTempDiffF(tempDiff.differential)
+                      : 'Loading...'
+                    }
+                  </ThemedText>
+                </ThemedView>
+              </>
             )}
           </ThemedView>
 
@@ -762,9 +1034,23 @@ export default function WindGuruScreen() {
               <ThemedText style={[styles.timeStatus, { color: textColor, opacity: 0.6, fontSize: 11 }]}>
                 📋 Plan your dawn patrol based on this forecast
               </ThemedText>
+
             </ThemedView>
             
-            {tomorrowPrediction ? (
+            {getTomorrowPredictionStatus().showCheckBackMessage ? (
+              <ThemedView style={styles.predictionDisplay}>
+                <ThemedView style={[styles.probabilityBar, { backgroundColor: '#FF9800', opacity: 0.3 }]}>
+                  <ThemedView style={[
+                    styles.probabilityFill, 
+                    { backgroundColor: '#FF9800', width: '25%', opacity: 0.7 }
+                  ]} />
+                </ThemedView>
+                <ThemedText style={styles.probabilityText}>Preliminary Forecast</ThemedText>
+                <ThemedText style={styles.confidenceText}>
+                  Enhanced prediction available after 6 PM today
+                </ThemedText>
+              </ThemedView>
+            ) : tomorrowPrediction ? (
               <ThemedView style={styles.predictionDisplay}>
                 <ThemedView style={[styles.probabilityBar, { backgroundColor: tintColor, opacity: 0.3 }]}>
                   <ThemedView style={[
@@ -778,29 +1064,11 @@ export default function WindGuruScreen() {
                 <ThemedText style={styles.probabilityText}>
                   {tomorrowPrediction.prediction.probability}% Chance of Good Winds
                 </ThemedText>
-                <ThemedText style={[
-                  styles.confidenceText,
-                  { color: getConfidenceColor(tomorrowPrediction.prediction.confidence) }
-                ]}>
-                  Prediction Reliability: {getConfidenceLabel(tomorrowPrediction.prediction.confidence, tomorrowPrediction.prediction.confidenceScore)} - {getRecommendationText(tomorrowPrediction.prediction.recommendation)}
+                <ThemedText style={[styles.confidenceText, { color: textColor, opacity: 0.9 }]}>
+                  ✅ {countFavorableFactors(tomorrowPrediction.prediction)} of 5 factors favorable
                 </ThemedText>
-                
-                {/* Clear explanation of the two metrics */}
-                <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                  <ThemedText style={[{ color: textColor, fontSize: 12, lineHeight: 16 }]}>
-                    📊 <ThemedText style={{ fontWeight: '600' }}>What this means:</ThemedText>{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.probability}% chance</ThemedText> that winds will be 15+ mph{'\n'}
-                    • <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.prediction.confidenceScore}% reliable</ThemedText> - how sure we are about this prediction
-                  </ThemedText>
-                </ThemedView>
-                
-                {/* Confidence Explanation */}
-                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 4 }]}>
-                  {getConfidenceExplanation(
-                    tomorrowPrediction.prediction.confidence, 
-                    tomorrowPrediction.prediction.confidenceScore,
-                    countFavorableFactors(tomorrowPrediction.prediction)
-                  )}
+                <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12 }]}>
+                  📊 Based on {tomorrowPrediction.dataQuality} forecast data
                 </ThemedText>
                 
                 <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
@@ -810,14 +1078,20 @@ export default function WindGuruScreen() {
                 {/* Preliminary Prediction Notice */}
                 <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.1)', borderRadius: 8, padding: 12, marginTop: 12 }}>
                   <ThemedText style={{ color: '#2196F3', fontSize: 14, fontWeight: '600', marginBottom: 4 }}>
-                    📊 Preliminary Forecast
+                    📊 {getTomorrowPredictionStatus().showCheckBackMessage ? 'Preliminary Forecast' : 'Evening Forecast'}
                   </ThemedText>
                   <ThemedText style={{ color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }}>
-                    This prediction uses current weather models and will be refined with evening updates (after 6 PM). 
+                    {getTomorrowPredictionStatus().showCheckBackMessage 
+                      ? 'This prediction uses current weather models and will be refined with evening updates (after 6 PM).'
+                      : 'This prediction uses today\'s complete thermal cycle for enhanced accuracy.'
+                    }
                     Data quality: <ThemedText style={{ fontWeight: '500' }}>{tomorrowPrediction.dataQuality}</ThemedText>
                   </ThemedText>
                   <ThemedText style={{ color: '#2196F3', fontSize: 11, marginTop: 4, fontStyle: 'italic' }}>
-                    💡 More accurate prediction available after 6 PM with fresh weather models
+                    {getTomorrowPredictionStatus().showCheckBackMessage
+                      ? '💡 More accurate prediction available after 6 PM with fresh weather models'
+                      : '✅ Enhanced with today\'s complete weather patterns'
+                    }
                   </ThemedText>
                 </ThemedView>
               </ThemedView>
@@ -841,614 +1115,157 @@ export default function WindGuruScreen() {
           </ThemedView>
         </ThemedView>
 
-        {/* Enhanced Key Conditions Section - Today's Analysis */}
-        <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedView style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <ThemedText style={styles.sectionTitle}>📊 Today&apos;s Conditions Analysis</ThemedText>
-            {katabaticAnalysis.analysisMode && (
-              <ThemedText style={[{
-                fontSize: 11,
-                fontWeight: '500',
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 12,
-                backgroundColor: (() => {
-                  switch (katabaticAnalysis.analysisMode) {
-                    case 'prediction': return 'rgba(33, 150, 243, 0.1)';
-                    case 'verification': return 'rgba(255, 152, 0, 0.1)';
-                    case 'post-dawn': return 'rgba(76, 175, 80, 0.1)';
-                    default: return 'rgba(128, 128, 128, 0.1)';
-                  }
-                })(),
-                color: (() => {
-                  switch (katabaticAnalysis.analysisMode) {
-                    case 'prediction': return '#2196F3';
-                    case 'verification': return '#FF9800';
-                    case 'post-dawn': return '#4CAF50';
-                    default: return '#666';
-                  }
-                })()
-              }]}>
-                {(() => {
-                  switch (katabaticAnalysis.analysisMode) {
-                    case 'prediction': return '🔮 PREDICTION';
-                    case 'verification': return '⚡ LIVE';
-                    case 'post-dawn': return '🔒 FROZEN';
-                    default: return 'UNKNOWN';
-                  }
-                })()}
-              </ThemedText>
+        {/* Tomorrow's Conditions Analysis - Only show after 6 PM */}
+        {getTomorrowPredictionStatus().status === 'available' ? (
+          <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
+            
+            {tomorrowPrediction ? (
+              <>
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.precipitation.value.toFixed(1)}% 
+                    {` (${tomorrowPrediction.prediction.factors.precipitation.threshold}% max)`}
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (6pm-6am):
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.pressureChange.change > 0 ? '+' : ''}
+                    {tomorrowPrediction.prediction.factors.pressureChange.change.toFixed(1)} hPa 
+                    ({tomorrowPrediction.prediction.factors.pressureChange.trend})
+                  </ThemedText>
+                </ThemedView>
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
+                  </ThemedText>
+                </ThemedView>
+                {/* Show thermal cycle status for tomorrow's prediction */}
+                {/* Tomorrow's forecast data is naturally available - no guidance needed */}
+                
+                <ThemedView style={styles.conditionRow}>
+                  <ThemedText style={styles.conditionLabel}>
+                    {tomorrowPrediction.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
+                  </ThemedText>
+                  <ThemedText style={styles.conditionValue}>
+                    {tomorrowPrediction.prediction.factors.wavePattern.waveEnhancement} 
+                    {tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData && 
+                      ` (${tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData}m)`}
+                  </ThemedText>
+                </ThemedView>
+
+                {/* Data Quality Note */}
+                <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                  <ThemedText style={{ color: '#2196F3', fontSize: 12, fontWeight: '500', marginBottom: 4 }}>
+                    📊 Forecast Data Quality: {tomorrowPrediction.dataQuality}
+                  </ThemedText>
+                  <ThemedText style={{ color: textColor, opacity: 0.7, fontSize: 11, lineHeight: 14 }}>
+                    Based on {tomorrowPrediction.dataQuality === 'good' ? '20+ hours' : 'limited hours'} of forecast data. 
+                    Enhanced accuracy with complete thermal cycle analysis.
+                  </ThemedText>
+                </ThemedView>
+              </>
+            ) : (
+              <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 16 }}>
+                <ThemedText style={{ color: '#2196F3', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                  🔄 Loading Tomorrow&apos;s Analysis
+                </ThemedText>
+                <ThemedText style={{ color: textColor, opacity: 0.7, lineHeight: 20 }}>
+                  Processing forecast data for tomorrow&apos;s 5-factor breakdown:{'\n'}
+                  • Rain probability analysis{'\n'}
+                  • Clear sky period assessment{'\n'}
+                  • Pressure change trends{'\n'}
+                  • Temperature differential calculation{'\n'}
+                  {'\n'}
+                </ThemedText>
+                <ThemedText style={{ color: textColor, opacity: 0.7, fontStyle: 'italic' }}>
+                  Forecast data loading...
+                </ThemedText>
+              </ThemedView>
             )}
           </ThemedView>
-          
-          {katabaticAnalysis.prediction ? (
-            <>
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {katabaticAnalysis.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticAnalysis.prediction.factors.precipitation.value.toFixed(1)}% 
-                  {` (${katabaticAnalysis.prediction.factors.precipitation.threshold}% max)`}
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {katabaticAnalysis.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (2-5am):
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticAnalysis.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {katabaticAnalysis.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticAnalysis.prediction.factors.pressureChange.change > 0 ? '+' : ''}
-                  {katabaticAnalysis.prediction.factors.pressureChange.change.toFixed(1)} hPa 
-                  ({katabaticAnalysis.prediction.factors.pressureChange.trend})
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {katabaticAnalysis.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {formatTempDiffF(katabaticAnalysis.prediction.factors.temperatureDifferential.differential)}
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {katabaticAnalysis.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticAnalysis.prediction.factors.wavePattern.waveEnhancement} 
-                  {katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData && 
-                    ` (${katabaticAnalysis.prediction.factors.wavePattern.mixingHeightData}m)`}
-                </ThemedText>
-              </ThemedView>
-
-            </>
-          ) : (
-            <>
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>⏸️ Rain Probability:</ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticConditions 
-                    ? `${katabaticConditions.precipitationProbability.toFixed(0)}%`
-                    : 'Loading...'
-                  }
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>🌙 Clear Sky (2-5am):</ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {katabaticConditions 
-                    ? `${(100 - katabaticConditions.cloudCover).toFixed(0)}% clear`
-                    : 'Loading...'
-                  }
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>📈 Pressure Change:</ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {pressureTrend 
-                    ? `${pressureTrend.change > 0 ? '+' : ''}${pressureTrend.change.toFixed(1)} hPa`
-                    : 'Loading...'
-                  }
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>🌡️ Temp Differential:</ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tempDiff 
-                    ? formatTempDiffF(tempDiff.differential)
-                    : 'Loading...'
-                  }
-                </ThemedText>
-              </ThemedView>
-            </>
-          )}
-        </ThemedView>
-
-        {/* Tomorrow's Conditions Analysis */}
-        <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
-          
-          {tomorrowPrediction ? (
-            <>
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.precipitation.meets ? '✅' : '❌'} Rain Probability:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.precipitation.value.toFixed(1)}% 
-                  {` (${tomorrowPrediction.prediction.factors.precipitation.threshold}% max)`}
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.skyConditions.meets ? '✅' : '❌'} Clear Sky (2-5am):
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.skyConditions.clearPeriodCoverage.toFixed(0)}% clear
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.pressureChange.meets ? '✅' : '❌'} Pressure Change:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.pressureChange.change > 0 ? '+' : ''}
-                  {tomorrowPrediction.prediction.factors.pressureChange.change.toFixed(1)} hPa 
-                  ({tomorrowPrediction.prediction.factors.pressureChange.trend})
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.temperatureDifferential.meets ? '✅' : '❌'} Temp Differential:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {formatTempDiffF(tomorrowPrediction.prediction.factors.temperatureDifferential.differential)}
-                </ThemedText>
-              </ThemedView>
-              
-              <ThemedView style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>
-                  {tomorrowPrediction.prediction.factors.wavePattern.meets ? '✅' : '❌'} Mountain Wave Pattern:
-                </ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {tomorrowPrediction.prediction.factors.wavePattern.waveEnhancement} 
-                  {tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData && 
-                    ` (${tomorrowPrediction.prediction.factors.wavePattern.mixingHeightData}m)`}
-                </ThemedText>
-              </ThemedView>
-
-              {/* Data Quality Note */}
-              <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                <ThemedText style={{ color: '#2196F3', fontSize: 12, fontWeight: '500', marginBottom: 4 }}>
-                  📊 Forecast Data Quality: {tomorrowPrediction.dataQuality}
-                </ThemedText>
-                <ThemedText style={{ color: textColor, opacity: 0.7, fontSize: 11, lineHeight: 14 }}>
-                  Based on {tomorrowPrediction.dataQuality === 'good' ? '20+ hours' : 'limited hours'} of forecast data. 
-                  Check back after 6 PM for enhanced accuracy with updated weather models.
-                </ThemedText>
-              </ThemedView>
-            </>
-          ) : (
-            <ThemedView style={{ backgroundColor: 'rgba(33, 150, 243, 0.05)', borderRadius: 8, padding: 16 }}>
-              <ThemedText style={{ color: '#2196F3', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
-                🔄 Loading Tomorrow&apos;s Analysis
+        ) : (
+          <ThemedView style={[styles.conditionsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.sectionTitle}>📊 Tomorrow&apos;s Conditions Analysis</ThemedText>
+            <ThemedView style={{ backgroundColor: 'rgba(255, 152, 0, 0.05)', borderRadius: 8, padding: 16 }}>
+              <ThemedText style={{ color: '#FF9800', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                ⏰ Check Back After 6 PM
               </ThemedText>
               <ThemedText style={{ color: textColor, opacity: 0.7, lineHeight: 20 }}>
-                Processing forecast data for tomorrow&apos;s 5-factor breakdown:{'\n'}
-                • Rain probability analysis{'\n'}
-                • Clear sky period assessment{'\n'}
-                • Pressure change trends{'\n'}
-                • Temperature differential calculation{'\n'}
-                {'\n'}
+                Tomorrow&apos;s detailed condition analysis will be available after 6 PM when today&apos;s complete thermal cycle data is processed.
               </ThemedText>
-              <ThemedText style={{ color: textColor, opacity: 0.7, fontStyle: 'italic' }}>
-                Forecast data loading...
+              <ThemedText style={{ color: textColor, opacity: 0.6, fontSize: 12, fontStyle: 'italic', marginTop: 8 }}>
+                The system needs full day cooling and pressure trends for accurate overnight predictions.
+              </ThemedText>
+            </ThemedView>
+          </ThemedView>
+        )}
+
+        {/* Optimal Timing Guidance */}
+        <ThemedView style={[styles.infoCard, { backgroundColor: cardColor, borderLeftWidth: 4, borderLeftColor: '#FF9800' }]}>
+          <ThemedText style={[styles.timingTitle, { color: '#FF9800', fontWeight: '600', fontSize: 16, marginBottom: 8 }]}>
+            ⏰ Time-Based Prediction System
+          </ThemedText>
+          <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20, marginBottom: 8 }]}>
+            Wind Guru adapts its behavior based on when you check it:
+          </ThemedText>
+          <ThemedText style={[styles.timingText, { color: textColor, fontSize: 14, lineHeight: 20 }]}>
+            🌅 <ThemedText style={{ fontWeight: '500' }}>Before 6 AM</ThemedText> - Prediction mode only (dawn patrol window hasn&apos;t started){'\n'}
+            ⚡ <ThemedText style={{ fontWeight: '500' }}>6 AM - 8 AM</ThemedText> - Active verification with real-time wind data if available{'\n'}
+            🔒 <ThemedText style={{ fontWeight: '500' }}>After 8 AM</ThemedText> - Today&apos;s prediction frozen, verified against historical wind data{'\n'}
+            📊 <ThemedText style={{ fontWeight: '500' }}>Before 6 PM</ThemedText> - Tomorrow&apos;s forecast preliminary (check back after 6 PM for accuracy){'\n'}
+            🌙 <ThemedText style={{ fontWeight: '500' }}>After 6 PM</ThemedText> - Tomorrow&apos;s forecast enhanced with today&apos;s complete thermal cycle
+          </ThemedText>
+          {new Date().getHours() < 18 && new Date().getHours() >= 8 && (
+            <ThemedView style={[styles.waitingNote, { backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 6, padding: 8, marginTop: 8 }]}>
+              <ThemedText style={[styles.waitingText, { color: '#FF9800', fontSize: 12, fontStyle: 'italic' }]}>
+                ⏳ Currently after dawn patrol but before 6 PM - tomorrow&apos;s enhanced analysis available tonight
               </ThemedText>
             </ThemedView>
           )}
         </ThemedView>
 
-        {/* Data Source Status Indicator */}
-        <ThemedView style={[styles.dataSourceStatus, { 
-          backgroundColor: (() => {
-            const sourceInfo = getDataSourceInfo();
-            if (!sourceInfo) return 'rgba(128, 128, 128, 0.1)'; // Gray for unknown
-            switch (sourceInfo.source) {
-              case 'api': return 'rgba(76, 175, 80, 0.1)'; // Green for API
-              case 'cache': return 'rgba(255, 152, 0, 0.1)'; // Orange for cache
-              case 'mock': return 'rgba(244, 67, 54, 0.1)'; // Red for mock
-              default: return 'rgba(128, 128, 128, 0.1)';
-            }
-          })(),
-          borderRadius: 8, 
-          padding: 12,
-          marginBottom: 16,
-          borderWidth: 1,
-          borderColor: (() => {
-            const sourceInfo = getDataSourceInfo();
-            if (!sourceInfo) return 'rgba(128, 128, 128, 0.3)';
-            switch (sourceInfo.source) {
-              case 'api': return 'rgba(76, 175, 80, 0.3)';
-              case 'cache': return 'rgba(255, 152, 0, 0.3)';
-              case 'mock': return 'rgba(244, 67, 54, 0.3)';
-              default: return 'rgba(128, 128, 128, 0.3)';
-            }
-          })()
-        }]}>
-          <ThemedText style={[styles.dataSourceTitle, { color: textColor, fontWeight: '600' }]}>
-            {(() => {
-              const sourceInfo = getDataSourceInfo();
-              if (!sourceInfo) return '❓ Data Status: Unknown';
-              switch (sourceInfo.source) {
-                case 'api': return '🌐 Data Status: Live API Data';
-                case 'cache': return '💾 Data Status: Cached Data';
-                case 'mock': return '⚠️ Data Status: DEMO DATA (NOT REAL)';
-                default: return '❓ Data Status: Unknown';
-              }
-            })()}
-          </ThemedText>
-          <ThemedText style={[styles.dataSourceText, { color: textColor, opacity: 0.8 }]}>
-            {(() => {
-              const sourceInfo = getDataSourceInfo();
-              if (!sourceInfo) return 'Unable to determine data source status.';
-              
-              switch (sourceInfo.source) {
-                case 'api':
-                  return '✅ Receiving real-time weather data from OpenWeatherMap API. Predictions are based on current meteorological conditions.';
-                case 'cache':
-                  return `📱 Using recent weather data from cache (fetched ${sourceInfo.lastFetch ? new Date(sourceInfo.lastFetch).toLocaleTimeString() : 'recently'}). Predictions may be slightly outdated but still reliable.`;
-                case 'mock':
-                  return '🚨 WARNING: This is DEMO DATA for testing purposes only. These are NOT real weather conditions! Configure your OpenWeatherMap API key in settings to see real data.';
-                default:
-                  return 'Data source status unclear. Check your internet connection and API configuration.';
-              }
-            })()}
-          </ThemedText>
-          {(() => {
-            const sourceInfo = getDataSourceInfo();
-            if (sourceInfo?.source === 'mock') {
-              return (
-                <ThemedText style={[styles.mockDataWarning, { 
-                  color: '#F44336', 
-                  fontWeight: 'bold',
-                  marginTop: 8,
-                  fontSize: 14
-                }]}>
-                  🔧 To fix: Add your OpenWeatherMap API key to .env file{'\n'}
-                  📖 See: docs/OPENWEATHERMAP_SETUP.md for setup instructions
-                </ThemedText>
-              );
-            }
-            return null;
-          })()}
-        </ThemedView>
-        
-        {/* Pressure Trend Chart */}
-        <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <PressureChart 
-            pressureTrend={pressureTrend} 
-            title="📈 Pressure Trend (24h)"
-            location="Morrison, CO"
-          />
-        </ThemedView>
-
-        <ThemedView style={[styles.chartCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.sectionTitle}>🌡️ Temperature Comparison</ThemedText>
-          {tempDiff ? (
-            <ThemedView style={styles.temperatureComparison}>
-              <ThemedView style={styles.tempLocationRow}>
-                <ThemedText style={styles.tempLocationLabel}>Morrison:</ThemedText>
-                <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.morrison)}</ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.tempLocationRow}>
-                <ThemedText style={styles.tempLocationLabel}>Mountains:</ThemedText>
-                <ThemedText style={styles.tempValue}>{formatTempF(tempDiff.mountain)}</ThemedText>
-              </ThemedView>
-              <ThemedView style={[styles.tempLocationRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: textColor, opacity: 0.2 }]}>
-                <ThemedText style={[styles.tempLocationLabel, { fontWeight: 'bold' }]}>Differential:</ThemedText>
-                <ThemedText style={[styles.tempValue, { fontWeight: 'bold', color: tempDiff.differential > 0 ? '#4CAF50' : '#F44336' }]}>
-                  {formatTempDiffF(tempDiff.differential)}
-                </ThemedText>
-              </ThemedView>
-              <ThemedText style={[styles.tempExplanation, { color: textColor, opacity: 0.7 }]}>
-                {tempDiff.differential > 5 
-                  ? 'Good temperature differential for katabatic winds'
-                  : tempDiff.differential > 2
-                  ? 'Moderate temperature differential'
-                  : 'Low temperature differential'
-                }
-              </ThemedText>
-            </ThemedView>
-          ) : (
-            <ThemedView style={styles.chartPlaceholder}>
-              <ThemedText style={[styles.placeholderText, { color: textColor, opacity: 0.5 }]}>
-                Loading temperature data...
-              </ThemedText>
-            </ThemedView>
-          )}
-        </ThemedView>
-
-        {/* Phase 3: Prediction Accuracy Tracking - June 14, 2025 */}
-        {/* Development Mode: Show detailed accuracy stats for debugging */}
-        {__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions > 0 && (
-          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              📊 Prediction Accuracy (Development Mode)
-            </ThemedText>
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
-              Learning from actual wind outcomes to improve future predictions
-            </ThemedText>
-            
-            <View style={styles.conditionsCard}>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Total Predictions:</ThemedText>
-                <ThemedText style={styles.conditionValue}>{predictionAccuracy.totalPredictions}</ThemedText>
-              </View>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Accuracy Rate:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { 
-                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
-                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
-                }]}>
-                  {predictionAccuracy.accuracy.toFixed(1)}%
-                </ThemedText>
-              </View>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Correct Predictions:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { color: '#4CAF50' }]}>
-                  {predictionAccuracy.correctPredictions}
-                </ThemedText>
-              </View>
-              {predictionAccuracy.falsePositives > 0 && (
-                <View style={styles.conditionRow}>
-                  <ThemedText style={styles.conditionLabel}>False Alarms:</ThemedText>
-                  <ThemedText style={[styles.conditionValue, { color: '#F44336' }]}>
-                    {predictionAccuracy.falsePositives}
-                  </ThemedText>
-                </View>
-              )}
-            </View>
-            
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
-              💡 Development Mode: Predictions become more accurate as we collect more data. 
-              {predictionAccuracy.totalPredictions < 10 && ' Need more data for reliable statistics.'}
-            </ThemedText>
-          </ThemedView>
-        )}
-
-        {/* Production Mode: Simple prediction learning indicator */}
-        {!__DEV__ && predictionAccuracy && predictionAccuracy.totalPredictions >= 10 && (
-          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              🧠 Prediction Learning System
-            </ThemedText>
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
-              The system is learning from wind patterns to improve future predictions
-            </ThemedText>
-            
-            <View style={styles.conditionsCard}>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Learning Status:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { 
-                  color: predictionAccuracy.accuracy >= 70 ? '#4CAF50' : 
-                        predictionAccuracy.accuracy >= 50 ? '#FF9800' : '#F44336' 
-                }]}>
-                  {predictionAccuracy.accuracy >= 70 ? 'Excellent' :
-                   predictionAccuracy.accuracy >= 50 ? 'Good' : 'Learning'}
-                </ThemedText>
-              </View>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Data Points:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { color: tintColor }]}>
-                  {predictionAccuracy.totalPredictions} predictions analyzed
-                </ThemedText>
-              </View>
-            </View>
-            
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
-              💡 Predictions improve over time as the system learns local wind patterns.
-            </ThemedText>
-          </ThemedView>
-        )}
-
-        {/* Prediction Validation Results - Show actionable feedback when predictions are wrong */}
-        {__DEV__ && (
-          <ThemedView style={{ margin: 16, padding: 12, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8 }}>
-            <ThemedText style={{ fontSize: 12, fontFamily: 'monospace' }}>
-              🐛 Debug Info:{'\n'}
-              validationResults: {validationResults ? 'HAS DATA' : 'NULL'}{'\n'}
-              Current time: {new Date().toLocaleTimeString()}{'\n'}
-              Soda Lake data points: {sodaLakeWindData.length}{'\n'}
-              {validationResults && `Validation data: ${JSON.stringify(validationResults, null, 2)}`}
-            </ThemedText>
-          </ThemedView>
-        )}
-        
-        {__DEV__ && validationResults && (
-          <ThemedView style={[styles.predictionCard, { backgroundColor: cardColor }]}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              🔍 Recent Prediction Analysis {validationResults.alreadyValidated ? '(Completed Earlier)' : '(Just Completed)'}
-            </ThemedText>
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.8 }]}>
-              Analysis of {validationResults.predictionDate ? new Date(validationResults.predictionDate).toLocaleDateString() : 'recent'} prediction vs actual wind data
-              {validationResults.alreadyValidated && (
-                <>
-                  {'\n'}
-                  <ThemedText style={{ fontStyle: 'italic', fontSize: 12 }}>
-                    This validation was completed earlier. {validationResults.validationNotes}
-                  </ThemedText>
-                </>
-              )}
-            </ThemedText>
-            
-            <View style={styles.conditionsCard}>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Prediction Result:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { 
-                  color: validationResults.predictionWasAccurate ? '#4CAF50' : '#F44336'
-                }]}>
-                  {validationResults.predictionWasAccurate ? '✅ Accurate' : '❌ Inaccurate'}
-                </ThemedText>
-              </View>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Predicted:</ThemedText>
-                <ThemedText style={styles.conditionValue}>
-                  {validationResults.predictedSuccess ? 'Good winds' : 'Poor winds'} ({validationResults.predictedProbability?.toFixed(0)}%)
-                </ThemedText>
-              </View>
-              <View style={styles.conditionRow}>
-                <ThemedText style={styles.conditionLabel}>Actual Result:</ThemedText>
-                <ThemedText style={[styles.conditionValue, { 
-                  color: validationResults.actualSuccess ? '#4CAF50' : '#F44336'
-                }]}>
-                  {validationResults.actualSuccess ? 'Good winds' : 'Poor winds'} (avg: {validationResults.avgSpeed?.toFixed(1)} mph)
-                </ThemedText>
-              </View>
-              {validationResults.goodWindPercentage !== undefined && (
-                <View style={styles.conditionRow}>
-                  <ThemedText style={styles.conditionLabel}>Wind Quality:</ThemedText>
-                  <ThemedText style={styles.conditionValue}>
-                    {validationResults.goodWindPercentage.toFixed(0)}% of time ≥15 mph
-                  </ThemedText>
-                </View>
-              )}
-            </View>
-
-            {/* Show detailed failure analysis and improvement suggestions */}
-            {!validationResults.predictionWasAccurate && validationResults.failureAnalysis && (
-              <View style={[styles.conditionsCard, { marginTop: 12, backgroundColor: 'rgba(244, 67, 54, 0.05)', borderLeftWidth: 4, borderLeftColor: '#F44336' }]}>
-                <ThemedText style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8, color: '#F44336' }]}>
-                  🔧 Prediction Failure Analysis
-                </ThemedText>
-                
-                {validationResults.failureAnalysis.summary && (
-                  <ThemedText style={[styles.explanationText, { color: textColor, marginBottom: 12 }]}>
-                    {validationResults.failureAnalysis.summary}
-                  </ThemedText>
-                )}
-
-                {validationResults.failureAnalysis.factorAnalysis && validationResults.failureAnalysis.factorAnalysis.length > 0 && (
-                  <View style={{ marginBottom: 12 }}>
-                    <ThemedText style={[styles.conditionLabel, { fontWeight: '600', marginBottom: 6 }]}>
-                      Factor Analysis:
-                    </ThemedText>
-                    {validationResults.failureAnalysis.factorAnalysis.map((factor: any, index: number) => (
-                      <ThemedText key={index} style={[styles.conditionValue, { fontSize: 12, marginBottom: 4, opacity: 0.9 }]}>
-                        • {factor}
-                      </ThemedText>
-                    ))}
-                  </View>
-                )}
-
-                {validationResults.failureAnalysis.improvementSuggestions && validationResults.failureAnalysis.improvementSuggestions.length > 0 && (
-                  <View>
-                    <ThemedText style={[styles.conditionLabel, { fontWeight: '600', marginBottom: 6, color: '#FF9800' }]}>
-                      💡 Code Improvement Suggestions:
-                    </ThemedText>
-                    {validationResults.failureAnalysis.improvementSuggestions.map((suggestion: any, index: number) => (
-                      <ThemedText key={index} style={[styles.conditionValue, { fontSize: 12, marginBottom: 6, color: '#FF9800', fontWeight: '500' }]}>
-                        {index + 1}. {suggestion}
-                      </ThemedText>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-
-            <ThemedText style={[styles.explanationText, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8 }]}>
-              🚀 This analysis helps improve the prediction algorithm by identifying weaknesses and suggesting code improvements.
-            </ThemedText>
-          </ThemedView>
-        )}
-
-        {/* Phase 2.5: Weekly Forecast */}
-        <WeeklyForecast 
-          predictions={weeklyPredictions}
-          forecastAvailability={forecastAvailability}
-          isLoading={isLoading}
-        />
+        {/* REMOVED: Learning mode, prediction tracking, and weekly forecast features */}
+        {/* These sections have been removed to focus on today/tomorrow predictions only */}
 
         {/* Development Info - Only show in development mode */}
         {__DEV__ && (
           <ThemedView style={[styles.devCard, { backgroundColor: cardColor, opacity: 0.7 }]}>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              🎯 Development Mode: Phase 3 Weekly Forecast Active!
+              🎯 Development Mode: Focused on Today & Tomorrow Predictions
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
               ✅ Today & Tomorrow detailed analysis
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              📅 5-day extended forecast with quick overview
+              🌤️ Using OpenWeatherMap API for reliable forecasts
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              🌤️ Using OpenWeatherMap API (up to 5 days available)
+              📍 Morrison, CO - Katabatic wind analysis
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              Next: Historical accuracy tracking & push notifications
+              🚀 Simplified approach: Manual control of predictions
             </ThemedText>
-            
-            {/* Temporary cleanup buttons */}
-            <ThemedView style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: 8 }}>
-              <ThemedText style={[styles.devText, { color: '#FF9800', fontWeight: '600', marginBottom: 8 }]}>
-                🧹 Temporary Cleanup Tools:
-              </ThemedText>
-              
-              <ThemedView style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: tintColor,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    flex: 1
-                  }}
-                  onPress={handleCleanupDuplicates}
-                >
-                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
-                    🧹 Remove Duplicates
-                  </ThemedText>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: '#F44336',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    flex: 1
-                  }}
-                  onPress={handleClearAllPredictions}
-                >
-                  <ThemedText style={{ color: 'white', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
-                    🗑️ Clear All
-                  </ThemedText>
-                </TouchableOpacity>
-              </ThemedView>
-              
-              {cleanupStatus ? (
-                <ThemedText style={{ color: textColor, fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
-                  {cleanupStatus}
-                </ThemedText>
-              ) : null}
-            </ThemedView>
           </ThemedView>
         )}
 
@@ -1871,7 +1688,7 @@ const styles = StyleSheet.create({
   // New styles for data source status indicator
   dataSourceStatus: {
     marginVertical: 8,
-  },
+   },
   mockDataWarning: {
     textAlign: 'left',
   },
@@ -1963,5 +1780,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     marginBottom: 4,
+  },
+  // Temperature calculation note styles
+  calculationNote: {
+    marginTop: 12,
+  },
+  calculationNoteTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  calculationNoteText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  tempCalcExample: {
+    fontSize: 11,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  // Data quality indicator styles
+  dataQualityIndicator: {
+    marginTop: 8,
+  },
+  dataQualityText: {
+    fontSize: 11,
+    opacity: 0.8,
+  },
+  // New styles for optimal timing guidance
+  timingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  timingText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  waitingNote: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 8,
+  },
+  waitingText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

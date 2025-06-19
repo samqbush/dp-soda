@@ -15,9 +15,6 @@
     "test-version": "node scripts/test-version-increment.mjs",
     "increment-version": "node scripts/increment-version.mjs",
     "debug-stations": "node scripts/debug-dp-stations.mjs",
-    "katabatic:predict": "tsx katabatic-analysis/scripts/predict-katabatic.ts",
-    "katabatic:verify": "tsx katabatic-analysis/scripts/verify-katabatic.ts",
-    "katabatic:analyze": "node katabatic-analysis/scripts/analyze-katabatic-trends.mjs",
     "prepare": "husky"
   },
   "dependencies": {

@@ -10,6 +10,7 @@ An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado 
 - **Fully Configurable**: Customize all wind criteria to match your preferences
 - **Standley Lake Monitor**: Monitor real-time wind conditions at Standley Lake (via Ecowitt weather stations)
 - **🎯 NEW: Mountain Wave-Katabatic Interaction (MKI)**: Revolutionary 6-factor atmospheric analysis (Phase 4 Complete!)
+- **🆓 FREE Historical Enhancement**: Uses actual observed weather data for improved thermal cycle analysis (no additional API costs)
 
 ## Phase 4: MKI Integration ✅ COMPLETE
 
@@ -26,6 +27,12 @@ The Wind Guru tab now features groundbreaking meteorological analysis based on a
 4. **🌡️ Temperature Differential** (15% weight): Valley vs mountain temperature with wave mixing effects
 5. **🌊 Wave Pattern** (15% weight): Mountain wave enhancement using Froude number analysis
 6. **🏔️ Atmospheric Stability** (5% weight): Multi-layer coupling efficiency between surface and wave levels
+
+**🆓 FREE Historical Enhancement:**
+- Uses [Open-Meteo](https://open-meteo.com/) for actual observed temperature data
+- Replaces forecast estimates with real thermal cycle data when available
+- Provides 95% confidence thermal analysis at no additional cost
+- Automatically falls back to forecast data when historical unavailable
 
 **Advanced MKI Calculations:**
 - Froude number assessment for optimal wave conditions (Fr = 0.4-0.6)

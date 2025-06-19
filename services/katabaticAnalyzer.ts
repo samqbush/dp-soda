@@ -1,4 +1,5 @@
 import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
+import { FreeHistoricalWeatherService } from '@/services/freeHistoricalWeatherService';
 
 /**
  * Katabatic wind prediction criteria for 5-factor hybrid system
@@ -46,7 +47,9 @@ export interface KatabaticFactors {
     morrisonTemp: number;
     mountainTemp: number;
     confidence: number;
-    dataSource: 'noaa' | 'openweather';
+    dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
+    analysisType: 'thermal_cycle' | 'unavailable'; // Type of analysis performed
+    thermalCycleFailureReason?: string; // Specific reason why overnight analysis isn't available
   };
   wavePattern: {
     meets: boolean;
@@ -74,6 +77,13 @@ export interface KatabaticPrediction {
     end: Date;
     confidence: number;
   } | null;
+  enhancedAnalysis?: {
+    hasHistoricalData: boolean;
+    historicalDifferential?: number;
+    historicalConfidence?: number;
+    historicalSource?: string;
+    fallbackReason?: string;
+  };
 }
 
 /**
@@ -86,9 +96,9 @@ export class KatabaticAnalyzer {
     maxPrecipitationProbability: 25,
     minCloudCoverClearPeriod: 45,
     minPressureChange: 1.0,
-    minTemperatureDifferential: 3.5,
+    minTemperatureDifferential: 3.2,
     minWavePatternScore: 50,
-    clearSkyWindow: { start: '02:00', end: '05:00' },
+    clearSkyWindow: { start: '18:00', end: '06:00' }, // Updated: 6pm to 6am as requested
     predictionWindow: { start: '06:00', end: '08:00' },
     minimumConfidence: 50,
   };
@@ -135,13 +145,116 @@ export class KatabaticAnalyzer {
     weatherData: WeatherServiceData,
     criteria: KatabaticCriteria
   ): KatabaticFactors {
+    // PERFORMANCE OPTIMIZATION: Pre-index forecast data once for all factor analyses
+    const morrisonIndex = this.indexForecastData(weatherData.morrison.hourlyForecast);
+    const mountainIndex = this.indexForecastData(weatherData.mountain.hourlyForecast);
+    
     return {
       precipitation: this.analyzePrecipitation(weatherData, criteria),
       skyConditions: this.analyzeSkyConditions(weatherData, criteria),
       pressureChange: this.analyzePressureChange(weatherData, criteria),
-      temperatureDifferential: this.analyzeTemperatureDifferential(weatherData, criteria),
+      temperatureDifferential: this.analyzeTemperatureDifferential(weatherData, criteria, morrisonIndex, mountainIndex),
       wavePattern: this.analyzeWavePattern(weatherData, criteria),
     };
+  }
+
+  /**
+   * PERFORMANCE OPTIMIZATION: Index forecast data by date and hour for efficient lookups
+   * This avoids repeated filtering and Date object creation
+   */
+  private indexForecastData(forecast: WeatherDataPoint[]): Map<string, Map<number, WeatherDataPoint>> {
+    const index = new Map<string, Map<number, WeatherDataPoint>>();
+    
+    for (const point of forecast) {
+      const pointDate = new Date(point.timestamp);
+      const dateStr = pointDate.toDateString();
+      const hour = pointDate.getHours();
+      
+      if (!index.has(dateStr)) {
+        index.set(dateStr, new Map());
+      }
+      index.get(dateStr)!.set(hour, point);
+    }
+    
+    return index;
+  }
+
+  /**
+   * Find max temperature in afternoon heating window for thermal cycle analysis
+   */
+  private findAfternoonMaxTemperature(
+    forecastIndex: Map<string, Map<number, WeatherDataPoint>>, 
+    targetDate?: Date
+  ): number | null {
+    const searchDate = targetDate || new Date();
+    const searchDateStr = searchDate.toDateString();
+    
+    const dayData = forecastIndex.get(searchDateStr);
+    if (!dayData) return null;
+    
+    let maxTemp = -Infinity;
+    let foundData = false;
+    
+    // Check afternoon hours (12-17)
+    for (let hour = 12; hour <= 17; hour++) {
+      const dataPoint = dayData.get(hour);
+      if (dataPoint && dataPoint.temperature > maxTemp) {
+        maxTemp = dataPoint.temperature;
+        foundData = true;
+      }
+    }
+    
+    return foundData ? maxTemp : null;
+  }
+
+  /**
+   * Find min temperature in pre-dawn cooling window for thermal cycle analysis
+   */
+  private findPreDawnMinTemperature(
+    forecastIndex: Map<string, Map<number, WeatherDataPoint>>, 
+    targetDate?: Date
+  ): number | null {
+    const today = targetDate || new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toDateString();
+    
+    // Try tomorrow's pre-dawn hours first (3-7 AM)
+    const tomorrowData = forecastIndex.get(tomorrowDateStr);
+    if (tomorrowData) {
+      let minTemp = Infinity;
+      let foundData = false;
+      
+      for (let hour = 3; hour <= 7; hour++) {
+        const dataPoint = tomorrowData.get(hour);
+        if (dataPoint && dataPoint.temperature < minTemp) {
+          minTemp = dataPoint.temperature;
+          foundData = true;
+        }
+      }
+      
+      if (foundData) return minTemp;
+    }
+    
+    // Fallback: try tonight's pre-dawn if tomorrow's isn't available
+    const todayDateStr = today.toDateString();
+    const todayData = forecastIndex.get(todayDateStr);
+    if (todayData) {
+      let minTemp = Infinity;
+      let foundData = false;
+      
+      for (let hour = 3; hour <= 7; hour++) {
+        const dataPoint = todayData.get(hour);
+        if (dataPoint && dataPoint.temperature < minTemp) {
+          minTemp = dataPoint.temperature;
+          foundData = true;
+        }
+      }
+      
+      if (foundData) return minTemp;
+    }
+    
+    return null;
   }
 
   private analyzePrecipitation(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
@@ -216,32 +329,77 @@ export class KatabaticAnalyzer {
     };
   }
 
-  private analyzeTemperatureDifferential(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
-    const morrisonTemp = this.getAverageTemperatureForWindow(
-      weatherData.morrison.hourlyForecast,
-      criteria.predictionWindow
-    );
+  private analyzeTemperatureDifferential(
+    weatherData: WeatherServiceData, 
+    criteria: KatabaticCriteria,
+    morrisonIndex?: Map<string, Map<number, WeatherDataPoint>>,
+    mountainIndex?: Map<string, Map<number, WeatherDataPoint>>
+  ) {
+    // Enhanced thermal cycle approach: Use afternoon max vs pre-dawn min
+    // This models the actual physics of katabatic wind formation
     
-    const mountainTemp = this.getAverageTemperatureForWindow(
-      weatherData.mountain.hourlyForecast,
-      criteria.predictionWindow
-    );
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Use provided indexes or create them if not available (for backward compatibility)
+    const morrisonForecastIndex = morrisonIndex || this.indexForecastData(weatherData.morrison.hourlyForecast);
+    const mountainForecastIndex = mountainIndex || this.indexForecastData(weatherData.mountain.hourlyForecast);
+    
+    // Check if thermal analysis is available based on timing
+    const availabilityCheck = this.determineThermalAnalysisAvailability(currentHour);
+    
+    let morrisonMaxTemp: number | null = null;
+    let evergreenMinTemp: number | null = null;
+    let thermalCycleFailureReason: string | undefined;
+    
+    if (availabilityCheck.isAvailable) {
+      // Extract thermal cycle data
+      const thermalData = this.extractThermalCycleData(
+        morrisonForecastIndex, 
+        mountainForecastIndex, 
+        now
+      );
+      
+      morrisonMaxTemp = thermalData.morrisonMaxTemp;
+      evergreenMinTemp = thermalData.evergreenMinTemp;
+      thermalCycleFailureReason = thermalData.failureReason;
+    } else {
+      thermalCycleFailureReason = availabilityCheck.failureReason;
+    }
+    
+    // Log debug information
+    this.logThermalDebugInfo(weatherData, now, currentHour, morrisonMaxTemp, evergreenMinTemp);
+    
+    // Determine analysis type and temperatures
+    let morrisonTemp: number;
+    let mountainTemp: number;
+    let analysisType: 'thermal_cycle' | 'unavailable';
+    
+    if (currentHour >= 18 && morrisonMaxTemp !== null && evergreenMinTemp !== null) {
+      // Proper overnight analysis available
+      morrisonTemp = morrisonMaxTemp;
+      mountainTemp = evergreenMinTemp;
+      analysisType = 'thermal_cycle';
+    } else {
+      // Overnight analysis not available - return minimal confidence
+      morrisonTemp = 0; // Placeholder values
+      mountainTemp = 0;
+      analysisType = 'unavailable';
+    }
     
     const differential = morrisonTemp - mountainTemp;
-    const meets = differential >= criteria.minTemperatureDifferential;
+    const meets = analysisType === 'thermal_cycle' && differential >= criteria.minTemperatureDifferential;
+    const confidence = this.calculateThermalConfidence(analysisType, meets, differential, criteria);
     
-    const confidence = meets 
-      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 65)
-      : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
-
-    return {
+    return this.createThermalAnalysisResult(
       meets,
       differential,
       morrisonTemp,
       mountainTemp,
       confidence,
-      dataSource: 'noaa' as const,
-    };
+      analysisType,
+      thermalCycleFailureReason
+    );
   }
 
   private analyzeWavePattern(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
@@ -455,16 +613,16 @@ export class KatabaticAnalyzer {
       adjustedConfidence = Math.min(50, adjustedConfidence);
     }
 
-    // LEARNING MODE CAP - June 14, 2025: Cap confidence at 65% until validation system proves accuracy
-    adjustedConfidence = Math.min(65, adjustedConfidence);
+    // REMOVED: Learning mode confidence cap - allowing full confidence range
+    // adjustedConfidence = Math.min(65, adjustedConfidence);
 
     const confidenceScore = Math.round(adjustedConfidence);
 
-    // Convert numeric confidence to string categories (adjusted thresholds)
+    // Convert numeric confidence to string categories (realistic thresholds)
     let confidence: 'low' | 'medium' | 'high';
-    if (adjustedConfidence >= 60) {
+    if (adjustedConfidence >= 80) {
       confidence = 'high';
-    } else if (adjustedConfidence >= 40) {
+    } else if (adjustedConfidence >= 60) {
       confidence = 'medium';
     } else {
       confidence = 'low';
@@ -474,11 +632,11 @@ export class KatabaticAnalyzer {
   }
 
   private generateRecommendation(probability: number, confidence: 'low' | 'medium' | 'high'): 'go' | 'maybe' | 'skip' {
-    if (probability >= 70 && confidence !== 'low') {
+    if (probability >= 75 && confidence === 'high') {
       return 'go';
-    } else if (probability >= 50 && confidence === 'high') {
+    } else if (probability >= 65 && confidence !== 'low') {
       return 'go';
-    } else if (probability >= 40) {
+    } else if (probability >= 45) {
       return 'maybe';
     } else {
       return 'skip';
@@ -499,15 +657,15 @@ export class KatabaticAnalyzer {
         }
       });
 
-    // LEARNING MODE DISCLAIMER - June 14, 2025
-    const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
+    // REMOVED: Learning mode disclaimer - focusing on direct predictions
+    // const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
 
     if (recommendation === 'go') {
-      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence. ${learningModeNote}`;
+      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence.`;
     } else if (recommendation === 'maybe') {
-      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn. ${learningModeNote}`;
+      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn.`;
     } else {
-      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions. ${learningModeNote}`;
+      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions.`;
     }
   }
 
@@ -537,6 +695,221 @@ export class KatabaticAnalyzer {
     end.setHours(8, 0, 0, 0);
     
     return { start, end, confidence: 75 };
+  }
+
+  /**
+   * Enhanced thermal differential analysis using FREE historical data when available
+   * This runs as a background enhancement and doesn't block the main analysis
+   */
+  async getEnhancedThermalAnalysis(
+    weatherData: WeatherServiceData, 
+    criteria: KatabaticCriteria
+  ): Promise<{
+    hasHistoricalData: boolean;
+    historicalDifferential?: number;
+    historicalConfidence?: number;
+    historicalSource?: string;
+    fallbackReason?: string;
+  }> {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Only try historical data if it's afternoon/evening (when we need today's data)
+    if (currentHour < 12) {
+      return {
+        hasHistoricalData: false,
+        fallbackReason: 'Too early in the day for historical analysis'
+      };
+    }
+    
+    try {
+      console.log('🆓 Attempting FREE historical weather enhancement...');
+      const historicalService = FreeHistoricalWeatherService.getInstance();
+      const historicalData = await historicalService.getTodaysThermalCycleData();
+      
+      if (historicalData.dataAvailability.canCalculateThermalCycle && 
+          historicalData.thermalDifferential !== null) {
+        
+        console.log('✅ FREE historical enhancement available:', {
+          morrisonAfternoonMax: historicalData.morrison?.afternoonMax,
+          evergreenMorningMin: historicalData.evergreen?.morningMin,
+          thermalDifferential: historicalData.thermalDifferential
+        });
+        
+        return {
+          hasHistoricalData: true,
+          historicalDifferential: historicalData.thermalDifferential,
+          historicalConfidence: 95, // High confidence for actual observed data
+          historicalSource: 'Open-Meteo actual observations (free)'
+        };
+      } else {
+        return {
+          hasHistoricalData: false,
+          fallbackReason: 'Historical data incomplete for thermal cycle analysis'
+        };
+      }
+    } catch (error) {
+      console.log('⚠️ Historical enhancement unavailable:', error);
+      return {
+        hasHistoricalData: false,
+        fallbackReason: `Historical service error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Determine if thermal cycle analysis is available based on current time
+   */
+  private determineThermalAnalysisAvailability(currentHour: number): {
+    isAvailable: boolean;
+    failureReason?: string;
+  } {
+    if (currentHour < 18) {
+      return {
+        isAvailable: false,
+        failureReason: `Overnight analysis available after 6 PM. For most accurate katabatic predictions, check back when evening temperatures are established.`
+      };
+    }
+    
+    return { isAvailable: true };
+  }
+
+  /**
+   * Extract thermal cycle temperature data using indexed forecasts
+   */
+  private extractThermalCycleData(
+    morrisonIndex: Map<string, Map<number, WeatherDataPoint>>,
+    mountainIndex: Map<string, Map<number, WeatherDataPoint>>,
+    currentTime: Date
+  ): {
+    morrisonMaxTemp: number | null;
+    evergreenMinTemp: number | null;
+    failureReason?: string;
+  } {
+    const today = new Date(currentTime);
+    
+    // Look for today's afternoon maximum temperature
+    const morrisonMaxTemp = this.findAfternoonMaxTemperature(morrisonIndex, today);
+    
+    // Look for tomorrow's dawn minimum temperature
+    const evergreenMinTemp = this.findPreDawnMinTemperature(mountainIndex, currentTime);
+    
+    // Determine failure reasons if data is missing
+    let failureReason: string | undefined;
+    if (morrisonMaxTemp === null || evergreenMinTemp === null) {
+      const reasons: string[] = [];
+      if (morrisonMaxTemp === null) {
+        reasons.push('evening temperature data (6 PM)');
+      }
+      if (evergreenMinTemp === null) {
+        reasons.push('dawn temperature data (6 AM tomorrow)');
+      }
+      
+      failureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}. This may indicate weather API data gaps or insufficient forecast coverage.`;
+    }
+    
+    return {
+      morrisonMaxTemp,
+      evergreenMinTemp,
+      failureReason
+    };
+  }
+
+  /**
+   * Calculate confidence score for thermal differential analysis
+   */
+  private calculateThermalConfidence(
+    analysisType: 'thermal_cycle' | 'unavailable',
+    meets: boolean,
+    differential: number,
+    criteria: KatabaticCriteria
+  ): number {
+    if (analysisType === 'unavailable') {
+      return 0; // No confidence when proper data isn't available
+    }
+    
+    return meets 
+      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 75)
+      : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
+  }
+
+  /**
+   * Log debug information for thermal cycle analysis
+   */
+  private logThermalDebugInfo(
+    weatherData: WeatherServiceData,
+    currentTime: Date,
+    currentHour: number,
+    morrisonMaxTemp: number | null,
+    evergreenMinTemp: number | null
+  ): void {
+    if (!__DEV__) return;
+    
+    console.log('🌡️ Thermal Cycle Debug Info:');
+    console.log(`  Current time: ${currentTime.toLocaleString()}`);
+    console.log(`  Current hour: ${currentHour}`);
+    console.log(`  Morrison forecast hours: ${weatherData.morrison.hourlyForecast.length}`);
+    console.log(`  Mountain forecast hours: ${weatherData.mountain.hourlyForecast.length}`);
+    
+    // Determine which day we're looking for afternoon data
+    const afternoonSearchDate = currentHour >= 17 ? (() => {
+      const tomorrow = new Date(currentTime);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow;
+    })() : currentTime;
+    
+    console.log(`  Primary search for afternoon heating data on: ${afternoonSearchDate.toDateString()} (${currentHour >= 17 ? 'tomorrow' : 'today'})`);
+    
+    // Log available timestamps
+    const morrisonTimes = weatherData.morrison.hourlyForecast.slice(0, 5).map(p => 
+      `${new Date(p.timestamp).toLocaleString()} (${new Date(p.timestamp).getHours()}h)`
+    );
+    console.log(`  First 5 Morrison forecast times: ${morrisonTimes.join(', ')}`);
+    
+    // Check if we have any data for the target afternoon period
+    const afternoonSearchDateStr = afternoonSearchDate.toDateString();
+    const targetAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
+      const pointDate = new Date(point.timestamp);
+      const pointHour = pointDate.getHours();
+      const pointDateStr = pointDate.toDateString();
+      return pointDateStr === afternoonSearchDateStr && pointHour >= 12 && pointHour <= 17;
+    });
+    console.log(`  Target afternoon data points found: ${targetAfternoonData.length}`);
+    
+    if (targetAfternoonData.length > 0) {
+      console.log(`  Target afternoon temps: ${targetAfternoonData.map(p => `${p.temperature.toFixed(1)}°C at ${new Date(p.timestamp).getHours()}h`).join(', ')}`);
+    }
+    
+    console.log(`  Morrison max temp found: ${morrisonMaxTemp ? morrisonMaxTemp.toFixed(1) + '°C' : 'null'}`);
+    console.log(`  Evergreen min temp found: ${evergreenMinTemp ? evergreenMinTemp.toFixed(1) + '°C' : 'null'}`);
+  }
+
+  /**
+   * Create the thermal analysis result object
+   */
+  private createThermalAnalysisResult(
+    meets: boolean,
+    differential: number,
+    morrisonTemp: number,
+    mountainTemp: number,
+    confidence: number,
+    analysisType: 'thermal_cycle' | 'unavailable',
+    thermalCycleFailureReason?: string
+  ) {
+    return {
+      meets,
+      differential,
+      morrisonTemp,
+      mountainTemp,
+      confidence,
+      dataSource: 'hybrid_thermal_cycle' as const,
+      analysisType,
+      thermalCycleFailureReason: thermalCycleFailureReason || undefined,
+      thermalWindow: analysisType === 'thermal_cycle' ? {
+        morrisonMax: '18:00 (Evening - start of cooling cycle)',
+        evergreenMin: '06:00 (Dawn - end of cooling cycle)'
+      } : undefined
+    };
   }
 
   // Helper methods
@@ -592,11 +965,48 @@ export class KatabaticAnalyzer {
     return this.getDataForTimeWindow(forecast, window);
   }
 
-  private getDataForTimeWindow(forecast: WeatherDataPoint[], window: { start: string; end: string }): WeatherDataPoint[] {
+  private getDataForTimeWindow(forecast: WeatherDataPoint[], window: { start: string; end: string }): WeatherDataPoint[];
+  private getDataForTimeWindow(forecastIndex: Map<string, Map<number, WeatherDataPoint>>, window: { start: string; end: string }, targetDate?: Date): WeatherDataPoint[];
+  private getDataForTimeWindow(
+    forecastOrIndex: WeatherDataPoint[] | Map<string, Map<number, WeatherDataPoint>>, 
+    window: { start: string; end: string },
+    targetDate?: Date
+  ): WeatherDataPoint[] {
     const startHour = parseInt(window.start.split(':')[0]);
     const endHour = parseInt(window.end.split(':')[0]);
     
-    return forecast.filter(point => {
+    // Check if we're working with indexed data (performance optimized path)
+    if (forecastOrIndex instanceof Map) {
+      const result: WeatherDataPoint[] = [];
+      const searchDate = targetDate || new Date();
+      const searchDateStr = searchDate.toDateString();
+      
+      const dayData = forecastOrIndex.get(searchDateStr);
+      if (!dayData) return result;
+      
+      if (startHour > endHour) {
+        // Handle time windows that cross midnight (e.g., 18:00 to 06:00)
+        for (let hour = startHour; hour <= 23; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+        for (let hour = 0; hour <= endHour; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+      } else {
+        // Handle normal time windows (e.g., 06:00 to 08:00)
+        for (let hour = startHour; hour <= endHour; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+      }
+      
+      return result;
+    }
+    
+    // Original implementation for backward compatibility
+    return forecastOrIndex.filter(point => {
       const pointDate = new Date(point.timestamp);
       const pointHour = pointDate.getHours();
       

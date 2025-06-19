@@ -128,6 +128,43 @@ export const useWeatherData = () => {
   }, [weatherData]);
 
   /**
+   * Enhanced temperature differential calculation using thermal cycles
+   * Uses the KatabaticAnalyzer to avoid code duplication
+   */
+  const getKatabaticTemperatureDifferential = useCallback(() => {
+    if (!weatherData) return null;
+    
+    try {
+      // Use the existing katabatic analyzer to get temperature differential analysis
+      const analysis = katabaticAnalyzer.analyzePrediction(weatherData);
+      const tempFactor = analysis.factors.temperatureDifferential;
+      
+      if (tempFactor.analysisType === 'unavailable') {
+        // Fallback to current differential if thermal cycle analysis unavailable
+        return getTemperatureDifferential();
+      }
+      
+      // Return the thermal cycle analysis from the analyzer
+      return {
+        morrison: tempFactor.morrisonTemp,
+        mountain: tempFactor.mountainTemp,
+        differential: tempFactor.differential,
+        type: 'thermal_cycle',
+        dataStrategy: tempFactor.analysisType === 'thermal_cycle' ? 'thermal_cycle_analysis' : 'fallback',
+        confidence: tempFactor.confidence > 70 ? 'high' : tempFactor.confidence > 40 ? 'medium' : 'low',
+        timeWindow: {
+          morrisonMax: '18:00 (Evening - start of cooling cycle)',
+          evergreenMin: '06:00 (Dawn - end of cooling cycle)'
+        }
+      };
+    } catch (error) {
+      console.error('Error getting katabatic temperature differential:', error);
+      // Fallback to current differential on error
+      return getTemperatureDifferential();
+    }
+  }, [weatherData, getTemperatureDifferential]);
+
+  /**
    * Get pressure trend analysis
    */
   const getPressureTrend = useCallback((location: 'morrison' | 'mountain', hours: number = 6) => {
@@ -908,6 +945,7 @@ export const useWeatherData = () => {
     getHourlyForecast,
     getWeatherForTimeWindow,
     getTemperatureDifferential,
+    getKatabaticTemperatureDifferential,
     getPressureTrend,
     getBasicKatabaticConditions,
     isApiKeyConfigured,

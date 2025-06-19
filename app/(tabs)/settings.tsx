@@ -9,40 +9,22 @@ import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Simple inline alarm testing component
-function SimpleAlarmTester() {
+// Alarm system testing component
+function AlarmSystemTester() {
   const { testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
-  const { testAlarm } = useDPAlarm();
   const [testing, setTesting] = React.useState(false);
-  const tintColor = useThemeColor({}, 'tint');
 
-  const handleTestCurrent = async () => {
-    setTesting(true);
-    try {
-      const result = await testAlarm();
-      Alert.alert(
-        result.triggered ? '🚨 Test Alarm Would Trigger!' : '❌ No Alarm',
-        result.reason,
-        [{ text: 'OK' }]
-      );
-    } catch {
-      Alert.alert('Test Failed', 'Unable to test alarm with current conditions');
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleTestIdeal = async () => {
+  const handleTestAlarmSystem = async () => {
     setTesting(true);
     try {
       const result = await testWithDelayedIdealConditions(15); // 15 second delay
       Alert.alert(
-        '⏰ Delayed Ideal Test Scheduled!',
-        `A test alarm with ideal conditions has been scheduled for 15 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🔔 This will test:\n• Background notifications\n• Alarm audio playback\n• App state handling\n\nPut the app in the background to test notifications!`,
+        '🔔 Alarm System Test Scheduled!',
+        `The alarm system test has been scheduled for 15 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🧪 This will test:\n• Push notifications\n• Alarm audio playback\n• Background app handling\n• Device wake-up functionality\n\nPut the app in the background now to test notifications!`,
         [{ text: 'Got it!' }]
       );
     } catch {
-      Alert.alert('Test Failed', 'Unable to schedule delayed ideal test');
+      Alert.alert('Test Failed', 'Unable to schedule alarm system test');
     } finally {
       setTesting(false);
     }
@@ -58,23 +40,17 @@ function SimpleAlarmTester() {
 
   return (
     <View style={{ padding: 16, gap: 12 }}>
-      <ThemedText type="subtitle">🧪 Alarm Testing</ThemedText>
-      <TouchableOpacity
-        style={{ padding: 12, borderWidth: 1, borderColor: tintColor, borderRadius: 8 }}
-        onPress={handleTestCurrent}
-        disabled={testing}
-      >
-        <ThemedText style={{ textAlign: 'center', color: tintColor }}>
-          {testing ? 'Testing...' : '🌊 Test Current Conditions'}
-        </ThemedText>
-      </TouchableOpacity>
+      <ThemedText type="subtitle">🔧 Alarm System Testing</ThemedText>
+      <ThemedText style={{ fontSize: 14, opacity: 0.8, marginBottom: 8 }}>
+        Test that notifications and audio work properly on your device. Current wind conditions are shown live on the main Dawn Patrol tab.
+      </ThemedText>
       <TouchableOpacity
         style={{ padding: 12, borderWidth: 1, borderColor: '#28a745', borderRadius: 8 }}
-        onPress={handleTestIdeal}
+        onPress={handleTestAlarmSystem}
         disabled={testing}
       >
         <ThemedText style={{ textAlign: 'center', color: '#28a745' }}>
-          {testing ? 'Scheduling...' : '⭐ Schedule Ideal Test (15s)'}
+          {testing ? 'Scheduling Test...' : '🔔 Test Alarm System (15s)'}
         </ThemedText>
       </TouchableOpacity>
     </View>
@@ -250,33 +226,33 @@ export default function SettingsScreen() {
         <View style={styles.infoSection}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>About Dawn Patrol Alarm</ThemedText>
           <ThemedText style={styles.infoText}>
-            The Dawn Patrol Alarm now uses a simplified, reliable approach for wake-up decisions.
-            It monitors wind conditions using high-quality Ecowitt weather station data and 
+            The Dawn Patrol Alarm now uses a simple, reliable approach for wake-up decisions.
+            It monitors current wind conditions using high-quality Ecowitt weather station data and 
             triggers alarms based on simple wind speed thresholds.
           </ThemedText>
           
           <ThemedText type="subtitle" style={styles.subsectionTitle}>How It Works</ThemedText>
           <ThemedText style={styles.infoText}>
-            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Alarm Logic Explained:{'\n'}</ThemedText>
+            <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Current Conditions Logic:{'\n'}</ThemedText>
             
-            1. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Set Your Alarm Time</ThemedText> - Choose when you want to be woken up (e.g., 5:00 AM){'\n'}
+            1. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Set Your Alarm Time</ThemedText> - Choose when you want to be checked (e.g., 5:00 AM){'\n'}
             
-            2. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Historical Data Check</ThemedText> - At your alarm time, we pull historical Ecowitt weather data from the last 5 minutes around that time{'\n'}
+            2. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Live Data Check</ThemedText> - At your alarm time, we check the current wind conditions at Soda Lake{'\n'}
             
-            3. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Wind Speed Analysis</ThemedText> - We calculate the average wind speed from those data points{'\n'}
+            3. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Real-Time Analysis</ThemedText> - We get the live wind speed from the Ecowitt weather station{'\n'}
             
-            4. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Threshold Comparison</ThemedText> - If the average wind speed equals or exceeds your minimum threshold (set above), the alarm rings{'\n'}
+            4. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Instant Decision</ThemedText> - If the current wind speed equals or exceeds your minimum threshold, the alarm rings{'\n'}
             
-            5. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Simple Decision</ThemedText> - No complex analysis needed - just reliable Ecowitt data and your speed preference
+            5. <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Wake Up or Sleep In</ThemedText> - Simple decision based on current conditions right now
           </ThemedText>
           
           <ThemedText style={styles.infoText}>
             <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Example:</ThemedText> If your alarm is set for 5:00 AM with a 15 mph threshold, 
-            we&apos;ll check the wind data from 4:57-5:02 AM. If the average speed was 17 mph, you get woken up for great conditions!
+            at exactly 5:00 AM we&apos;ll check the current wind speed at Soda Lake. If it&apos;s 17 mph right now, you get woken up for great conditions!
           </ThemedText>
 
-          {/* Unified Alarm Testing Panel */}
-          <SimpleAlarmTester />
+          {/* Alarm System Testing Panel */}
+          <AlarmSystemTester />
         </View>
 
           <ThemedText type="subtitle" style={styles.subsectionTitle}>Wind Analysis on Lake Tabs</ThemedText>
@@ -468,4 +444,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Testing functionality is now handled by SimpleAlarmTester component above
+// Alarm system testing functionality is now handled by AlarmSystemTester component above

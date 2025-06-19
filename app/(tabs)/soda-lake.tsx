@@ -20,11 +20,15 @@ export default function SodaLakeScreen() {
   const {
     windData,
     chartData,
+    currentConditions,
     analysis,
     isLoading,
+    isLoadingCurrent,
     error,
     lastUpdated,
+    currentConditionsUpdated,
     refreshData,
+    refreshCurrentConditions,
     clearCache
   } = useSodaLakeWind();
 
@@ -36,7 +40,9 @@ export default function SodaLakeScreen() {
     React.useCallback(() => {
       console.log('🏔️ Soda Lake tab focused - refreshing data...');
       refreshData();
-    }, [refreshData])
+      // Also refresh current conditions separately for faster updates
+      refreshCurrentConditions();
+    }, [refreshData, refreshCurrentConditions])
   );
 
   const handleRefresh = async () => {
@@ -45,25 +51,40 @@ export default function SodaLakeScreen() {
 
   const formatLastUpdated = () => {
     if (!lastUpdated) return 'Never';
-    const now = new Date();
-    const diff = now.getTime() - lastUpdated.getTime();
-    const minutes = Math.floor(diff / 60000);
     
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    // Format as time (e.g., "2:45 PM")
+    return lastUpdated.toLocaleTimeString([], { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
   };
 
   const getCurrentWindSpeed = () => {
+    // Use real-time data if available and recent (within 10 minutes)
+    if (currentConditions && currentConditionsUpdated) {
+      const age = Date.now() - currentConditionsUpdated.getTime();
+      if (age < 10 * 60 * 1000) { // 10 minutes
+        return currentConditions.windSpeedMph;
+      }
+    }
+    
+    // Fall back to latest historical data
     if (windData.length === 0) return null;
     const latest = windData[windData.length - 1];
     return latest.windSpeedMph;
   };
 
   const getCurrentWindDirection = () => {
+    // Use real-time data if available and recent (within 10 minutes)
+    if (currentConditions && currentConditionsUpdated) {
+      const age = Date.now() - currentConditionsUpdated.getTime();
+      if (age < 10 * 60 * 1000) { // 10 minutes
+        return currentConditions.windDirection;
+      }
+    }
+    
+    // Fall back to latest historical data
     if (windData.length === 0) return null;
     const latest = windData[windData.length - 1];
     return latest.windDirection;
@@ -77,8 +98,19 @@ export default function SodaLakeScreen() {
     return directions[index];
   };
 
-  // Check if data is stale (no data in last 2 hours)
+  // Check if data is stale - prioritize real-time data for current conditions
   const isDataStale = () => {
+    // Check real-time data first
+    if (currentConditions && currentConditionsUpdated) {
+      const now = new Date();
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+      
+      if (currentConditionsUpdated > tenMinutesAgo) {
+        return false; // Real-time data is fresh
+      }
+    }
+    
+    // Fall back to historical data check  
     if (windData.length === 0) return true;
     
     const latest = windData[windData.length - 1];
@@ -90,6 +122,15 @@ export default function SodaLakeScreen() {
   };
 
   const getDataFreshnessMessage = () => {
+    // Check real-time data first
+    if (currentConditions && currentConditionsUpdated) {
+      const now = new Date();
+      const diffMinutes = Math.floor((now.getTime() - currentConditionsUpdated.getTime()) / 60000);
+      
+      if (diffMinutes < 15) return `Real-time data from ${diffMinutes} minutes ago`;
+    }
+    
+    // Fall back to historical data messaging
     if (windData.length === 0) return 'No data available';
     
     const latest = windData[windData.length - 1];
@@ -141,6 +182,13 @@ export default function SodaLakeScreen() {
           </View>
         )}
 
+        {isLoadingCurrent && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={tintColor} />
+            <ThemedText style={styles.loadingText}>Updating current conditions...</ThemedText>
+          </View>
+        )}
+
         {/* Data Freshness Alert */}
         {windData.length > 0 && isDataStale() && (
           <View style={styles.staleDataContainer}>
@@ -155,7 +203,18 @@ export default function SodaLakeScreen() {
 
         {/* Current Conditions */}
         <View style={[styles.currentConditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+          <View style={styles.cardHeader}>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+            <TouchableOpacity
+              style={[styles.refreshButton, { borderColor: tintColor }]}
+              onPress={refreshCurrentConditions}
+              disabled={isLoadingCurrent}
+            >
+              <ThemedText style={[styles.refreshButtonText, { color: tintColor }]}>
+                {isLoadingCurrent ? '⏳' : '🔄'}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
           <View style={styles.currentConditionsGrid}>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
@@ -167,12 +226,6 @@ export default function SodaLakeScreen() {
               <ThemedText style={styles.conditionLabel}>Direction</ThemedText>
               <ThemedText style={styles.conditionValue}>
                 {getWindDirectionText(getCurrentWindDirection())} ({getCurrentWindDirection()?.toFixed(0) || '--'}°)
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Data Points</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {windData.length}
               </ThemedText>
             </View>
             <View style={styles.conditionItem}>
@@ -193,7 +246,7 @@ export default function SodaLakeScreen() {
           <View style={[styles.chartCard, { backgroundColor: cardColor }]}>
             <WindChart
               data={chartData}
-              title="Today's Wind Speed - All Data"
+              title="Today's Wind Speed"
               timeWindow={getWindChartTimeWindow()}
             />
           </View>
@@ -205,14 +258,40 @@ export default function SodaLakeScreen() {
           </View>
         )}
 
-        {/* Analysis */}
+        {/* Historic Data Points */}
+        {windData.length > 0 && (
+          <View style={[styles.dataPointsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.dataPointsText}>
+              Historic Data Points: {windData.length}
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Recent Wind Analysis */}
         {analysis && (
           <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
-            <ThemedText style={styles.analysisText}>
-              Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
-              Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}
-              Consecutive Good Points: {analysis.consecutiveGoodPoints}{'\n'}
+            <View style={styles.analysisGrid}>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.averageSpeed.toFixed(1)} mph
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Avg Speed</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.directionConsistency.toFixed(0)}%
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Direction Consistency</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.consecutiveGoodPoints}
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Good Points</ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.analysisDescription}>
               {analysis.analysis}
             </ThemedText>
           </View>
@@ -243,6 +322,14 @@ export default function SodaLakeScreen() {
             >
               <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
                 Clear Cache
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.debugButton, { borderColor: tintColor, marginTop: 8 }]}
+              onPress={refreshCurrentConditions}
+            >
+              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
+                Test Real-Time API
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -322,6 +409,23 @@ const styles = StyleSheet.create({
   cardTitle: {
     marginBottom: 12,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  refreshButton: {
+    padding: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   currentConditionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -351,6 +455,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  dataPointsCard: {
+    margin: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dataPointsText: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
   noDataCard: {
     margin: 16,
     padding: 32,
@@ -366,9 +481,32 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
-  analysisText: {
+  analysisGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  analysisItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  analysisValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  analysisLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  analysisDescription: {
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.3)',
   },
   linkCard: {
     margin: 16,

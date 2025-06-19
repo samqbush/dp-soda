@@ -702,8 +702,8 @@ export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
 };
 
 /**
- * Simplified alarm checking using Ecowitt data
- * This function can be used by the unified alarm manager without React hooks
+ * Simplified alarm checking using current Ecowitt conditions
+ * This function uses real-time current conditions for immediate alarm decisions
  */
 export const checkSimplifiedAlarmConditions = async (): Promise<{
   shouldTrigger: boolean;
@@ -715,7 +715,7 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
 }> => {
   try {
     // Import Ecowitt service functions
-    const { fetchEcowittWindDataForDevice } = await import('./ecowittService');
+    const { fetchEcowittRealTimeWindData } = await import('./ecowittService');
     
     // Get alarm criteria
     const criteria = await getAlarmCriteria();
@@ -724,50 +724,46 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     // Use the DP Soda Lakes device for Dawn Patrol alarm
     const deviceName = 'DP Soda Lakes';
     
-    // Fetch recent wind data
-    const windData = await fetchEcowittWindDataForDevice(deviceName);
+    // Fetch current real-time wind data (not historical)
+    const currentConditions = await fetchEcowittRealTimeWindData(deviceName);
     
-    if (!windData || windData.length === 0) {
+    if (!currentConditions) {
       return {
         shouldTrigger: false,
         currentSpeed: null,
         averageSpeed: null,
         threshold,
         confidence: 'low',
-        reason: 'No recent wind data available from DP Soda Lakes'
+        reason: 'No current wind data available from DP Soda Lakes station'
       };
     }
     
-    // Calculate average speed from recent data
-    const speeds = windData.map(d => d.windSpeed).filter(speed => speed !== null && speed !== undefined);
-    if (speeds.length === 0) {
+    const currentSpeed = currentConditions.windSpeedMph;
+    
+    if (currentSpeed === null || currentSpeed === undefined) {
       return {
         shouldTrigger: false,
         currentSpeed: null,
         averageSpeed: null,
         threshold,
         confidence: 'low',
-        reason: 'No valid wind speed data'
+        reason: 'Wind speed data not available from station'
       };
     }
     
-    const averageSpeed = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
-    const currentSpeed = windData[windData.length - 1]?.windSpeed || null;
+    // For current conditions, we use the current speed as both current and average
+    // since we're making an immediate decision based on current conditions
+    const averageSpeed = currentSpeed;
     
-    // Determine confidence based on data availability
-    let confidence: 'high' | 'medium' | 'low' = 'low';
-    if (windData.length >= 20) {
-      confidence = 'high';
-    } else if (windData.length >= 10) {
-      confidence = 'medium';
-    }
+    // Confidence is always high for real-time data if we have it
+    const confidence: 'high' | 'medium' | 'low' = 'high';
     
-    // Simple threshold check
-    const shouldTrigger = averageSpeed >= threshold;
+    // Simple threshold check using current conditions
+    const shouldTrigger = currentSpeed >= threshold;
     
     const reason = shouldTrigger 
-      ? `Average wind speed (${averageSpeed.toFixed(1)} mph) meets threshold (${threshold} mph)`
-      : `Average wind speed (${averageSpeed.toFixed(1)} mph) below threshold (${threshold} mph)`;
+      ? `Current wind speed (${currentSpeed.toFixed(1)} mph) meets your threshold (${threshold} mph) - Time to go!`
+      : `Current wind speed (${currentSpeed.toFixed(1)} mph) below your threshold (${threshold} mph) - Not quite yet`;
     
     return {
       shouldTrigger,
@@ -779,14 +775,14 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     };
     
   } catch (error) {
-    console.error('Error checking simplified alarm conditions:', error);
+    console.error('Error checking current alarm conditions:', error);
     return {
       shouldTrigger: false,
       currentSpeed: null,
       averageSpeed: null,
       threshold: 10,
       confidence: 'low',
-      reason: `Error checking conditions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      reason: `Error checking current conditions: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 };

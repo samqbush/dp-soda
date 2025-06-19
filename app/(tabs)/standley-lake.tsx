@@ -19,11 +19,14 @@ export default function StandleyLakeScreen() {
   const {
     windData,
     chartData,
+    currentConditions,
     analysis,
     isLoading,
+    isLoadingCurrent,
     error,
-    lastUpdated,
+    currentConditionsUpdated,
     refreshData,
+    refreshCurrentConditions,
     clearCache
   } = useStandleyLakeWind();
 
@@ -37,45 +40,39 @@ export default function StandleyLakeScreen() {
     React.useCallback(() => {
       console.log('🏔️ Standley Lake tab focused - refreshing data...');
       refreshData();
-    }, [refreshData])
+      // Also refresh current conditions separately for faster updates
+      refreshCurrentConditions();
+    }, [refreshData, refreshCurrentConditions])
   );
 
   const handleRefresh = async () => {
     await refreshData();
   };
 
-  const formatLastUpdated = () => {
-    if (!lastUpdated) return 'Never';
-    const now = new Date();
-    const diff = now.getTime() - lastUpdated.getTime();
-    const minutes = Math.floor(diff / 60000);
-    
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  };
-
+  // Helper functions for current conditions
   const getCurrentWindSpeed = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windSpeedMph;
+    return currentConditions?.windSpeedMph || null;
   };
 
   const getCurrentWindDirection = () => {
-    if (windData.length === 0) return null;
-    const latest = windData[windData.length - 1];
-    return latest.windDirection;
+    return currentConditions?.windDirection;
   };
 
-  const getWindDirectionText = (degrees: number | null) => {
-    if (degrees === null) return 'N/A';
+  const getWindDirectionText = (degrees: number | undefined): string => {
+    if (degrees === undefined || degrees === null) return '--';
     
     const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     const index = Math.round(degrees / 22.5) % 16;
     return directions[index];
+  };
+
+  const formatCurrentConditionsUpdated = () => {
+    if (!currentConditionsUpdated) return 'Never';
+    return currentConditionsUpdated.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
   };
 
   // Check if data is stale (no data in last 2 hours)
@@ -91,18 +88,16 @@ export default function StandleyLakeScreen() {
   };
 
   const getDataFreshnessMessage = () => {
-    if (windData.length === 0) return 'No data available';
+    if (!currentConditions || !currentConditionsUpdated) {
+      return 'Real-time data unavailable';
+    }
     
-    const latest = windData[windData.length - 1];
-    const latestTime = new Date(latest.time);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - latestTime.getTime()) / 60000);
+    const diffMinutes = Math.floor((now.getTime() - currentConditionsUpdated.getTime()) / 60000);
     
-    if (diffMinutes < 30) return 'Data is current';
-    if (diffMinutes < 120) return `Last reading ${diffMinutes} minutes ago`;
-    
-    const diffHours = Math.floor(diffMinutes / 60);
-    return `⚠️ Station may be offline - last reading ${diffHours} hours ago`;
+    if (diffMinutes < 5) return '🟢 Real-time data current';
+    if (diffMinutes < 15) return '🟡 Real-time data slightly delayed';
+    return '🔴 Real-time data may be stale';
   };
 
   return (
@@ -156,7 +151,18 @@ export default function StandleyLakeScreen() {
 
         {/* Current Conditions */}
         <View style={[styles.currentConditionsCard, { backgroundColor: cardColor }]}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+          <View style={styles.cardHeader}>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Current Conditions</ThemedText>
+            <TouchableOpacity
+              style={[styles.refreshButton, { borderColor: tintColor }]}
+              onPress={refreshCurrentConditions}
+              disabled={isLoadingCurrent}
+            >
+              <ThemedText style={[styles.refreshButtonText, { color: tintColor }]}>
+                {isLoadingCurrent ? '⏳' : '🔄'}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
           <View style={styles.currentConditionsGrid}>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Wind Speed</ThemedText>
@@ -171,18 +177,16 @@ export default function StandleyLakeScreen() {
               </ThemedText>
             </View>
             <View style={styles.conditionItem}>
-              <ThemedText style={styles.conditionLabel}>Data Points</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {windData.length}
-              </ThemedText>
-            </View>
-            <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
               <ThemedText style={styles.conditionValue}>
-                {formatLastUpdated()}
+                {formatCurrentConditionsUpdated()}
               </ThemedText>
             </View>
           </View>
+          {/* Data freshness message */}
+          <ThemedText style={styles.freshnessMessage}>
+            {getDataFreshnessMessage()}
+          </ThemedText>
         </View>
 
         {/* Wind Chart */}
@@ -190,7 +194,7 @@ export default function StandleyLakeScreen() {
           <View style={[styles.chartCard, { backgroundColor: cardColor }]}>
             <WindChart
               data={chartData}
-              title="Today's Wind Speed - All Data"
+              title="Today's Wind Speed"
               timeWindow={getWindChartTimeWindow()}
             />
           </View>
@@ -202,14 +206,40 @@ export default function StandleyLakeScreen() {
           </View>
         )}
 
-        {/* Analysis */}
+        {/* Historic Data Points */}
+        {windData.length > 0 && (
+          <View style={[styles.dataPointsCard, { backgroundColor: cardColor }]}>
+            <ThemedText style={styles.dataPointsText}>
+              Historic Data Points: {windData.length}
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Recent Wind Analysis */}
         {analysis && (
           <View style={[styles.analysisCard, { backgroundColor: cardColor }]}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Recent Wind Analysis (Last Hour)</ThemedText>
-            <ThemedText style={styles.analysisText}>
-              Average Speed: {analysis.averageSpeed.toFixed(1)} mph{'\n'}
-              Direction Consistency: {analysis.directionConsistency.toFixed(0)}%{'\n'}
-              Consecutive Good Points: {analysis.consecutiveGoodPoints}{'\n'}
+            <View style={styles.analysisGrid}>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.averageSpeed.toFixed(1)} mph
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Avg Speed</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.directionConsistency.toFixed(0)}%
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Direction Consistency</ThemedText>
+              </View>
+              <View style={styles.analysisItem}>
+                <ThemedText style={styles.analysisValue}>
+                  {analysis.consecutiveGoodPoints}
+                </ThemedText>
+                <ThemedText style={styles.analysisLabel}>Good Points</ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.analysisDescription}>
               {analysis.analysis}
             </ThemedText>
           </View>
@@ -224,6 +254,14 @@ export default function StandleyLakeScreen() {
             >
               <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
                 Clear Cache
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.debugButton, { borderColor: tintColor, marginTop: 8 }]}
+              onPress={refreshCurrentConditions}
+            >
+              <ThemedText style={[styles.debugButtonText, { color: tintColor }]}>
+                Test Real-Time API
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -308,6 +346,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  dataPointsCard: {
+    margin: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dataPointsText: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
   noDataCard: {
     margin: 16,
     padding: 32,
@@ -323,9 +372,32 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
-  analysisText: {
+  analysisGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  analysisItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  analysisValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  analysisLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  analysisDescription: {
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.3)',
   },
   debugContainer: {
     margin: 16,
@@ -357,5 +429,28 @@ const styles = StyleSheet.create({
   staleDataSubtext: {
     fontSize: 14,
     opacity: 0.8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  refreshButton: {
+    padding: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  freshnessMessage: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
