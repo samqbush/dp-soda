@@ -1,4 +1,5 @@
 import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
+import { FreeHistoricalWeatherService } from '@/services/freeHistoricalWeatherService';
 
 /**
  * Katabatic wind prediction criteria for 5-factor hybrid system
@@ -76,6 +77,13 @@ export interface KatabaticPrediction {
     end: Date;
     confidence: number;
   } | null;
+  enhancedAnalysis?: {
+    hasHistoricalData: boolean;
+    historicalDifferential?: number;
+    historicalConfidence?: number;
+    historicalSource?: string;
+    fallbackReason?: string;
+  };
 }
 
 /**
@@ -755,6 +763,66 @@ export class KatabaticAnalyzer {
     end.setHours(8, 0, 0, 0);
     
     return { start, end, confidence: 75 };
+  }
+
+  /**
+   * Enhanced thermal differential analysis using FREE historical data when available
+   * This runs as a background enhancement and doesn't block the main analysis
+   */
+  async getEnhancedThermalAnalysis(
+    weatherData: WeatherServiceData, 
+    criteria: KatabaticCriteria
+  ): Promise<{
+    hasHistoricalData: boolean;
+    historicalDifferential?: number;
+    historicalConfidence?: number;
+    historicalSource?: string;
+    fallbackReason?: string;
+  }> {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Only try historical data if it's afternoon/evening (when we need today's data)
+    if (currentHour < 12) {
+      return {
+        hasHistoricalData: false,
+        fallbackReason: 'Too early in the day for historical analysis'
+      };
+    }
+    
+    try {
+      console.log('🆓 Attempting FREE historical weather enhancement...');
+      const historicalService = FreeHistoricalWeatherService.getInstance();
+      const historicalData = await historicalService.getTodaysThermalCycleData();
+      
+      if (historicalData.dataAvailability.canCalculateThermalCycle && 
+          historicalData.thermalDifferential !== null) {
+        
+        console.log('✅ FREE historical enhancement available:', {
+          morrisonAfternoonMax: historicalData.morrison?.afternoonMax,
+          evergreenMorningMin: historicalData.evergreen?.morningMin,
+          thermalDifferential: historicalData.thermalDifferential
+        });
+        
+        return {
+          hasHistoricalData: true,
+          historicalDifferential: historicalData.thermalDifferential,
+          historicalConfidence: 95, // High confidence for actual observed data
+          historicalSource: 'Open-Meteo actual observations (free)'
+        };
+      } else {
+        return {
+          hasHistoricalData: false,
+          fallbackReason: 'Historical data incomplete for thermal cycle analysis'
+        };
+      }
+    } catch (error) {
+      console.log('⚠️ Historical enhancement unavailable:', error);
+      return {
+        hasHistoricalData: false,
+        fallbackReason: `Historical service error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
   }
 
   // Helper methods

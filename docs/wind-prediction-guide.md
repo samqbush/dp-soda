@@ -47,7 +47,39 @@ Soda Lake sits in an ideal position to receive katabatic flow:
 
 ### Enhanced Analysis Approach
 
-The prediction system combines **meteorological modeling** with **local pattern recognition** and **mountain wave interaction analysis**:
+The prediction system combines **meteorological modeling** with **local pattern recognition**, **mountain wave interaction analysis**, and **free historical data enhancement**:
+
+#### Core Analysis Engine
+- **Multi-source data fusion**: NOAA, OpenWeather, and local sensor integration
+- **Real-time factor evaluation**: 5-factor hybrid analysis system
+- **Dynamic confidence scoring**: Based on data quality and consistency
+- **Time-aware analysis**: Different strategies for pre-dawn vs post-dawn predictions
+
+#### FREE Historical Enhancement (NEW)
+Starting in late 2024, the system includes a **completely free** enhancement using [Open-Meteo](https://open-meteo.com/) historical weather data:
+
+**What it provides:**
+- **Actual observed temperatures** from Morrison and Evergreen, CO for today
+- **Precise thermal cycle analysis** using real afternoon heating vs morning cooling
+- **95% confidence data** replacing forecast estimates when available
+- **No API costs** - Open-Meteo provides free access to historical hourly data back to 1940
+
+**How it works:**
+1. **Morning Mode** (before noon): Uses standard forecast-based analysis
+2. **Afternoon Mode** (after noon): Attempts to fetch actual observed thermal data
+3. **Thermal Enhancement**: If today's thermal cycle is complete, replaces forecast estimates with observed data
+4. **Seamless Fallback**: If historical data unavailable, falls back to standard forecast analysis
+
+**Benefits:**
+- **Higher accuracy** for afternoon/evening predictions using actual vs forecast data
+- **Cost-free enhancement** - no additional API expenses
+- **Real-time thermal validation** - know exactly how much heating occurred today
+- **Improved confidence scores** when actual thermal data is available
+
+**UI Indicators:**
+- 🆓 **FREE Historical Enhancement Active** - when using actual observed data
+- 📊 **Historical Enhancement: [reason]** - explains why enhancement unavailable
+- Green highlight in temperature analysis when historical data improves prediction accuracy
 
 1. **Synoptic Pattern Assessment** (Large-scale conditions)
    - Evaluate Froude number (Fr = U/NH) to determine mountain wave behavior

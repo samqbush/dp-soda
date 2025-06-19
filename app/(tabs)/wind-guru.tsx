@@ -628,6 +628,34 @@ export default function WindGuruScreen() {
                   {katabaticAnalysis.prediction.explanation}
                 </ThemedText>
                 
+                {/* Enhanced Historical Analysis Indicator */}
+                {katabaticAnalysis.prediction.enhancedAnalysis?.hasHistoricalData && (
+                  <ThemedView style={{
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginTop: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#4CAF50'
+                  }}>
+                    <ThemedText style={[styles.explanationText, { 
+                      color: '#4CAF50', 
+                      fontSize: 12,
+                      fontWeight: '600'
+                    }]}>
+                      🆓 FREE Historical Enhancement Active
+                    </ThemedText>
+                    <ThemedText style={[styles.explanationText, { 
+                      color: textColor, 
+                      opacity: 0.8,
+                      fontSize: 11,
+                      marginTop: 4
+                    }]}>
+                      Using actual observed thermal data from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource} for improved accuracy
+                    </ThemedText>
+                  </ThemedView>
+                )}
+                
                 {/* Enhanced Analysis Summary */}
                 {katabaticAnalysis.analysisSummary && (
                   <ThemedView style={styles.analysisSummary}>
@@ -867,6 +895,31 @@ export default function WindGuruScreen() {
                       '⚠️ Using current temps:'
                     } {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
                   </ThemedText>
+                </ThemedView>
+              )}
+              
+              {/* Show enhanced historical analysis status */}
+              {katabaticAnalysis.prediction.enhancedAnalysis && (
+                <ThemedView style={{ marginLeft: 16, marginTop: -4, marginBottom: 8 }}>
+                  {katabaticAnalysis.prediction.enhancedAnalysis.hasHistoricalData ? (
+                    <ThemedText style={[styles.conditionLabel, { 
+                      fontSize: 10, 
+                      opacity: 0.8, 
+                      fontStyle: 'italic',
+                      color: '#4CAF50'
+                    }]}>
+                      🆓 FREE Historical Data: Using actual observed temperatures from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource}
+                    </ThemedText>
+                  ) : katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason && (
+                    <ThemedText style={[styles.conditionLabel, { 
+                      fontSize: 10, 
+                      opacity: 0.6, 
+                      fontStyle: 'italic',
+                      color: '#9E9E9E'
+                    }]}>
+                      📊 Historical Enhancement: {katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason}
+                    </ThemedText>
+                  )}
                 </ThemedView>
               )}
               
@@ -1210,6 +1263,33 @@ export default function WindGuruScreen() {
                       }]}>
                         {(tempDiff as any)?.usedTomorrowFallback ? 'Info:' : 'Reason:'} {(tempDiff as any).thermalCycleFailureReason}
                       </ThemedText>
+                    )}
+                    
+                    {/* Show enhanced historical analysis status */}
+                    {katabaticAnalysis.prediction?.enhancedAnalysis && (
+                      <ThemedView style={{ marginTop: 6 }}>
+                        {katabaticAnalysis.prediction.enhancedAnalysis.hasHistoricalData ? (
+                          <ThemedText style={[styles.dataQualityText, { 
+                            color: '#4CAF50', 
+                            fontSize: 10, 
+                            opacity: 0.9, 
+                            fontStyle: 'italic',
+                            lineHeight: 14
+                          }]}>
+                            🆓 FREE Enhancement: Using actual observed thermal data from {katabaticAnalysis.prediction.enhancedAnalysis.historicalSource}
+                          </ThemedText>
+                        ) : katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason && (
+                          <ThemedText style={[styles.dataQualityText, { 
+                            color: textColor, 
+                            fontSize: 10, 
+                            opacity: 0.6, 
+                            fontStyle: 'italic',
+                            lineHeight: 14
+                          }]}>
+                            📊 Historical Enhancement: {katabaticAnalysis.prediction.enhancedAnalysis.fallbackReason}
+                          </ThemedText>
+                        )}
+                      </ThemedView>
                     )}
                   </ThemedView>
                 </>
