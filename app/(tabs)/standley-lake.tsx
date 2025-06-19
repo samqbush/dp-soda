@@ -24,7 +24,6 @@ export default function StandleyLakeScreen() {
     isLoading,
     isLoadingCurrent,
     error,
-    lastUpdated,
     currentConditionsUpdated,
     refreshData,
     refreshCurrentConditions,

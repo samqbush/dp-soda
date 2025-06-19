@@ -405,7 +405,7 @@ export default function WindGuruScreen() {
                     <ThemedText style={[styles.factorName, { color: textColor }]}>Temperature Difference (15% weight)</ThemedText>
                     <ThemedText style={[styles.factorDesc, { color: textColor, opacity: 0.7 }]}>
                       ≥5.8°F Morrison (valley, 1740m) vs Evergreen (mountain, 2200m) - drives density-driven flow{'\n'}
-                      <ThemedText style={{ fontWeight: '500', color: tintColor }}>Enhanced Thermal Cycle Analysis:</ThemedText> Uses afternoon max vs pre-dawn min temperatures when available for more accurate predictions. Falls back to current readings when thermal cycle data is unavailable.
+                      <ThemedText style={{ fontWeight: '500', color: tintColor }}>Enhanced Thermal Cycle Analysis:</ThemedText> Uses afternoon max vs pre-dawn min temperatures when available for more accurate predictions. If today&apos;s afternoon data is missing, uses tomorrow&apos;s data as fallback. Falls back to current readings only when thermal cycle data is completely unavailable.
                     </ThemedText>
                   </ThemedView>
                 </ThemedView>
@@ -860,9 +860,12 @@ export default function WindGuruScreen() {
                     fontSize: 10, 
                     opacity: 0.7, 
                     fontStyle: 'italic',
-                    color: '#F44336'
+                    color: katabaticAnalysis.prediction.factors.temperatureDifferential.usedTomorrowFallback ? '#FF9800' : '#F44336'
                   }]}>
-                    ⚠️ Using current temps: {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
+                    {katabaticAnalysis.prediction.factors.temperatureDifferential.usedTomorrowFallback ? 
+                      '📅 Using tomorrow\'s data:' : 
+                      '⚠️ Using current temps:'
+                    } {katabaticAnalysis.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
                   </ThemedText>
                 </ThemedView>
               )}
@@ -975,9 +978,12 @@ export default function WindGuruScreen() {
                     fontSize: 10, 
                     opacity: 0.7, 
                     fontStyle: 'italic',
-                    color: '#F44336'
+                    color: tomorrowPrediction.prediction.factors.temperatureDifferential.usedTomorrowFallback ? '#FF9800' : '#F44336'
                   }]}>
-                    ⚠️ Using forecast temps: {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
+                    {tomorrowPrediction.prediction.factors.temperatureDifferential.usedTomorrowFallback ? 
+                      '📅 Using next day\'s data:' : 
+                      '⚠️ Using forecast temps:'
+                    } {tomorrowPrediction.prediction.factors.temperatureDifferential.thermalCycleFailureReason}
                   </ThemedText>
                 </ThemedView>
               )}
@@ -1179,15 +1185,18 @@ export default function WindGuruScreen() {
                   </ThemedView>
                   
                   <ThemedView style={[styles.dataQualityIndicator, { 
-                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    backgroundColor: (tempDiff as any)?.usedTomorrowFallback ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)',
                     borderRadius: 6,
                     padding: 8,
                     marginTop: 8,
                     borderLeftWidth: 3,
-                    borderLeftColor: '#F44336'
+                    borderLeftColor: (tempDiff as any)?.usedTomorrowFallback ? '#FF9800' : '#F44336'
                   }]}>
                     <ThemedText style={[styles.dataQualityText, { color: textColor, fontSize: 11, opacity: 0.8 }]}>
-                      ⚠️ Using current temps (thermal cycle data unavailable)
+                      {(tempDiff as any)?.usedTomorrowFallback ? 
+                        '📅 Using tomorrow\'s thermal data (preferred method)' : 
+                        '⚠️ Using current temps (thermal cycle data unavailable)'
+                      }
                     </ThemedText>
                     {/* Show specific reason for thermal cycle failure */}
                     {(tempDiff as any)?.thermalCycleFailureReason && (
@@ -1199,7 +1208,7 @@ export default function WindGuruScreen() {
                         fontStyle: 'italic',
                         lineHeight: 14
                       }]}>
-                        Reason: {(tempDiff as any).thermalCycleFailureReason}
+                        {(tempDiff as any)?.usedTomorrowFallback ? 'Info:' : 'Reason:'} {(tempDiff as any).thermalCycleFailureReason}
                       </ThemedText>
                     )}
                   </ThemedView>
@@ -1230,13 +1239,19 @@ export default function WindGuruScreen() {
                 borderLeftColor: '#2196F3'
               }]}>
                 <ThemedText style={[styles.calculationNoteTitle, { color: '#2196F3', fontWeight: '600', fontSize: 13, marginBottom: 6 }]}>
-                  📊 {(tempDiff as any)?.type === 'thermal_cycle' ? 'Thermal Cycle Analysis (Enhanced)' : 'Current Temperature Analysis (Fallback)'}
+                  📊 {(tempDiff as any)?.type === 'thermal_cycle' ? 
+                      ((tempDiff as any)?.usedTomorrowFallback ? 'Thermal Cycle Analysis (Tomorrow\'s Data)' : 'Thermal Cycle Analysis (Enhanced)') : 
+                      'Current Temperature Analysis (Fallback)'
+                    }
                 </ThemedText>
                 <ThemedText style={[styles.calculationNoteText, { color: textColor, opacity: 0.8, fontSize: 12, lineHeight: 16 }]}>
                   {(tempDiff as any)?.type === 'thermal_cycle' ? (
                     <>
                       <ThemedText style={{ fontWeight: '500' }}>Method:</ThemedText> Uses thermal cycle peaks for maximum accuracy{'\n'}
                       <ThemedText style={{ fontWeight: '500' }}>How:</ThemedText> Morrison max (12-5 PM) - Evergreen min (3-7 AM) = Thermal differential{'\n'}
+                      {(tempDiff as any)?.usedTomorrowFallback && (
+                        <ThemedText style={{ fontWeight: '500', color: '#FF9800' }}>Fallback:</ThemedText>
+                      )} {(tempDiff as any)?.usedTomorrowFallback ? 'Using tomorrow\'s afternoon data (today\'s unavailable){\'\\n\'}' : ''}
                       <ThemedText style={{ fontWeight: '500' }}>Data Quality:</ThemedText> {(tempDiff as any)?.dataStrategy?.replace(/_/g, ' ')} approach ({(tempDiff as any)?.confidence} confidence)
                     </>
                   ) : (
@@ -1249,7 +1264,10 @@ export default function WindGuruScreen() {
                 </ThemedText>
                 <ThemedText style={[styles.tempCalcExample, { color: textColor, opacity: 0.7, fontSize: 11, marginTop: 6, fontStyle: 'italic' }]}>
                   {(tempDiff as any)?.type === 'thermal_cycle' ? 
-                    'Example: Morrison 95°F (afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential' :
+                    ((tempDiff as any)?.usedTomorrowFallback ? 
+                      'Example: Morrison 95°F (tomorrow afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential' :
+                      'Example: Morrison 95°F (afternoon max) - Evergreen 65°F (pre-dawn min) = 30°F thermal differential'
+                    ) :
                     'Example: Morrison 90°F - Evergreen 83°F = 7°F current differential (may not reflect katabatic potential)'
                   }
                 </ThemedText>

@@ -48,6 +48,7 @@ export interface KatabaticFactors {
     confidence: number;
     dataSource: 'noaa' | 'openweather' | 'hybrid_thermal_cycle';
     thermalCycleFailureReason?: string; // Specific reason why thermal cycle data is unavailable
+    usedTomorrowFallback?: boolean; // Whether tomorrow's data was used as fallback for today's missing data
   };
   wavePattern: {
     meets: boolean;
@@ -226,8 +227,8 @@ export class KatabaticAnalyzer {
     
     // Helper function to find max temperature in afternoon heating window for a specific day
     const findAfternoonMax = (forecast: WeatherDataPoint[], targetDate?: Date): number | null => {
-      const today = targetDate || new Date();
-      const todayDateStr = today.toDateString();
+      const searchDate = targetDate || new Date();
+      const searchDateStr = searchDate.toDateString();
       
       const afternoonData = forecast.filter(point => {
         const pointDate = new Date(point.timestamp);
@@ -235,7 +236,7 @@ export class KatabaticAnalyzer {
         const pointDateStr = pointDate.toDateString();
         
         // Only use data from the target date and within afternoon hours
-        return pointDateStr === todayDateStr && pointHour >= 12 && pointHour <= 17;
+        return pointDateStr === searchDateStr && pointHour >= 12 && pointHour <= 17;
       });
       
       if (afternoonData.length === 0) return null;
@@ -275,31 +276,130 @@ export class KatabaticAnalyzer {
       return Math.min(...preDawnData.map(p => p.temperature));
     };
     
-    // Get thermal cycle temperatures for today's cycle
-    const morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, now);
-    const evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
+    // Get thermal cycle temperatures - use smart date selection with fallback logic
+    let morrisonMaxTemp: number | null = null;
+    let evergreenMinTemp: number | null = null;
+    let usedTomorrowFallback = false;
+    
+    // Determine which day to look for afternoon heating data
+    if (currentHour >= 17) {
+      // After 5 PM: Look for tomorrow's afternoon heating (since today's is past)
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, tomorrow);
+    } else {
+      // Before 5 PM: Look for today's afternoon heating (future or current)
+      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, now);
+      
+      // ENHANCED FALLBACK LOGIC: If today's afternoon data is missing, try tomorrow's
+      if (morrisonMaxTemp === null) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, tomorrow);
+        if (morrisonMaxTemp !== null) {
+          usedTomorrowFallback = true;
+        }
+      }
+    }
+    
+    // Always look for tomorrow's pre-dawn minimum (3-7 AM following the heating cycle)
+    evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
+    
+    // 🔍 DEBUG: Log what forecast data we actually have
+    if (__DEV__) {
+      console.log('🌡️ Thermal Cycle Debug Info:');
+      console.log(`  Current time: ${now.toLocaleString()}`);
+      console.log(`  Current hour: ${currentHour}`);
+      console.log(`  Morrison forecast hours: ${weatherData.morrison.hourlyForecast.length}`);
+      console.log(`  Mountain forecast hours: ${weatherData.mountain.hourlyForecast.length}`);
+      
+      // Determine which day we're looking for afternoon data
+      const afternoonSearchDate = currentHour >= 17 ? (() => {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      })() : now;
+      
+      console.log(`  Primary search for afternoon heating data on: ${afternoonSearchDate.toDateString()} (${currentHour >= 17 ? 'tomorrow' : 'today'})`);
+      if (usedTomorrowFallback) {
+        console.log(`  📅 FALLBACK USED: Today's afternoon data missing, using tomorrow's data instead`);
+      }
+      
+      // Log available timestamps
+      const morrisonTimes = weatherData.morrison.hourlyForecast.slice(0, 5).map(p => 
+        `${new Date(p.timestamp).toLocaleString()} (${new Date(p.timestamp).getHours()}h)`
+      );
+      console.log(`  First 5 Morrison forecast times: ${morrisonTimes.join(', ')}`);
+      
+      // Check if we have any data for the target afternoon period
+      const afternoonSearchDateStr = afternoonSearchDate.toDateString();
+      const targetAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
+        const pointDate = new Date(point.timestamp);
+        const pointHour = pointDate.getHours();
+        const pointDateStr = pointDate.toDateString();
+        return pointDateStr === afternoonSearchDateStr && pointHour >= 12 && pointHour <= 17;
+      });
+      console.log(`  Target afternoon data points found: ${targetAfternoonData.length}`);
+      
+      // If using fallback, also show tomorrow's data
+      if (usedTomorrowFallback) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowDateStr = tomorrow.toDateString();
+        const tomorrowAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
+          const pointDate = new Date(point.timestamp);
+          const pointHour = pointDate.getHours();
+          const pointDateStr = pointDate.toDateString();
+          return pointDateStr === tomorrowDateStr && pointHour >= 12 && pointHour <= 17;
+        });
+        console.log(`  Tomorrow's afternoon data points found: ${tomorrowAfternoonData.length}`);
+      }
+      
+      if (targetAfternoonData.length > 0) {
+        console.log(`  Target afternoon temps: ${targetAfternoonData.map(p => `${p.temperature.toFixed(1)}°C at ${new Date(p.timestamp).getHours()}h`).join(', ')}`);
+      }
+      
+      console.log(`  Morrison max temp found: ${morrisonMaxTemp ? morrisonMaxTemp.toFixed(1) + '°C' : 'null'}`);
+      console.log(`  Evergreen min temp found: ${evergreenMinTemp ? evergreenMinTemp.toFixed(1) + '°C' : 'null'}`);
+    }
     
     // Determine specific failure reasons for thermal cycle data
     let thermalCycleFailureReason: string | null = null;
     if (morrisonMaxTemp === null || evergreenMinTemp === null) {
       const reasons: string[] = [];
       if (morrisonMaxTemp === null) {
-        reasons.push('afternoon heating data (12-5 PM)');
+        const afternoonDay = currentHour >= 17 ? 'tomorrow' : 'today';
+        if (currentHour < 17 && !usedTomorrowFallback) {
+          reasons.push(`afternoon heating data for both today and tomorrow (12-5 PM)`);
+        } else {
+          reasons.push(`afternoon heating data (12-5 PM ${afternoonDay})`);
+        }
       }
       if (evergreenMinTemp === null) {
         reasons.push('pre-dawn cooling data (3-7 AM tomorrow)');
       }
       
-      // Determine likely cause
+      // Enhanced failure reason messages
       const morrisonForecastHours = weatherData.morrison.hourlyForecast.length;
       const mountainForecastHours = weatherData.mountain.hourlyForecast.length;
-      const minHoursNeeded = currentHour < 12 ? 24 : 15; // Need more hours if before afternoon heating
+      const minHoursNeeded = currentHour >= 17 ? 18 : 15;
       
       if (morrisonForecastHours < minHoursNeeded || mountainForecastHours < minHoursNeeded) {
         thermalCycleFailureReason = `Insufficient forecast data - missing ${reasons.join(' and ')}. Weather models provide only ${Math.min(morrisonForecastHours, mountainForecastHours)} hours of data, but ${minHoursNeeded}+ hours needed for thermal cycle analysis.`;
       } else {
-        thermalCycleFailureReason = `Weather API data gaps during critical periods - missing ${reasons.join(' and ')}. This typically occurs with incomplete NOAA or OpenWeather forecast coverage.`;
+        // Check if forecast starts from midnight (common API limitation)
+        const firstForecastTime = new Date(weatherData.morrison.hourlyForecast[0]?.timestamp);
+        const isStartingFromMidnight = firstForecastTime.getHours() === 0 && firstForecastTime.getDate() > now.getDate();
+        
+        if (isStartingFromMidnight && currentHour < 17) {
+          thermalCycleFailureReason = `Weather API limitation - forecast starts from midnight of next day, missing today's afternoon heating data. ${usedTomorrowFallback ? 'Using tomorrow\'s afternoon data as fallback.' : 'Unable to use fallback data.'}`;
+        } else {
+          thermalCycleFailureReason = `Weather API data gaps during critical periods - missing ${reasons.join(' and ')}. This typically occurs with incomplete NOAA or OpenWeather forecast coverage.`;
+        }
       }
+    } else if (usedTomorrowFallback) {
+      // Special message when using fallback successfully
+      thermalCycleFailureReason = `Using tomorrow's afternoon heating data as fallback (today's data unavailable). This is common with weather APIs that start forecasts from midnight.`;
     }
     
     // Fallback to prediction window averages if thermal cycle data unavailable
@@ -354,8 +454,9 @@ export class KatabaticAnalyzer {
       dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
       thermalCycleFailureReason: thermalCycleFailureReason || undefined, // Convert null to undefined for TypeScript
+      usedTomorrowFallback,
       thermalWindow: analysisType === 'thermal_cycle' ? {
-        morrisonMax: '12:00-17:00 (Afternoon heating)',
+        morrisonMax: usedTomorrowFallback ? '12:00-17:00 (Tomorrow\'s afternoon heating - fallback)' : '12:00-17:00 (Afternoon heating)',
         evergreenMin: '03:00-07:00 (Pre-dawn cooling)'
       } : undefined
     };
