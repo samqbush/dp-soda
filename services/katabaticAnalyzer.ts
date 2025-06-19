@@ -681,8 +681,8 @@ export class KatabaticAnalyzer {
       adjustedConfidence = Math.min(50, adjustedConfidence);
     }
 
-    // LEARNING MODE CAP - June 14, 2025: Cap confidence at 65% until validation system proves accuracy
-    adjustedConfidence = Math.min(65, adjustedConfidence);
+    // REMOVED: Learning mode confidence cap - allowing full confidence range
+    // adjustedConfidence = Math.min(65, adjustedConfidence);
 
     const confidenceScore = Math.round(adjustedConfidence);
 
@@ -725,15 +725,15 @@ export class KatabaticAnalyzer {
         }
       });
 
-    // LEARNING MODE DISCLAIMER - June 14, 2025
-    const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
+    // REMOVED: Learning mode disclaimer - focusing on direct predictions
+    // const learningModeNote = "🧠 Learning Mode: Predictions are more conservative while we validate accuracy with actual wind data.";
 
     if (recommendation === 'go') {
-      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence. ${learningModeNote}`;
+      return `Strong conditions! ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction confidence.`;
     } else if (recommendation === 'maybe') {
-      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn. ${learningModeNote}`;
+      return `Mixed conditions. ${metFactors.length}/5 factors favorable (${metFactors.join(', ')}). ${probability}% hybrid prediction - check closer to dawn.`;
     } else {
-      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions. ${learningModeNote}`;
+      return `Poor conditions. Only ${metFactors.length}/5 factors favorable. ${probability}% hybrid prediction suggests waiting for better conditions.`;
     }
   }
 
