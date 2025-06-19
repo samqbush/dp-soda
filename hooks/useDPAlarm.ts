@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSodaLakeWind } from './useSodaLakeWind';
-import { getAlarmCriteria, setAlarmCriteria } from '@/services/windService';
+import { getAlarmCriteria, setAlarmCriteria, checkSimplifiedAlarmConditions } from '@/services/windService';
 import { unifiedAlarmManager } from '@/services/unifiedAlarmManager';
 
 // Simple event emitter for cross-hook synchronization
@@ -33,7 +33,6 @@ export interface SimplifiedAlarmCriteria {
 export interface DPAlarmStatus {
   shouldWakeUp: boolean;
   currentSpeed: number | null;
-  averageSpeed: number | null;
   threshold: number;
   lastUpdated: Date | null;
   confidence: 'high' | 'medium' | 'low';
@@ -64,7 +63,7 @@ const DEFAULT_SIMPLIFIED_CRITERIA: SimplifiedAlarmCriteria = {
 };
 
 /**
- * Simplified DP Alarm hook that uses Ecowitt data for basic wind speed checking
+ * Simplified DP Alarm hook that uses current Ecowitt conditions
  */
 export const useDPAlarm = (): UseDPAlarmReturn => {
   console.log('⏰ useDPAlarm hook initializing...');
@@ -72,14 +71,12 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
   const [criteria, setCriteriaState] = useState<SimplifiedAlarmCriteria>(DEFAULT_SIMPLIFIED_CRITERIA);
   const [error, setError] = useState<string | null>(null);
   
-  // Use Soda Lake wind data (Ecowitt source) - matches actual alarm system
+  // Use Soda Lake current conditions for immediate alarm decisions
   const {
-    windData,
-    analysis,
-    isLoading,
+    currentConditions,
+    currentConditionsUpdated,
     error: windError,
-    lastUpdated,
-    refreshData: refreshWindData
+    refreshCurrentConditions
   } = useSodaLakeWind();
 
   // Subscribe to unified alarm manager and load initial state from it
@@ -171,95 +168,63 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
   }, []);
 
   /**
-   * Calculate alarm status based on alarm time conditions (not current conditions)
-   * This shows what the conditions were at the time the alarm was set to trigger
+   * Calculate alarm status based on current wind conditions
+   * This shows what the current conditions are for immediate decisions
    */
-  const calculateAlarmTimeStatus = useCallback((): DPAlarmStatus => {
+  const calculateCurrentAlarmStatus = useCallback((): DPAlarmStatus => {
     // Default status
     const defaultStatus: DPAlarmStatus = {
       shouldWakeUp: false,
       currentSpeed: null,
-      averageSpeed: null,
       threshold: criteria.minimumAverageSpeed,
-      lastUpdated,
+      lastUpdated: currentConditionsUpdated,
       confidence: 'low',
-      reason: 'No data available'
+      reason: 'No current wind data available'
     };
 
-    // Check if we have wind data
-    if (!windData || windData.length === 0) {
+    // Check if we have current conditions
+    if (!currentConditions) {
       return {
         ...defaultStatus,
-        reason: 'No wind data available'
+        reason: 'No current wind data from Soda Lake station'
       };
     }
 
-    // Parse alarm time (e.g., "05:00")
-    const [alarmHour, alarmMinute] = criteria.alarmTime.split(':').map(Number);
+    const currentSpeed = currentConditions.windSpeedMph;
     
-    // Create alarm time for today
-    const now = new Date();
-    const alarmTimeToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), alarmHour, alarmMinute);
-    
-    // If alarm time hasn't happened yet today, use yesterday's data
-    const targetTime = alarmTimeToday > now 
-      ? new Date(alarmTimeToday.getTime() - 24 * 60 * 60 * 1000) // Yesterday
-      : alarmTimeToday; // Today
-    
-    // Find wind data closest to the alarm time
-    // Look for data within 5 minutes of alarm time
-    const targetTimeMs = targetTime.getTime();
-    const fiveMinutesMs = 5 * 60 * 1000;
-    
-    const alarmTimeData = windData.filter((point) => {
-      const pointTime = new Date(point.timestamp).getTime();
-      return Math.abs(pointTime - targetTimeMs) <= fiveMinutesMs;
-    });
-
-    if (alarmTimeData.length === 0) {
+    if (currentSpeed === null || currentSpeed === undefined) {
       return {
         ...defaultStatus,
-        reason: `No wind data available around ${criteria.alarmTime} alarm time`
+        reason: 'Wind speed data not available from station'
       };
     }
 
-    // Calculate average of data points around alarm time
-    const averageSpeed = alarmTimeData.reduce((sum, point) => sum + point.windSpeedMph, 0) / alarmTimeData.length;
-    const currentSpeed = alarmTimeData[alarmTimeData.length - 1]?.windSpeedMph || null;
+    // High confidence for real-time data
+    const confidence: 'high' | 'medium' | 'low' = 'high';
 
-    // Determine confidence based on data availability
-    let confidence: 'high' | 'medium' | 'low' = 'low';
-    if (alarmTimeData.length >= 3) { // 3+ data points around alarm time
-      confidence = 'high';
-    } else if (alarmTimeData.length >= 2) { // 2+ data points
-      confidence = 'medium';
-    }
-
-    // Simple alarm logic: average speed must meet threshold
-    const shouldWakeUp = averageSpeed >= criteria.minimumAverageSpeed;
+    // Simple alarm logic: current speed must meet threshold
+    const shouldWakeUp = currentSpeed >= criteria.minimumAverageSpeed;
     
-    // Generate reason text with alarm time context
-    const timeDisplay = targetTime.toLocaleDateString() === now.toLocaleDateString() ? 'today' : 'yesterday';
+    // Generate reason text for current conditions
     let reason = '';
     if (shouldWakeUp) {
-      reason = `At ${criteria.alarmTime} ${timeDisplay}: Average wind speed (${averageSpeed.toFixed(1)} mph) met threshold (${criteria.minimumAverageSpeed} mph) - Alarm would have triggered`;
+      reason = `Current wind speed (${currentSpeed.toFixed(1)} mph) meets your threshold (${criteria.minimumAverageSpeed} mph) - Time to go!`;
     } else {
-      reason = `At ${criteria.alarmTime} ${timeDisplay}: Average wind speed (${averageSpeed.toFixed(1)} mph) below threshold (${criteria.minimumAverageSpeed} mph) - Alarm would not trigger`;
+      reason = `Current wind speed (${currentSpeed.toFixed(1)} mph) below your threshold (${criteria.minimumAverageSpeed} mph) - Not quite yet`;
     }
 
     return {
       shouldWakeUp,
       currentSpeed,
-      averageSpeed,
       threshold: criteria.minimumAverageSpeed,
-      lastUpdated: targetTime,
+      lastUpdated: currentConditionsUpdated,
       confidence,
       reason
     };
-  }, [windData, criteria.minimumAverageSpeed, criteria.alarmTime, lastUpdated]);
+  }, [currentConditions, criteria.minimumAverageSpeed, currentConditionsUpdated]);
 
-  // Calculate alarm time status (not current conditions)
-  const alarmStatus = calculateAlarmTimeStatus();
+  // Calculate current alarm status (not historical conditions)
+  const alarmStatus = calculateCurrentAlarmStatus();
 
   /**
    * Update alarm criteria and persist to storage
@@ -313,28 +278,36 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
   }, [criteria]);
 
   /**
-   * Refresh wind data
+   * Refresh current wind conditions
    */
   const refreshData = useCallback(async () => {
     try {
       setError(null);
-      await refreshWindData();
+      await refreshCurrentConditions();
     } catch (err) {
-      console.error('❌ Failed to refresh wind data:', err);
-      setError('Failed to refresh wind data');
+      console.error('❌ Failed to refresh current conditions:', err);
+      setError('Failed to refresh current wind conditions');
     }
-  }, [refreshWindData]);
+  }, [refreshCurrentConditions]);
 
   /**
-   * Test alarm with alarm time conditions
+   * Test alarm with current conditions
    */
   const testAlarm = useCallback(async (): Promise<{ triggered: boolean; reason: string }> => {
-    const status = calculateAlarmTimeStatus();
-    return {
-      triggered: status.shouldWakeUp,
-      reason: status.reason
-    };
-  }, [calculateAlarmTimeStatus]);
+    try {
+      const result = await checkSimplifiedAlarmConditions();
+      return {
+        triggered: result.shouldTrigger,
+        reason: result.reason
+      };
+    } catch (err) {
+      console.error('❌ Failed to test alarm:', err);
+      return {
+        triggered: false,
+        reason: 'Failed to check current conditions'
+      };
+    }
+  }, []);
 
   // Combine wind error with local error
   const combinedError = error || windError;
@@ -343,7 +316,7 @@ export const useDPAlarm = (): UseDPAlarmReturn => {
     alarmStatus,
     criteria,
     setCriteria,
-    isLoading,
+    isLoading: false, // No loading state needed for current conditions display
     error: combinedError,
     refreshData,
     testAlarm,
