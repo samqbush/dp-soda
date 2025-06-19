@@ -145,13 +145,116 @@ export class KatabaticAnalyzer {
     weatherData: WeatherServiceData,
     criteria: KatabaticCriteria
   ): KatabaticFactors {
+    // PERFORMANCE OPTIMIZATION: Pre-index forecast data once for all factor analyses
+    const morrisonIndex = this.indexForecastData(weatherData.morrison.hourlyForecast);
+    const mountainIndex = this.indexForecastData(weatherData.mountain.hourlyForecast);
+    
     return {
       precipitation: this.analyzePrecipitation(weatherData, criteria),
       skyConditions: this.analyzeSkyConditions(weatherData, criteria),
       pressureChange: this.analyzePressureChange(weatherData, criteria),
-      temperatureDifferential: this.analyzeTemperatureDifferential(weatherData, criteria),
+      temperatureDifferential: this.analyzeTemperatureDifferential(weatherData, criteria, morrisonIndex, mountainIndex),
       wavePattern: this.analyzeWavePattern(weatherData, criteria),
     };
+  }
+
+  /**
+   * PERFORMANCE OPTIMIZATION: Index forecast data by date and hour for efficient lookups
+   * This avoids repeated filtering and Date object creation
+   */
+  private indexForecastData(forecast: WeatherDataPoint[]): Map<string, Map<number, WeatherDataPoint>> {
+    const index = new Map<string, Map<number, WeatherDataPoint>>();
+    
+    for (const point of forecast) {
+      const pointDate = new Date(point.timestamp);
+      const dateStr = pointDate.toDateString();
+      const hour = pointDate.getHours();
+      
+      if (!index.has(dateStr)) {
+        index.set(dateStr, new Map());
+      }
+      index.get(dateStr)!.set(hour, point);
+    }
+    
+    return index;
+  }
+
+  /**
+   * Find max temperature in afternoon heating window for thermal cycle analysis
+   */
+  private findAfternoonMaxTemperature(
+    forecastIndex: Map<string, Map<number, WeatherDataPoint>>, 
+    targetDate?: Date
+  ): number | null {
+    const searchDate = targetDate || new Date();
+    const searchDateStr = searchDate.toDateString();
+    
+    const dayData = forecastIndex.get(searchDateStr);
+    if (!dayData) return null;
+    
+    let maxTemp = -Infinity;
+    let foundData = false;
+    
+    // Check afternoon hours (12-17)
+    for (let hour = 12; hour <= 17; hour++) {
+      const dataPoint = dayData.get(hour);
+      if (dataPoint && dataPoint.temperature > maxTemp) {
+        maxTemp = dataPoint.temperature;
+        foundData = true;
+      }
+    }
+    
+    return foundData ? maxTemp : null;
+  }
+
+  /**
+   * Find min temperature in pre-dawn cooling window for thermal cycle analysis
+   */
+  private findPreDawnMinTemperature(
+    forecastIndex: Map<string, Map<number, WeatherDataPoint>>, 
+    targetDate?: Date
+  ): number | null {
+    const today = targetDate || new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toDateString();
+    
+    // Try tomorrow's pre-dawn hours first (3-7 AM)
+    const tomorrowData = forecastIndex.get(tomorrowDateStr);
+    if (tomorrowData) {
+      let minTemp = Infinity;
+      let foundData = false;
+      
+      for (let hour = 3; hour <= 7; hour++) {
+        const dataPoint = tomorrowData.get(hour);
+        if (dataPoint && dataPoint.temperature < minTemp) {
+          minTemp = dataPoint.temperature;
+          foundData = true;
+        }
+      }
+      
+      if (foundData) return minTemp;
+    }
+    
+    // Fallback: try tonight's pre-dawn if tomorrow's isn't available
+    const todayDateStr = today.toDateString();
+    const todayData = forecastIndex.get(todayDateStr);
+    if (todayData) {
+      let minTemp = Infinity;
+      let foundData = false;
+      
+      for (let hour = 3; hour <= 7; hour++) {
+        const dataPoint = todayData.get(hour);
+        if (dataPoint && dataPoint.temperature < minTemp) {
+          minTemp = dataPoint.temperature;
+          foundData = true;
+        }
+      }
+      
+      if (foundData) return minTemp;
+    }
+    
+    return null;
   }
 
   private analyzePrecipitation(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
@@ -226,148 +329,48 @@ export class KatabaticAnalyzer {
     };
   }
 
-  private analyzeTemperatureDifferential(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
+  private analyzeTemperatureDifferential(
+    weatherData: WeatherServiceData, 
+    criteria: KatabaticCriteria,
+    morrisonIndex?: Map<string, Map<number, WeatherDataPoint>>,
+    mountainIndex?: Map<string, Map<number, WeatherDataPoint>>
+  ) {
     // Enhanced thermal cycle approach: Use afternoon max vs pre-dawn min
     // This models the actual physics of katabatic wind formation
     
     const now = new Date();
     const currentHour = now.getHours();
     
-    // Helper function to find max temperature in afternoon heating window for a specific day
-    const findAfternoonMax = (forecast: WeatherDataPoint[], targetDate?: Date): number | null => {
-      const searchDate = targetDate || new Date();
-      const searchDateStr = searchDate.toDateString();
-      
-      const afternoonData = forecast.filter(point => {
-        const pointDate = new Date(point.timestamp);
-        const pointHour = pointDate.getHours();
-        const pointDateStr = pointDate.toDateString();
-        
-        // Only use data from the target date and within afternoon hours
-        return pointDateStr === searchDateStr && pointHour >= 12 && pointHour <= 17;
-      });
-      
-      if (afternoonData.length === 0) return null;
-      return Math.max(...afternoonData.map(p => p.temperature));
-    };
+    // Use provided indexes or create them if not available (for backward compatibility)
+    const morrisonForecastIndex = morrisonIndex || this.indexForecastData(weatherData.morrison.hourlyForecast);
+    const mountainForecastIndex = mountainIndex || this.indexForecastData(weatherData.mountain.hourlyForecast);
     
-    // Helper function to find min temperature in pre-dawn cooling window for the following night
-    const findPreDawnMin = (forecast: WeatherDataPoint[], targetDate?: Date): number | null => {
-      const today = targetDate || new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowDateStr = tomorrow.toDateString();
-      
-      const preDawnData = forecast.filter(point => {
-        const pointDate = new Date(point.timestamp);
-        const pointHour = pointDate.getHours();
-        const pointDateStr = pointDate.toDateString();
-        
-        // Use tomorrow's pre-dawn hours (the following night after the afternoon heating)
-        return pointDateStr === tomorrowDateStr && pointHour >= 3 && pointHour <= 7;
-      });
-      
-      if (preDawnData.length === 0) {
-        // Fallback: try tonight's pre-dawn if tomorrow's isn't available
-        const tonightData = forecast.filter(point => {
-          const pointDate = new Date(point.timestamp);
-          const pointHour = pointDate.getHours();
-          const pointDateStr = pointDate.toDateString();
-          
-          return pointDateStr === today.toDateString() && pointHour >= 3 && pointHour <= 7;
-        });
-        
-        if (tonightData.length === 0) return null;
-        return Math.min(...tonightData.map(p => p.temperature));
-      }
-      
-      return Math.min(...preDawnData.map(p => p.temperature));
-    };
+    // Check if thermal analysis is available based on timing
+    const availabilityCheck = this.determineThermalAnalysisAvailability(currentHour);
     
-    // Get thermal cycle temperatures - use smart date selection
     let morrisonMaxTemp: number | null = null;
     let evergreenMinTemp: number | null = null;
+    let thermalCycleFailureReason: string | undefined;
     
-    // Determine which day to look for overnight analysis data
-    // Real-world workflow: Only provide reliable analysis after 6 PM
-    if (currentHour < 18) {
-      // Before 6 PM: Don't use fallback data, indicate when proper analysis will be available
-      morrisonMaxTemp = null;
-      evergreenMinTemp = null;
-    } else {
-      // After 6 PM: Look for today's evening data (6 PM) and tomorrow's dawn data (6 AM)
-      // This aligns with real-world prediction workflow
-      const today = new Date(now);
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      // Look for today's evening temperature (6 PM - start of cooling cycle)
-      morrisonMaxTemp = findAfternoonMax(weatherData.morrison.hourlyForecast, today);
-      
-      // Look for tomorrow's dawn minimum (3-7 AM - end of cooling cycle)
-      evergreenMinTemp = findPreDawnMin(weatherData.mountain.hourlyForecast, now);
-    }
-    
-    // 🔍 DEBUG: Log what forecast data we actually have
-    if (__DEV__) {
-      console.log('🌡️ Thermal Cycle Debug Info:');
-      console.log(`  Current time: ${now.toLocaleString()}`);
-      console.log(`  Current hour: ${currentHour}`);
-      console.log(`  Morrison forecast hours: ${weatherData.morrison.hourlyForecast.length}`);
-      console.log(`  Mountain forecast hours: ${weatherData.mountain.hourlyForecast.length}`);
-      
-      // Determine which day we're looking for afternoon data
-      const afternoonSearchDate = currentHour >= 17 ? (() => {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow;
-      })() : now;
-      
-      console.log(`  Primary search for afternoon heating data on: ${afternoonSearchDate.toDateString()} (${currentHour >= 17 ? 'tomorrow' : 'today'})`);
-      
-      // Log available timestamps
-      const morrisonTimes = weatherData.morrison.hourlyForecast.slice(0, 5).map(p => 
-        `${new Date(p.timestamp).toLocaleString()} (${new Date(p.timestamp).getHours()}h)`
+    if (availabilityCheck.isAvailable) {
+      // Extract thermal cycle data
+      const thermalData = this.extractThermalCycleData(
+        morrisonForecastIndex, 
+        mountainForecastIndex, 
+        now
       );
-      console.log(`  First 5 Morrison forecast times: ${morrisonTimes.join(', ')}`);
       
-      // Check if we have any data for the target afternoon period
-      const afternoonSearchDateStr = afternoonSearchDate.toDateString();
-      const targetAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
-        const pointDate = new Date(point.timestamp);
-        const pointHour = pointDate.getHours();
-        const pointDateStr = pointDate.toDateString();
-        return pointDateStr === afternoonSearchDateStr && pointHour >= 12 && pointHour <= 17;
-      });
-      console.log(`  Target afternoon data points found: ${targetAfternoonData.length}`);
-      
-      if (targetAfternoonData.length > 0) {
-        console.log(`  Target afternoon temps: ${targetAfternoonData.map(p => `${p.temperature.toFixed(1)}°C at ${new Date(p.timestamp).getHours()}h`).join(', ')}`);
-      }
-      
-      console.log(`  Morrison max temp found: ${morrisonMaxTemp ? morrisonMaxTemp.toFixed(1) + '°C' : 'null'}`);
-      console.log(`  Evergreen min temp found: ${evergreenMinTemp ? evergreenMinTemp.toFixed(1) + '°C' : 'null'}`);
+      morrisonMaxTemp = thermalData.morrisonMaxTemp;
+      evergreenMinTemp = thermalData.evergreenMinTemp;
+      thermalCycleFailureReason = thermalData.failureReason;
+    } else {
+      thermalCycleFailureReason = availabilityCheck.failureReason;
     }
     
-    // Determine specific failure reasons for overnight analysis
-    let thermalCycleFailureReason: string | null = null;
-    if (currentHour < 18) {
-      // Before 6 PM: Guide user to optimal prediction timing
-      thermalCycleFailureReason = `Overnight analysis available after 6 PM. For most accurate katabatic predictions, check back when evening temperatures are established.`;
-    } else if (morrisonMaxTemp === null || evergreenMinTemp === null) {
-      // After 6 PM but data missing: Indicate data availability issues
-      const reasons: string[] = [];
-      if (morrisonMaxTemp === null) {
-        reasons.push('evening temperature data (6 PM)');
-      }
-      if (evergreenMinTemp === null) {
-        reasons.push('dawn temperature data (6 AM tomorrow)');
-      }
-      
-      thermalCycleFailureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}. This may indicate weather API data gaps or insufficient forecast coverage.`;
-    }
+    // Log debug information
+    this.logThermalDebugInfo(weatherData, now, currentHour, morrisonMaxTemp, evergreenMinTemp);
     
-    // Use overnight analysis when available, otherwise indicate unavailability
+    // Determine analysis type and temperatures
     let morrisonTemp: number;
     let mountainTemp: number;
     let analysisType: 'thermal_cycle' | 'unavailable';
@@ -385,34 +388,18 @@ export class KatabaticAnalyzer {
     }
     
     const differential = morrisonTemp - mountainTemp;
-    
-    // Analysis quality based on timing
     const meets = analysisType === 'thermal_cycle' && differential >= criteria.minTemperatureDifferential;
+    const confidence = this.calculateThermalConfidence(analysisType, meets, differential, criteria);
     
-    // Confidence calculation based on data availability
-    let confidence: number;
-    if (analysisType === 'unavailable') {
-      confidence = 0; // No confidence when proper data isn't available
-    } else {
-      confidence = meets 
-        ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 75)
-        : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
-    }
-
-    return {
+    return this.createThermalAnalysisResult(
       meets,
       differential,
       morrisonTemp,
       mountainTemp,
       confidence,
-      dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
-      thermalCycleFailureReason: thermalCycleFailureReason || undefined,
-      thermalWindow: analysisType === 'thermal_cycle' ? {
-        morrisonMax: '18:00 (Evening - start of cooling cycle)',
-        evergreenMin: '06:00 (Dawn - end of cooling cycle)'
-      } : undefined
-    };
+      thermalCycleFailureReason
+    );
   }
 
   private analyzeWavePattern(weatherData: WeatherServiceData, criteria: KatabaticCriteria) {
@@ -770,6 +757,161 @@ export class KatabaticAnalyzer {
     }
   }
 
+  /**
+   * Determine if thermal cycle analysis is available based on current time
+   */
+  private determineThermalAnalysisAvailability(currentHour: number): {
+    isAvailable: boolean;
+    failureReason?: string;
+  } {
+    if (currentHour < 18) {
+      return {
+        isAvailable: false,
+        failureReason: `Overnight analysis available after 6 PM. For most accurate katabatic predictions, check back when evening temperatures are established.`
+      };
+    }
+    
+    return { isAvailable: true };
+  }
+
+  /**
+   * Extract thermal cycle temperature data using indexed forecasts
+   */
+  private extractThermalCycleData(
+    morrisonIndex: Map<string, Map<number, WeatherDataPoint>>,
+    mountainIndex: Map<string, Map<number, WeatherDataPoint>>,
+    currentTime: Date
+  ): {
+    morrisonMaxTemp: number | null;
+    evergreenMinTemp: number | null;
+    failureReason?: string;
+  } {
+    const today = new Date(currentTime);
+    
+    // Look for today's afternoon maximum temperature
+    const morrisonMaxTemp = this.findAfternoonMaxTemperature(morrisonIndex, today);
+    
+    // Look for tomorrow's dawn minimum temperature
+    const evergreenMinTemp = this.findPreDawnMinTemperature(mountainIndex, currentTime);
+    
+    // Determine failure reasons if data is missing
+    let failureReason: string | undefined;
+    if (morrisonMaxTemp === null || evergreenMinTemp === null) {
+      const reasons: string[] = [];
+      if (morrisonMaxTemp === null) {
+        reasons.push('evening temperature data (6 PM)');
+      }
+      if (evergreenMinTemp === null) {
+        reasons.push('dawn temperature data (6 AM tomorrow)');
+      }
+      
+      failureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}. This may indicate weather API data gaps or insufficient forecast coverage.`;
+    }
+    
+    return {
+      morrisonMaxTemp,
+      evergreenMinTemp,
+      failureReason
+    };
+  }
+
+  /**
+   * Calculate confidence score for thermal differential analysis
+   */
+  private calculateThermalConfidence(
+    analysisType: 'thermal_cycle' | 'unavailable',
+    meets: boolean,
+    differential: number,
+    criteria: KatabaticCriteria
+  ): number {
+    if (analysisType === 'unavailable') {
+      return 0; // No confidence when proper data isn't available
+    }
+    
+    return meets 
+      ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 75)
+      : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
+  }
+
+  /**
+   * Log debug information for thermal cycle analysis
+   */
+  private logThermalDebugInfo(
+    weatherData: WeatherServiceData,
+    currentTime: Date,
+    currentHour: number,
+    morrisonMaxTemp: number | null,
+    evergreenMinTemp: number | null
+  ): void {
+    if (!__DEV__) return;
+    
+    console.log('🌡️ Thermal Cycle Debug Info:');
+    console.log(`  Current time: ${currentTime.toLocaleString()}`);
+    console.log(`  Current hour: ${currentHour}`);
+    console.log(`  Morrison forecast hours: ${weatherData.morrison.hourlyForecast.length}`);
+    console.log(`  Mountain forecast hours: ${weatherData.mountain.hourlyForecast.length}`);
+    
+    // Determine which day we're looking for afternoon data
+    const afternoonSearchDate = currentHour >= 17 ? (() => {
+      const tomorrow = new Date(currentTime);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow;
+    })() : currentTime;
+    
+    console.log(`  Primary search for afternoon heating data on: ${afternoonSearchDate.toDateString()} (${currentHour >= 17 ? 'tomorrow' : 'today'})`);
+    
+    // Log available timestamps
+    const morrisonTimes = weatherData.morrison.hourlyForecast.slice(0, 5).map(p => 
+      `${new Date(p.timestamp).toLocaleString()} (${new Date(p.timestamp).getHours()}h)`
+    );
+    console.log(`  First 5 Morrison forecast times: ${morrisonTimes.join(', ')}`);
+    
+    // Check if we have any data for the target afternoon period
+    const afternoonSearchDateStr = afternoonSearchDate.toDateString();
+    const targetAfternoonData = weatherData.morrison.hourlyForecast.filter(point => {
+      const pointDate = new Date(point.timestamp);
+      const pointHour = pointDate.getHours();
+      const pointDateStr = pointDate.toDateString();
+      return pointDateStr === afternoonSearchDateStr && pointHour >= 12 && pointHour <= 17;
+    });
+    console.log(`  Target afternoon data points found: ${targetAfternoonData.length}`);
+    
+    if (targetAfternoonData.length > 0) {
+      console.log(`  Target afternoon temps: ${targetAfternoonData.map(p => `${p.temperature.toFixed(1)}°C at ${new Date(p.timestamp).getHours()}h`).join(', ')}`);
+    }
+    
+    console.log(`  Morrison max temp found: ${morrisonMaxTemp ? morrisonMaxTemp.toFixed(1) + '°C' : 'null'}`);
+    console.log(`  Evergreen min temp found: ${evergreenMinTemp ? evergreenMinTemp.toFixed(1) + '°C' : 'null'}`);
+  }
+
+  /**
+   * Create the thermal analysis result object
+   */
+  private createThermalAnalysisResult(
+    meets: boolean,
+    differential: number,
+    morrisonTemp: number,
+    mountainTemp: number,
+    confidence: number,
+    analysisType: 'thermal_cycle' | 'unavailable',
+    thermalCycleFailureReason?: string
+  ) {
+    return {
+      meets,
+      differential,
+      morrisonTemp,
+      mountainTemp,
+      confidence,
+      dataSource: 'hybrid_thermal_cycle' as const,
+      analysisType,
+      thermalCycleFailureReason: thermalCycleFailureReason || undefined,
+      thermalWindow: analysisType === 'thermal_cycle' ? {
+        morrisonMax: '18:00 (Evening - start of cooling cycle)',
+        evergreenMin: '06:00 (Dawn - end of cooling cycle)'
+      } : undefined
+    };
+  }
+
   // Helper methods
   private getPrecipitationForWindow(forecast: WeatherDataPoint[], window: { start: string; end: string }): number {
     const windowData = this.getDataForTimeWindow(forecast, window);
@@ -823,11 +965,48 @@ export class KatabaticAnalyzer {
     return this.getDataForTimeWindow(forecast, window);
   }
 
-  private getDataForTimeWindow(forecast: WeatherDataPoint[], window: { start: string; end: string }): WeatherDataPoint[] {
+  private getDataForTimeWindow(forecast: WeatherDataPoint[], window: { start: string; end: string }): WeatherDataPoint[];
+  private getDataForTimeWindow(forecastIndex: Map<string, Map<number, WeatherDataPoint>>, window: { start: string; end: string }, targetDate?: Date): WeatherDataPoint[];
+  private getDataForTimeWindow(
+    forecastOrIndex: WeatherDataPoint[] | Map<string, Map<number, WeatherDataPoint>>, 
+    window: { start: string; end: string },
+    targetDate?: Date
+  ): WeatherDataPoint[] {
     const startHour = parseInt(window.start.split(':')[0]);
     const endHour = parseInt(window.end.split(':')[0]);
     
-    return forecast.filter(point => {
+    // Check if we're working with indexed data (performance optimized path)
+    if (forecastOrIndex instanceof Map) {
+      const result: WeatherDataPoint[] = [];
+      const searchDate = targetDate || new Date();
+      const searchDateStr = searchDate.toDateString();
+      
+      const dayData = forecastOrIndex.get(searchDateStr);
+      if (!dayData) return result;
+      
+      if (startHour > endHour) {
+        // Handle time windows that cross midnight (e.g., 18:00 to 06:00)
+        for (let hour = startHour; hour <= 23; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+        for (let hour = 0; hour <= endHour; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+      } else {
+        // Handle normal time windows (e.g., 06:00 to 08:00)
+        for (let hour = startHour; hour <= endHour; hour++) {
+          const dataPoint = dayData.get(hour);
+          if (dataPoint) result.push(dataPoint);
+        }
+      }
+      
+      return result;
+    }
+    
+    // Original implementation for backward compatibility
+    return forecastOrIndex.filter(point => {
       const pointDate = new Date(point.timestamp);
       const pointHour = pointDate.getHours();
       
