@@ -22,6 +22,7 @@ import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
 import { initializeNotificationService } from '@/services/alarmNotificationService';
+import { eveningWeatherRefreshService } from '@/services/eveningWeatherRefreshService';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
 // Ignore specific warnings in production builds
@@ -98,6 +99,11 @@ export default function RootLayout() {
           console.log('🔔 Initializing notification service...');
           await initializeNotificationService();
           console.log('✅ Notification service initialized');
+          
+          // Initialize evening weather refresh service
+          console.log('🌅 Initializing evening weather refresh service...');
+          await eveningWeatherRefreshService.initialize();
+          console.log('✅ Evening weather refresh service initialized');
         }
         
       } catch (e) {

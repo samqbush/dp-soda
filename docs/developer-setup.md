@@ -170,6 +170,7 @@ dp-react/
 - API integrations (OpenWeatherMap, Ecowitt)
 - Data processing and analysis
 - Audio and notification services
+- Evening weather refresh service (automatic 6 PM data updates)
 
 ## Recent Major Updates
 
@@ -184,6 +185,8 @@ The prediction system has been enhanced with sophisticated atmospheric science b
 **Key Files:**
 - `services/mountainWaveAnalyzer.ts` - New MKI analysis engine
 - `services/katabaticAnalyzer.ts` - Enhanced with 6-factor system
+- `services/generalNotificationService.ts` - General purpose notification system
+- `services/eveningWeatherRefreshService.ts` - Automatic 6 PM weather data refresh
 - `docs/wind-prediction-guide.md` - Updated with comprehensive MKI theory and 6-factor system
 - `docs/architecture.md` - Updated with MKI service architecture details
 
@@ -406,6 +409,37 @@ npm run test-apis          # Test API connectivity
 3. **Lazy load components** when possible
 4. **Profile performance** using React DevTools Profiler
 5. **Test on lower-end devices** to ensure smooth experience
+
+## Evening Weather Refresh Service
+
+The app includes an automatic evening weather refresh system that ensures accurate overnight wind predictions.
+
+### Purpose
+The evening refresh service solves the issue where pressure change and temperature differential would show 0.0 values when the app transitions from afternoon to evening analysis mode at 6 PM.
+
+### How It Works
+1. **Automatic Scheduling**: Service schedules a background notification for 6 PM daily
+2. **Silent Refresh**: At 6 PM, weather data is automatically refreshed in the background
+3. **Fresh Data**: Ensures pressure trends and temperature differentials are calculated with current data
+4. **User Transparency**: Status is visible in the Wind Guru screen header
+
+### Key Files
+- `services/generalNotificationService.ts` - General purpose notification system
+- `services/eveningWeatherRefreshService.ts` - Main service implementation
+- `services/alarmNotificationService.ts` - Alarm-specific notifications (separate from general)
+- `app/(tabs)/wind-guru.tsx` - UI status display
+
+### Debug Commands
+```bash
+# Test the evening refresh service
+npm run debug-evening-refresh
+
+# Check current status and trigger manual refresh
+node scripts/debug-evening-refresh.mjs
+```
+
+### Configuration
+The service automatically initializes when the app starts and requires notification permissions to function properly. No additional configuration is needed.
 
 ## Getting Help
 

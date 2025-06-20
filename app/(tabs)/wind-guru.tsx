@@ -6,6 +6,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useAppSettings } from '@/contexts/SettingsContext';
 import { useSodaLakeWind } from '@/hooks/useSodaLakeWind';
+import { eveningWeatherRefreshService } from '@/services/eveningWeatherRefreshService';
 
 export default function WindGuruScreen() {
   const textColor = useThemeColor({}, 'text');
@@ -30,6 +31,45 @@ export default function WindGuruScreen() {
   const formatTempDiffF = (celsiusDiff: number): string => {
     const fahrenheitDiff = celsiusDiff * 9/5; // Convert temperature difference from C to F
     return `${fahrenheitDiff.toFixed(1)}°F`;
+  };
+
+  // Helper to get evening refresh status for UI display
+  const getEveningRefreshInfo = () => {
+    const refreshStatus = eveningWeatherRefreshService.getRefreshStatus();
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (!refreshStatus.isInitialized) {
+      return {
+        status: 'initializing',
+        message: '🔄 Evening refresh starting...',
+        color: '#FF9800'
+      };
+    }
+    
+    if (!refreshStatus.isScheduled) {
+      return {
+        status: 'disabled',
+        message: '⚠️ Evening refresh not scheduled',
+        color: '#F44336'
+      };
+    }
+    
+    // Check if we're past 6 PM today
+    if (currentHour >= 18) {
+      return {
+        status: 'ready',
+        message: '✅ Evening data refresh complete',
+        color: '#4CAF50'
+      };
+    } else {
+      const hoursUntil6PM = 18 - currentHour;
+      return {
+        status: 'scheduled',
+        message: `⏰ Auto-refresh in ${hoursUntil6PM}h (6PM)`,
+        color: '#2196F3'
+      };
+    }
   };
 
   // Use the weather data hook with Phase 2 prediction engine - must be called unconditionally
@@ -376,6 +416,12 @@ export default function WindGuruScreen() {
                 return '🔴 Stale data';
               })()}
             </ThemedText>
+            <ThemedText style={[styles.eveningRefreshStatus, { 
+              color: getEveningRefreshInfo().color,
+              opacity: 0.8
+            }]}>
+              {getEveningRefreshInfo().message}
+            </ThemedText>
           </ThemedView>
         </ThemedView>
 
@@ -553,15 +599,23 @@ export default function WindGuruScreen() {
                     &lt;18 hours of forecast data available. Common for days 3-5 as forecast models provide fewer data points further out. Predictions are still useful but less detailed.
                   </ThemedText>
                 </ThemedView>
-                
-                <ThemedText style={[styles.dataQualityExplanation, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8, fontStyle: 'italic' }]}>
-                  <ThemedText style={{ fontWeight: '500' }}>Why this happens:</ThemedText> OpenWeatherMap provides forecasts in 3-hour intervals. For distant days (3-5 days out), fewer forecast points may be available in our analysis window, but the 5-factor hybrid algorithm still works effectively with available data.
+                   <ThemedText style={[styles.dataQualityExplanation, { color: textColor, opacity: 0.7, fontSize: 12, marginTop: 8, fontStyle: 'italic' }]}>
+                <ThemedText style={{ fontWeight: '500' }}>Why this happens:</ThemedText> OpenWeatherMap provides forecasts in 3-hour intervals. For distant days (3-5 days out), fewer forecast points may be available in our analysis window, but the 5-factor hybrid algorithm still works effectively with available data.
+              </ThemedText>
+              
+              <ThemedView style={[styles.dataQualityItem, { marginTop: 12, padding: 12, backgroundColor: 'rgba(33, 150, 243, 0.1)', borderRadius: 8 }]}>
+                <ThemedText style={[styles.dataQualityLabel, { color: '#2196F3', fontWeight: '600' }]}>
+                  🕐 Automatic Evening Data Refresh
+                </ThemedText>
+                <ThemedText style={[styles.dataQualityDesc, { color: textColor, opacity: 0.8 }]}>
+                  Weather data automatically refreshes at 6 PM daily to ensure accurate overnight prediction analysis. This prevents pressure change and temperature differential from showing 0.0 values during the critical evening transition period.
                 </ThemedText>
               </ThemedView>
-              
-              <ThemedText style={[styles.learnMoreText, { color: tintColor, opacity: 0.8 }]}>
-                📖 For detailed explanations, see docs/KATABATIC_PREDICTION_GUIDE.md
-              </ThemedText>
+            </ThemedView>
+            
+            <ThemedText style={[styles.learnMoreText, { color: tintColor, opacity: 0.8 }]}>
+              📖 For detailed explanations, see docs/KATABATIC_PREDICTION_GUIDE.md
+            </ThemedText>
             </ThemedView>
           )}
         </ThemedView>
@@ -1632,14 +1686,19 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   updateInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginTop: 4,
+    gap: 2,
   },
   dataFreshness: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  eveningRefreshStatus: {
+    fontSize: 11,
+    fontWeight: '400',
+    fontStyle: 'italic',
   },
   // Day prediction styles
   dayPredictionCard: {
