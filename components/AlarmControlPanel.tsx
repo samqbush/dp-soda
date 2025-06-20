@@ -23,8 +23,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
     setEnabled,
     setAlarmTime,
     stopAlarm,
-    emergencyStop,
-    hasBackgroundSupport
+    emergencyStop
   } = useUnifiedAlarm();
 
   const [timeInputVisible, setTimeInputVisible] = useState(false);
@@ -44,20 +43,6 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
   const handleToggleAlarm = async () => {
     try {
       await setEnabled(!alarmState.isEnabled);
-      
-      if (!alarmState.isEnabled && !hasBackgroundSupport) {
-        Alert.alert(
-          'Foreground Alarms Only',
-          'Background notifications are not available. Keep the app open for alarms to work.',
-          [{ text: 'Got it', style: 'default' }]
-        );
-      } else if (!alarmState.isEnabled && hasBackgroundSupport) {
-        Alert.alert(
-          'Background Alarms Ready!',
-          'You\'ll receive notifications even when the app is closed. Perfect for dawn patrol alerts!',
-          [{ text: 'Awesome!', style: 'default' }]
-        );
-      }
     } catch {
       Alert.alert('Error', 'Failed to update alarm settings. Please try again.');
     }
@@ -224,7 +209,7 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
           <View style={styles.toggleLabelContainer}>
             <ThemedText style={styles.toggleLabel}>Dawn Patrol Alarm</ThemedText>
             <ThemedText style={styles.toggleSubLabel}>
-              {hasBackgroundSupport ? 'Works in background' : 'Foreground only'}
+              Alarm will ring at scheduled time
             </ThemedText>
           </View>
           <Switch
@@ -340,16 +325,6 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
               <ThemedText style={styles.emergencyButtonText}>Emergency Stop</ThemedText>
             </TouchableOpacity>
           </View>
-        </View>
-      )}
-
-      {/* Background Support Info */}
-      {!hasBackgroundSupport && Platform.OS !== 'web' && (
-        <View style={[styles.infoCard, { backgroundColor: '#fff3cd', borderColor: '#ffeaa7' }]}>
-          <Ionicons name="information-circle-outline" size={20} color="#856404" />
-          <ThemedText style={[styles.infoText, { color: '#856404' }]}>
-            For background alarms, enable notifications in your device settings.
-          </ThemedText>
         </View>
       )}
     </ThemedView>

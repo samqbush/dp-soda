@@ -1,61 +1,12 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useUnifiedAlarm } from '@/hooks/useUnifiedAlarm';
 import { useDPAlarm } from '@/hooks/useDPAlarm';
 import type { SimplifiedAlarmCriteria } from '@/hooks/useDPAlarm';
 import { useAppSettings } from '@/contexts/SettingsContext';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Platform, Switch } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, View, Platform, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Alarm system testing component
-function AlarmSystemTester() {
-  const { testWithDelayedIdealConditions, isInitialized } = useUnifiedAlarm();
-  const [testing, setTesting] = React.useState(false);
-
-  const handleTestAlarmSystem = async () => {
-    setTesting(true);
-    try {
-      const result = await testWithDelayedIdealConditions(15); // 15 second delay
-      Alert.alert(
-        '🔔 Alarm System Test Scheduled!',
-        `The alarm system test has been scheduled for 15 seconds from now (${result.triggerTime.toLocaleTimeString()}).\n\n🧪 This will test:\n• Push notifications\n• Alarm audio playback\n• Background app handling\n• Device wake-up functionality\n\nPut the app in the background now to test notifications!`,
-        [{ text: 'Got it!' }]
-      );
-    } catch {
-      Alert.alert('Test Failed', 'Unable to schedule alarm system test');
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  if (!isInitialized) {
-    return (
-      <View style={{ padding: 16, alignItems: 'center' }}>
-        <ThemedText>Initializing alarm system...</ThemedText>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ padding: 16, gap: 12 }}>
-      <ThemedText type="subtitle">🔧 Alarm System Testing</ThemedText>
-      <ThemedText style={{ fontSize: 14, opacity: 0.8, marginBottom: 8 }}>
-        Test that notifications and audio work properly on your device. Current wind conditions are shown live on the main Dawn Patrol tab.
-      </ThemedText>
-      <TouchableOpacity
-        style={{ padding: 12, borderWidth: 1, borderColor: '#28a745', borderRadius: 8 }}
-        onPress={handleTestAlarmSystem}
-        disabled={testing}
-      >
-        <ThemedText style={{ textAlign: 'center', color: '#28a745' }}>
-          {testing ? 'Scheduling Test...' : '🔔 Test Alarm System (15s)'}
-        </ThemedText>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 export default function SettingsScreen() {
   const { criteria, setCriteria } = useDPAlarm();
@@ -250,9 +201,6 @@ export default function SettingsScreen() {
             <ThemedText style={[styles.infoText, { fontWeight: '600' }]}>Example:</ThemedText> If your alarm is set for 5:00 AM with a 15 mph threshold, 
             at exactly 5:00 AM we&apos;ll check the current wind speed at Soda Lake. If it&apos;s 17 mph right now, you get woken up for great conditions!
           </ThemedText>
-
-          {/* Alarm System Testing Panel */}
-          <AlarmSystemTester />
         </View>
 
           <ThemedText type="subtitle" style={styles.subsectionTitle}>Wind Analysis on Lake Tabs</ThemedText>

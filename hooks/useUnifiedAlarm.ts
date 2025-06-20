@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AppState } from 'react-native';
-import { unifiedAlarmManager, type AlarmState, type AlarmTestOptions } from '@/services/unifiedAlarmManager';
-import type { WindAnalysis } from '@/services/windService';
+import { unifiedAlarmManager, type AlarmState } from '@/services/unifiedAlarmManager';
 
 /**
  * React hook for unified alarm management
@@ -71,46 +70,6 @@ export function useUnifiedAlarm() {
     }
   }, []);
 
-  // Test alarm with current conditions
-  const testWithCurrentConditions = useCallback(async (): Promise<{ triggered: boolean; analysis: WindAnalysis }> => {
-    try {
-      return await unifiedAlarmManager.testAlarmWithCurrentConditions();
-    } catch (error) {
-      console.error('Failed to test alarm with current conditions:', error);
-      throw error;
-    }
-  }, []);
-
-  // Test alarm with ideal conditions
-  const testWithIdealConditions = useCallback(async (): Promise<{ triggered: boolean; analysis: WindAnalysis }> => {
-    try {
-      return await unifiedAlarmManager.testAlarmWithIdealConditions();
-    } catch (error) {
-      console.error('Failed to test alarm with ideal conditions:', error);
-      throw error;
-    }
-  }, []);
-
-  // Test alarm with delay (for background testing)
-  const testWithDelay = useCallback(async (delaySeconds: number): Promise<{ scheduled: boolean; triggerTime: Date }> => {
-    try {
-      return await unifiedAlarmManager.testAlarmWithDelay(delaySeconds);
-    } catch (error) {
-      console.error('Failed to schedule delayed test alarm:', error);
-      throw error;
-    }
-  }, []);
-
-  // Test alarm with delayed ideal conditions (for background testing)
-  const testWithDelayedIdealConditions = useCallback(async (delaySeconds: number): Promise<{ scheduled: boolean; triggerTime: Date }> => {
-    try {
-      return await unifiedAlarmManager.testAlarmWithDelayedIdealConditions(delaySeconds);
-    } catch (error) {
-      console.error('Failed to schedule delayed ideal conditions test alarm:', error);
-      throw error;
-    }
-  }, []);
-
   // Stop currently playing alarm
   const stopAlarm = useCallback(async () => {
     try {
@@ -139,10 +98,6 @@ export function useUnifiedAlarm() {
     // Actions
     setEnabled,
     setAlarmTime,
-    testWithCurrentConditions,
-    testWithIdealConditions,
-    testWithDelay,
-    testWithDelayedIdealConditions,
     stopAlarm,
     emergencyStop,
     
@@ -152,7 +107,6 @@ export function useUnifiedAlarm() {
     isPlaying: alarmState.isPlaying,
     alarmTime: alarmState.alarmTime,
     nextCheckTime: alarmState.nextCheckTime,
-    hasBackgroundSupport: alarmState.hasBackgroundSupport,
   };
 }
 

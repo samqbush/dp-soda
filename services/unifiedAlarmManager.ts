@@ -1,8 +1,6 @@
 import { Platform } from 'react-native';
 import { AlarmLogger } from './alarmDebugLogger';
-import { alarmNotificationService } from './alarmNotificationService';
 import { alarmAudio } from './alarmAudioService';
-import { notificationListeners } from './notificationListeners';
 import { fetchWindData, analyzeWindData, getAlarmCriteria, checkSimplifiedAlarmConditions, type AlarmCriteria, type WindAnalysis } from './windService';
 
 export interface AlarmState {
@@ -11,7 +9,6 @@ export interface AlarmState {
   isPlaying: boolean;
   alarmTime: string;
   nextCheckTime: Date | null;
-  hasBackgroundSupport: boolean;
 }
 
 export interface AlarmTestOptions {
@@ -29,14 +26,11 @@ export interface AlarmTestOptions {
  * 
  * Single service that manages all alarm functionality:
  * - Wind condition checking and analysis
- * - Alarm scheduling (foreground timers + background notifications)
+ * - Alarm scheduling with JavaScript timers
  * - Audio playback and vibration
- * - Push notifications
- * - Test functionality
  */
 class UnifiedAlarmManager {
   private foregroundTimer: NodeJS.Timeout | null = null;
-  private scheduledNotificationId: string | null = null;
   private isAppInForeground: boolean = true;
   private settingsLoaded: boolean = false;
   private isInitialized: boolean = false;
@@ -47,7 +41,6 @@ class UnifiedAlarmManager {
     isPlaying: false,
     alarmTime: '05:00',
     nextCheckTime: null,
-    hasBackgroundSupport: false
   };
   private stateChangeCallbacks: Set<(state: AlarmState) => void> = new Set();
 
@@ -63,25 +56,6 @@ class UnifiedAlarmManager {
       }
       
       AlarmLogger.info('🚀 Initializing Unified Alarm Manager...');
-      
-      // Request notification permissions for background support
-      const hasNotificationPermissions = await alarmNotificationService.requestPermissions();
-      this.alarmState.hasBackgroundSupport = hasNotificationPermissions;
-      
-      if (!hasNotificationPermissions && Platform.OS !== 'web') {
-        AlarmLogger.warning('Notification permissions not granted - only foreground alarms will work');
-      }
-
-      // Set up notification channels
-      await alarmNotificationService.setupNotificationChannels();
-      
-      // Initialize notification listeners with callback to prevent circular dependency
-      AlarmLogger.info('🔧 Initializing notification listeners with callback...');
-      await notificationListeners.initialize(() => {
-        AlarmLogger.warning('🚨 NOTIFICATION CALLBACK TRIGGERED - this should only happen for valid alarm notifications!');
-        AlarmLogger.info('🔍 Callback stack trace:', new Error().stack?.split('\n').slice(0, 8).join('\n'));
-        return this.testAlarmWithCurrentConditions();
-      });
       
       // Load saved alarm settings
       await this.loadAlarmSettings();
@@ -119,9 +93,9 @@ class UnifiedAlarmManager {
       this.settingsLoaded = true; // Mark as loaded to prevent initialization overwrites
       
       if (enabled) {
-        // When user explicitly enables alarm, schedule with full notification support
+        // When user explicitly enables alarm, schedule timer
         await this.scheduleNextAlarmCheck(false); // NOT silent - user action
-        AlarmLogger.info('Alarm system enabled - notifications scheduled');
+        AlarmLogger.info('Alarm system enabled - timer scheduled');
       } else {
         await this.cancelAllAlarms();
         this.alarmState.nextCheckTime = null;
@@ -162,7 +136,7 @@ class UnifiedAlarmManager {
       
       // If alarm is enabled, reschedule with new time
       if (this.alarmState.isEnabled) {
-        // When user changes time, schedule with full notification support
+        // When user changes time, schedule timer with new time
         await this.scheduleNextAlarmCheck(false); // NOT silent - user action
       }
       
@@ -175,174 +149,6 @@ class UnifiedAlarmManager {
       throw error;
     } finally {
       this.isUpdatingAlarmTime = false;
-    }
-  }
-
-  /**
-   * Test the alarm with current wind conditions
-   */
-  async testAlarmWithCurrentConditions(): Promise<{ triggered: boolean; analysis: any }> {
-    try {
-      // DEBUG: Log the call stack to see what's calling this method
-      const stack = new Error().stack;
-      AlarmLogger.info('🔍 testAlarmWithCurrentConditions called!', {
-        timestamp: new Date().toISOString(),
-        callStack: stack?.split('\n').slice(0, 5).join('\n') // First 5 lines of stack trace
-      });
-      
-      AlarmLogger.info('Testing alarm with current simplified conditions...');
-      
-      const result = await checkSimplifiedAlarmConditions();
-      
-      if (result.shouldTrigger) {
-        const message = `🧪 Test alarm - current conditions are favorable!\n` +
-          `Current: ${result.currentSpeed?.toFixed(1) || 'N/A'} mph, ` +
-          `Average: ${result.averageSpeed?.toFixed(1) || 'N/A'} mph ` +
-          `(threshold: ${result.threshold} mph)`;
-        
-        await this.triggerAlarm(message);
-        return { triggered: true, analysis: result };
-      } else {
-        AlarmLogger.info('Test completed - current conditions do not meet alarm criteria');
-        return { triggered: false, analysis: result };
-      }
-    } catch (error) {
-      AlarmLogger.error('Error testing alarm with current conditions:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Test the alarm with ideal wind conditions
-   */
-  async testAlarmWithIdealConditions(): Promise<{ triggered: boolean; analysis: any }> {
-    try {
-      AlarmLogger.info('Testing alarm with ideal wind conditions...');
-      
-      // Create mock ideal conditions for simplified system
-      const idealResult = {
-        shouldTrigger: true,
-        currentSpeed: 15.5,
-        averageSpeed: 14.2,
-        threshold: 10,
-        confidence: 'high' as const,
-        reason: 'Test conditions: Ideal wind conditions simulated - perfect for dawn patrol!'
-      };
-      
-      const message = `🧪 Test alarm - ideal conditions simulated!\n` +
-        `Current: ${idealResult.currentSpeed} mph, ` +
-        `Average: ${idealResult.averageSpeed} mph ` +
-        `(threshold: ${idealResult.threshold} mph)`;
-      
-      await this.triggerAlarm(message);
-      return { triggered: true, analysis: idealResult };
-    } catch (error) {
-      AlarmLogger.error('Error testing alarm with ideal conditions:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Test the alarm after a specified delay (for background testing)
-   */
-  async testAlarmWithDelay(delaySeconds: number): Promise<{ scheduled: boolean; triggerTime: Date }> {
-    try {
-      const triggerTime = new Date(Date.now() + (delaySeconds * 1000));
-      AlarmLogger.info(`Scheduling delayed test alarm for ${triggerTime.toLocaleString()}`);
-      
-      // Schedule a timer for the test
-      setTimeout(async () => {
-        try {
-          const message = `🧪 Delayed Test Alarm!\nThis alarm was scheduled ${delaySeconds} seconds ago to test background functionality.`;
-          await this.triggerAlarm(message);
-          
-          AlarmLogger.success('Delayed test alarm triggered successfully');
-        } catch (error) {
-          AlarmLogger.error('Error triggering delayed test alarm:', error);
-        }
-      }, delaySeconds * 1000);
-      
-      // Also schedule a background notification as backup
-      if (this.alarmState.hasBackgroundSupport) {
-        await alarmNotificationService.scheduleAlarmNotification(
-          triggerTime,
-          '🧪 Test Alarm - Background Check!',
-          `This is a test alarm scheduled ${delaySeconds} seconds ago. If you see this, background alarms are working!`,
-          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
-        );
-      }
-      
-      AlarmLogger.info(`Delayed test alarm scheduled for ${delaySeconds} seconds from now`);
-      return { scheduled: true, triggerTime };
-      
-    } catch (error) {
-      AlarmLogger.error('Error scheduling delayed test alarm:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Test the alarm with ideal conditions after a specified delay (for background testing)
-   */
-  async testAlarmWithDelayedIdealConditions(delaySeconds: number): Promise<{ scheduled: boolean; triggerTime: Date }> {
-    try {
-      const triggerTime = new Date(Date.now() + (delaySeconds * 1000));
-      AlarmLogger.info(`Scheduling delayed ideal conditions test alarm for ${triggerTime.toLocaleString()}`);
-      
-      // Schedule a timer for the test
-      setTimeout(async () => {
-        try {
-          const message = `⭐ Delayed Ideal Conditions Test!\nThis alarm was scheduled ${delaySeconds} seconds ago with simulated perfect wind conditions - wake up for great wind!`;
-          await this.triggerAlarm(message);
-          
-          AlarmLogger.success('Delayed ideal conditions test alarm triggered successfully');
-        } catch (error) {
-          AlarmLogger.error('Error triggering delayed ideal conditions test alarm:', error);
-        }
-      }, delaySeconds * 1000);
-      
-      // Also schedule a background notification as backup
-      if (this.alarmState.hasBackgroundSupport) {
-        await alarmNotificationService.scheduleAlarmNotification(
-          triggerTime,
-          '⭐ Ideal Conditions Test!',
-          `Perfect wind conditions detected! This delayed test simulates ideal dawn patrol conditions.`,
-          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
-        );
-      }
-      
-      AlarmLogger.info(`Delayed ideal conditions test alarm scheduled for ${delaySeconds} seconds from now`);
-      return { scheduled: true, triggerTime };
-      
-    } catch (error) {
-      AlarmLogger.error('Error scheduling delayed ideal conditions test alarm:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Manually schedule notifications (for user testing purposes)
-   * This can be called from test buttons to verify notification scheduling works
-   */
-  async scheduleNotificationForTesting(): Promise<boolean> {
-    try {
-      if (!this.alarmState.isEnabled) {
-        AlarmLogger.warning('Cannot schedule notification - alarm is not enabled');
-        return false;
-      }
-
-      if (!this.alarmState.hasBackgroundSupport) {
-        AlarmLogger.warning('Cannot schedule notification - no background support');
-        return false;
-      }
-
-      // Schedule with normal notification support (not silent)
-      await this.scheduleNextAlarmCheck(false);
-      AlarmLogger.success('✅ Manual notification scheduling completed for testing');
-      return true;
-    } catch (error) {
-      AlarmLogger.error('Error manually scheduling notification:', error);
-      return false;
     }
   }
 
@@ -372,7 +178,7 @@ class UnifiedAlarmManager {
       // Stop audio
       await alarmAudio.stop();
       
-      // Cancel all timers and notifications
+      // Cancel all timers
       await this.cancelAllAlarms();
       
       // Reset state
@@ -398,7 +204,7 @@ class UnifiedAlarmManager {
 
   /**
    * Schedule the next alarm check
-   * Uses hybrid approach: foreground timer + background notification
+   * Uses JavaScript timer to schedule alarm checks
    */
   private async scheduleNextAlarmCheck(silent: boolean = false): Promise<void> {
     try {
@@ -414,34 +220,14 @@ class UnifiedAlarmManager {
       
       AlarmLogger.info(`Scheduling next alarm check for ${nextCheckTime.toLocaleString()}`);
       
-      // Skip notification scheduling if in silent mode (initialization)
-      if (silent) {
-        AlarmLogger.info('🔇 Silent mode: Skipping notification scheduling to prevent unwanted notifications during initialization');
-      } else {
-        // ALWAYS schedule the background notification as the primary mechanism
-        // The JavaScript timer is just a backup for when the app is in foreground
-        if (this.alarmState.hasBackgroundSupport) {
-          this.scheduledNotificationId = await alarmNotificationService.scheduleAlarmNotification(
-            nextCheckTime,
-            '🌊 DAWN PATROL ALARM!',
-            'Checking wind conditions now... Tap to see if you should wake up! 🏄‍♂️'
-          );
-          
-          if (this.scheduledNotificationId) {
-            AlarmLogger.success('Background notification scheduled as primary alarm mechanism');
-          } else {
-            AlarmLogger.warning('Background notification could not be scheduled (likely due to timing bug) - relying on foreground timer only');
-          }
-        } else {
-          AlarmLogger.warning('No notification permissions - alarm will only work in foreground');
-        }
+      // Skip timer scheduling if in silent mode (initialization)
+      if (!silent) {
+        // Schedule timer for alarm check
+        this.foregroundTimer = setTimeout(async () => {
+          AlarmLogger.info('Timer triggered - performing alarm check');
+          await this.performAlarmCheck();
+        }, msUntilAlarm);
       }
-      
-      // Schedule foreground timer as backup (only works when app is active)
-      this.foregroundTimer = setTimeout(async () => {
-        AlarmLogger.info('Foreground timer triggered - performing alarm check');
-        await this.performAlarmCheck();
-      }, msUntilAlarm);
       
       this.notifyStateChange();
     } catch (error) {
@@ -514,8 +300,8 @@ class UnifiedAlarmManager {
   }
 
   /**
-   * Trigger the alarm (audio + notification)
-   * This method plays the alarm sound and sends convenience notifications
+   * Trigger the alarm (audio)
+   * This method plays the alarm sound
    */
   private async triggerAlarm(message: string): Promise<void> {
     try {
@@ -532,19 +318,7 @@ class UnifiedAlarmManager {
         AlarmLogger.success('🔊 Alarm audio playing successfully');
       } catch (audioError) {
         AlarmLogger.error('⚠️ Failed to play alarm audio:', audioError);
-        // Continue with notification even if audio fails
-      }
-      
-      // Send immediate notification to help user access the app
-      // This is a convenience feature - the alarm should already be audible
-      if (this.alarmState.hasBackgroundSupport) {
-        await alarmNotificationService.scheduleAlarmNotification(
-          new Date(Date.now() + 1000), // Send after 1 second
-          '🚨 ALARM RINGING!',
-          `${message}\n\nYour alarm is playing! Tap to open app and stop alarm.`,
-          { deepLink: '/(tabs)/' } // Deep link to DP alarm page
-        );
-        AlarmLogger.info('📱 Convenience notification sent to help user access app with deep link to DP alarm page');
+        // Continue even if audio fails
       }
       
     } catch (error) {
@@ -566,17 +340,6 @@ class UnifiedAlarmManager {
         this.foregroundTimer = null;
         AlarmLogger.info('Cancelled foreground timer');
       }
-      
-      // Cancel specific background notification if we have the ID
-      if (this.scheduledNotificationId) {
-        await alarmNotificationService.cancelAlarmNotification(this.scheduledNotificationId);
-        this.scheduledNotificationId = null;
-        AlarmLogger.info('Cancelled specific scheduled notification');
-      }
-      
-      // Also cancel ALL notifications as a safety measure to prevent conflicts
-      await alarmNotificationService.cancelAllAlarmNotifications();
-      AlarmLogger.info('Cancelled all alarm notifications as safety measure');
       
       AlarmLogger.success('All alarms and timers cancelled');
     } catch (error) {
@@ -616,12 +379,10 @@ class UnifiedAlarmManager {
       });
       
       // Only schedule if alarm was previously enabled by user
-      // NEVER schedule notifications during initialization to prevent unwanted popups
       if (this.alarmState.isEnabled) {
         await this.scheduleNextAlarmCheck(true);
         
-        AlarmLogger.info('🔇 INITIALIZATION: Alarm is enabled but skipping all notification scheduling during initialization');
-        AlarmLogger.info('📝 To schedule notifications, user must manually toggle alarm settings or app must restart');
+        AlarmLogger.info('🔇 INITIALIZATION: Alarm is enabled - timer scheduled for next check');
       }
       
     } catch (error) {

@@ -21,7 +21,6 @@ import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androi
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
-import { initializeNotificationService } from '@/services/alarmNotificationService';
 import { eveningWeatherRefreshService } from '@/services/eveningWeatherRefreshService';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
@@ -94,11 +93,6 @@ export default function RootLayout() {
           setInitError('Storage initialization failed');
         } else {
           console.log('✅ Storage initialization successful');
-          
-          // Initialize notification service for background alarms
-          console.log('🔔 Initializing notification service...');
-          await initializeNotificationService();
-          console.log('✅ Notification service initialized');
           
           // Initialize evening weather refresh service
           console.log('🌅 Initializing evening weather refresh service...');
