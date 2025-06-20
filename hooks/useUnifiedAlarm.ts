@@ -107,6 +107,9 @@ export function useUnifiedAlarm() {
     isPlaying: alarmState.isPlaying,
     alarmTime: alarmState.alarmTime,
     nextCheckTime: alarmState.nextCheckTime,
+    lastCheckTime: alarmState.lastCheckTime,
+    lastCheckResult: alarmState.lastCheckResult,
+    lastCheckWindSpeed: alarmState.lastCheckWindSpeed,
   };
 }
 

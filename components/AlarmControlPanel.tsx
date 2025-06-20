@@ -163,6 +163,46 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
     return 'Alarm Armed ⏰';
   };
 
+  const getLastCheckText = () => {
+    if (!alarmState.lastCheckTime) {
+      return 'No recent checks';
+    }
+    
+    const checkTime = new Date(alarmState.lastCheckTime);
+    const now = new Date();
+    const timeDiff = now.getTime() - checkTime.getTime();
+    const hoursDiff = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutesDiff = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    let timeAgo = '';
+    if (hoursDiff > 0) {
+      timeAgo = `${hoursDiff}h ${minutesDiff}m ago`;
+    } else if (minutesDiff > 0) {
+      timeAgo = `${minutesDiff}m ago`;
+    } else {
+      timeAgo = 'Just now';
+    }
+    
+    return `Last checked: ${timeAgo}`;
+  };
+
+  const getLastCheckResult = () => {
+    if (!alarmState.lastCheckResult) return '';
+    
+    switch (alarmState.lastCheckResult) {
+      case 'triggered':
+        return '✅ Alarm rang - conditions were good!';
+      case 'conditions-not-met':
+        const windSpeed = alarmState.lastCheckWindSpeed;
+        const windText = windSpeed ? `${windSpeed.toFixed(1)} mph` : 'Unknown';
+        return `😴 Wind too low (${windText})`;
+      case 'error':
+        return '⚠️ Check failed - will retry tomorrow';
+      default:
+        return '';
+    }
+  };
+
   // Update picker date when alarm time changes
   useEffect(() => {
     const [hours, minutes] = alarmState.alarmTime.split(':').map(Number);
@@ -200,6 +240,17 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
               <ThemedText style={styles.statusSubtext}>
                 Scheduling...
               </ThemedText>
+            )}
+            {/* Last Check Information */}
+            {alarmState.lastCheckTime && (
+              <View style={styles.lastCheckContainer}>
+                <ThemedText style={styles.lastCheckTime}>
+                  {getLastCheckText()}
+                </ThemedText>
+                <ThemedText style={styles.lastCheckResult}>
+                  {getLastCheckResult()}
+                </ThemedText>
+              </View>
             )}
           </View>
         </View>
@@ -327,6 +378,16 @@ export function AlarmControlPanel({ style }: AlarmControlPanelProps) {
           </View>
         </View>
       )}
+
+      {/* Last Check Info */}
+      <View style={[styles.infoCard, { backgroundColor: cardBackgroundColor }]}>
+        <ThemedText style={styles.infoText}>
+          {getLastCheckText()}
+        </ThemedText>
+        <ThemedText style={styles.infoText}>
+          {getLastCheckResult()}
+        </ThemedText>
+      </View>
     </ThemedView>
   );
 }
@@ -531,5 +592,17 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 12,
+  },
+  lastCheckContainer: {
+    marginTop: 4,
+    gap: 2,
+  },
+  lastCheckTime: {
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  lastCheckResult: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

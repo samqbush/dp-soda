@@ -33,6 +33,10 @@ export interface AlarmCriteria {
   useWindDirection: boolean; // Whether to include wind direction in alarm calculations
   alarmEnabled: boolean; // Whether or not the alarm is enabled
   alarmTime: string; // Time in 24-hour format (e.g., "05:00")
+  // Last check information for user visibility
+  lastCheckTime?: string | null; // ISO string
+  lastCheckResult?: 'triggered' | 'conditions-not-met' | 'error' | null;
+  lastCheckWindSpeed?: number | null;
 }
 
 // Simplified criteria for the new DP Alarm system

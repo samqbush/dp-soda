@@ -9,6 +9,9 @@ export interface AlarmState {
   isPlaying: boolean;
   alarmTime: string;
   nextCheckTime: Date | null;
+  lastCheckTime: Date | null;
+  lastCheckResult: 'triggered' | 'conditions-not-met' | 'error' | null;
+  lastCheckWindSpeed: number | null;
 }
 
 export interface AlarmTestOptions {
@@ -41,6 +44,9 @@ class UnifiedAlarmManager {
     isPlaying: false,
     alarmTime: '05:00',
     nextCheckTime: null,
+    lastCheckTime: null,
+    lastCheckResult: null,
+    lastCheckWindSpeed: null,
   };
   private stateChangeCallbacks: Set<(state: AlarmState) => void> = new Set();
 
@@ -261,14 +267,23 @@ class UnifiedAlarmManager {
     try {
       AlarmLogger.info('Performing scheduled alarm check using simplified Ecowitt data...');
       
+      // Record the check time
+      this.alarmState.lastCheckTime = new Date();
+      
       // Use simplified alarm checking with Ecowitt data
       const result = await checkSimplifiedAlarmConditions();
+      
+      // Record wind speed for user visibility
+      this.alarmState.lastCheckWindSpeed = result.currentSpeed || result.averageSpeed || null;
       
       if (result.shouldTrigger) {
         const message = `🌊 Wake up! Wind conditions are favorable!\n` +
           `Current: ${result.currentSpeed?.toFixed(1) || 'N/A'} mph, ` +
           `Average: ${result.averageSpeed?.toFixed(1) || 'N/A'} mph ` +
           `(threshold: ${result.threshold} mph)`;
+        
+        // Record successful trigger
+        this.alarmState.lastCheckResult = 'triggered';
         
         await this.triggerAlarm(message);
         
@@ -280,6 +295,9 @@ class UnifiedAlarmManager {
           reason: result.reason
         });
       } else {
+        // Record that conditions were not met
+        this.alarmState.lastCheckResult = 'conditions-not-met';
+        
         AlarmLogger.info('Alarm check completed - conditions not favorable', {
           currentSpeed: result.currentSpeed,
           averageSpeed: result.averageSpeed,
@@ -289,10 +307,19 @@ class UnifiedAlarmManager {
         });
       }
       
+      // Notify UI of state change to show last check info
+      this.notifyStateChange();
+      
       // Schedule next check for tomorrow
       await this.scheduleNextAlarmCheck();
       
     } catch (error) {
+      // Record the error
+      this.alarmState.lastCheckTime = new Date();
+      this.alarmState.lastCheckResult = 'error';
+      this.alarmState.lastCheckWindSpeed = null;
+      this.notifyStateChange();
+      
       AlarmLogger.error('Error performing alarm check:', error);
       // Still schedule next check even if this one failed
       await this.scheduleNextAlarmCheck();
@@ -370,6 +397,18 @@ class UnifiedAlarmManager {
       const previousState = { ...this.alarmState };
       this.alarmState.isEnabled = criteria.alarmEnabled;
       this.alarmState.alarmTime = criteria.alarmTime;
+      
+      // Load last check information if available
+      if (criteria.lastCheckTime) {
+        this.alarmState.lastCheckTime = new Date(criteria.lastCheckTime);
+      }
+      if (criteria.lastCheckResult) {
+        this.alarmState.lastCheckResult = criteria.lastCheckResult;
+      }
+      if (criteria.lastCheckWindSpeed !== undefined) {
+        this.alarmState.lastCheckWindSpeed = criteria.lastCheckWindSpeed;
+      }
+      
       this.settingsLoaded = true;
       
       AlarmLogger.info('Alarm settings loaded from storage', { 
@@ -400,7 +439,10 @@ class UnifiedAlarmManager {
       
       const settingsToSave = {
         alarmEnabled: this.alarmState.isEnabled,
-        alarmTime: this.alarmState.alarmTime
+        alarmTime: this.alarmState.alarmTime,
+        lastCheckTime: this.alarmState.lastCheckTime?.toISOString() || null,
+        lastCheckResult: this.alarmState.lastCheckResult,
+        lastCheckWindSpeed: this.alarmState.lastCheckWindSpeed
       };
       
       AlarmLogger.info('Saving alarm settings to storage:', settingsToSave);
