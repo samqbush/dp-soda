@@ -1,5 +1,6 @@
 import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
 import { FreeHistoricalWeatherService } from '@/services/freeHistoricalWeatherService';
+import { predictionStateManager, PredictionStateManager, LockedPrediction } from '@/services/predictionStateManager';
 
 /**
  * Katabatic wind prediction criteria for 5-factor hybrid system
@@ -84,6 +85,18 @@ export interface KatabaticPrediction {
     historicalSource?: string;
     fallbackReason?: string;
   };
+  isLocked?: boolean;
+  lockInfo?: {
+    lockedAt: string;
+    lockType: 'evening' | 'final';
+    state: 'locked' | 'verified';
+  };
+  predictionState?: {
+    state: 'preview' | 'locked' | 'active' | 'verified' | 'expired';
+    message: string;
+    shouldLock: boolean;
+    lockType: 'evening' | 'final' | null;
+  };
 }
 
 /**
@@ -113,15 +126,66 @@ export class KatabaticAnalyzer {
   }
 
   /**
-   * Main prediction method - analyzes weather data and returns katabatic prediction
+   * Helper method to get tomorrow's date
    */
-  public analyzePrediction(
+  private getTomorrowDate(): Date {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
+  }
+
+  /**
+   * Helper method to format date for logging
+   */
+  private formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
+  /**
+   * Main prediction method - analyzes weather data and returns katabatic prediction
+   * Now integrates with prediction state management for proper timing lifecycle
+   */
+  public async analyzePrediction(
     weatherData: WeatherServiceData,
-    criteria: Partial<KatabaticCriteria> = {}
-  ): KatabaticPrediction {
+    criteria: Partial<KatabaticCriteria> = {},
+    targetDate?: Date
+  ): Promise<KatabaticPrediction> {
     const activeCriteria = { ...this.defaultCriteria, ...criteria };
+    const predictionDate = targetDate || this.getTomorrowDate();
     
-    const factors = this.analyzeFactors(weatherData, activeCriteria);
+    // Ensure prediction state manager is initialized
+    await predictionStateManager.initialize();
+    
+    // Check prediction state and determine if we should use locked prediction
+    const stateInfo = await predictionStateManager.getCurrentPredictionState(predictionDate);
+    const shouldUseLocked = await predictionStateManager.shouldUseLocked(predictionDate);
+    const lockedPrediction = await predictionStateManager.getLockedPrediction(predictionDate);
+
+    console.log(`🔍 Prediction Analysis for ${this.formatDate(predictionDate)}:`, {
+      state: stateInfo.state,
+      shouldUseLocked,
+      hasLocked: !!lockedPrediction,
+      message: stateInfo.message
+    });
+
+    // Use locked prediction if available and appropriate
+    if (shouldUseLocked && lockedPrediction) {
+      console.log(`🔒 Using locked prediction from ${lockedPrediction.lockTime}`);
+      return {
+        ...lockedPrediction.prediction,
+        bestTimeWindow: this.findBestTimeWindow(weatherData, activeCriteria),
+        isLocked: true,
+        lockInfo: {
+          lockedAt: lockedPrediction.lockTime,
+          lockType: lockedPrediction.lockType,
+          state: lockedPrediction.state
+        }
+      } as KatabaticPrediction;
+    }
+
+    // Calculate new prediction
+    const factors = this.analyzeFactors(weatherData, activeCriteria, predictionDate);
     const probability = this.calculateOverallProbability(factors);
     const { confidence, confidenceScore } = this.determineConfidence(factors, probability);
     const recommendation = this.generateRecommendation(probability, confidence);
@@ -129,7 +193,7 @@ export class KatabaticAnalyzer {
     const detailedAnalysis = this.generateDetailedAnalysis(factors, weatherData);
     const bestTimeWindow = this.findBestTimeWindow(weatherData, activeCriteria);
 
-    return {
+    const prediction: KatabaticPrediction = {
       probability,
       confidence,
       confidenceScore,
@@ -138,12 +202,34 @@ export class KatabaticAnalyzer {
       explanation,
       detailedAnalysis,
       bestTimeWindow,
+      isLocked: false,
+      predictionState: {
+        state: stateInfo.state,
+        message: stateInfo.message,
+        shouldLock: stateInfo.shouldLock,
+        lockType: stateInfo.lockType || null
+      }
     };
+
+    // Auto-lock prediction if it's time
+    if (stateInfo.shouldLock && stateInfo.lockType) {
+      console.log(`🔒 Auto-locking ${stateInfo.lockType} prediction for ${this.formatDate(predictionDate)}`);
+      await predictionStateManager.lockPrediction(predictionDate, prediction, stateInfo.lockType);
+      prediction.isLocked = true;
+      prediction.lockInfo = {
+        lockedAt: new Date().toISOString(),
+        lockType: stateInfo.lockType,
+        state: 'locked'
+      };
+    }
+
+    return prediction;
   }
 
   private analyzeFactors(
     weatherData: WeatherServiceData,
-    criteria: KatabaticCriteria
+    criteria: KatabaticCriteria,
+    predictionDate: Date
   ): KatabaticFactors {
     // PERFORMANCE OPTIMIZATION: Pre-index forecast data once for all factor analyses
     const morrisonIndex = this.indexForecastData(weatherData.morrison.hourlyForecast);
@@ -375,14 +461,34 @@ export class KatabaticAnalyzer {
     let mountainTemp: number;
     let analysisType: 'thermal_cycle' | 'unavailable';
     
-    if (currentHour >= 18 && morrisonMaxTemp !== null && evergreenMinTemp !== null) {
-      // Proper overnight analysis available
-      morrisonTemp = morrisonMaxTemp;
-      mountainTemp = evergreenMinTemp;
-      analysisType = 'thermal_cycle';
+    if (currentHour >= 18 && evergreenMinTemp !== null) {
+      // Evening analysis available - we have tomorrow's dawn data
+      if (morrisonMaxTemp !== null) {
+        morrisonTemp = morrisonMaxTemp;
+        mountainTemp = evergreenMinTemp;
+        analysisType = 'thermal_cycle';
+      } else {
+        // Check if current Morrison data is available
+        if (weatherData.morrison.current && typeof weatherData.morrison.current.temperature === 'number') {
+          morrisonTemp = weatherData.morrison.current.temperature;
+          mountainTemp = evergreenMinTemp;
+          analysisType = 'thermal_cycle';
+        } else {
+          // Try to use a reasonable estimate based on recent forecast data
+          const recentMorrisonTemp = weatherData.morrison.hourlyForecast[0]?.temperature;
+          if (recentMorrisonTemp && typeof recentMorrisonTemp === 'number') {
+            morrisonTemp = recentMorrisonTemp;
+            mountainTemp = evergreenMinTemp;
+            analysisType = 'thermal_cycle';
+          } else {
+            morrisonTemp = 0;
+            mountainTemp = 0;
+            analysisType = 'unavailable';
+          }
+        }
+      }
     } else {
-      // Overnight analysis not available - return minimal confidence
-      morrisonTemp = 0; // Placeholder values
+      morrisonTemp = 0;
       mountainTemp = 0;
       analysisType = 'unavailable';
     }
@@ -453,19 +559,20 @@ export class KatabaticAnalyzer {
   }
 
   private calculateOverallProbability(factors: KatabaticFactors): number {
-    // UPDATED WEIGHTS - June 16, 2025: Enhanced critical factor analysis
-    // Added VETO POWER for critical factors based on prediction failure analysis
+    // UPDATED WEIGHTS - June 20, 2025: Temperature differential is the core physics driver
+    // Rebalanced based on user feedback that 4/5 factors should be strong
     const weights = {
-      temperatureDifferential: 0.30, // Most critical factor
-      precipitation: 0.25,           // Unchanged
-      skyConditions: 0.20,           // Decreased from 25% → 20%
+      temperatureDifferential: 0.35, // Increased: Most critical factor for katabatic formation
+      precipitation: 0.25,           // Unchanged: Still very important
+      skyConditions: 0.20,           // Unchanged: Important for radiative cooling
       pressureChange: 0.15,          // Critical for katabatic formation
-      wavePattern: 0.10,             // Critical for wind enhancement
+      wavePattern: 0.05,             // Decreased: Enhancement factor, not make-or-break
     };
 
-    // CRITICAL FACTOR ANALYSIS - June 16, 2025 Fix
-    // These factors have "veto power" - if they fail, cap prediction probability
-    const criticalFactors = ['pressureChange', 'wavePattern'];
+    // CRITICAL FACTOR ANALYSIS - June 20, 2025 Fix
+    // Reduced to only the most essential factor based on user feedback
+    // Wave pattern is important but shouldn't have veto power over strong conditions
+    const criticalFactors = ['pressureChange']; // Only pressure change is truly critical
     const failedCriticalFactors = criticalFactors.filter(factorName => 
       !factors[factorName as keyof KatabaticFactors].meets
     );
@@ -474,7 +581,7 @@ export class KatabaticAnalyzer {
       criticalFactors,
       failedCriticalFactors,
       pressureChange: factors.pressureChange.meets ? 'MET' : 'FAILED',
-      wavePattern: factors.wavePattern.meets ? 'MET' : 'FAILED'
+      wavePattern: factors.wavePattern.meets ? 'MET' : 'FAILED (no longer critical)'
     });
 
     let weightedScore = 0;
@@ -504,59 +611,55 @@ export class KatabaticAnalyzer {
 
     const baseProbability = totalWeight > 0 ? (weightedScore / totalWeight) : 0;
 
-    // CRITICAL FACTOR VETO SYSTEM - June 16, 2025
-    // If critical factors fail, apply hard caps to prevent overconfident predictions
+    // CRITICAL FACTOR VETO SYSTEM - June 20, 2025: Less aggressive capping
+    // Only pressure change can veto now, allowing stronger predictions when other factors align
     let probabilityCap = 100;
     
-    if (failedCriticalFactors.length >= 2) {
-      // Both critical factors failed - hard cap at 35%
-      probabilityCap = 35;
-      console.log('🚨 CRITICAL VETO: Both critical factors failed, capping at 35%');
-    } else if (failedCriticalFactors.length === 1) {
-      // One critical factor failed - cap at 55%
-      probabilityCap = 55;
-      console.log('⚠️ CRITICAL VETO: One critical factor failed, capping at 55%');
+    if (failedCriticalFactors.length >= 1) {
+      // Only pressure change is critical now - cap at 70% instead of 55%
+      // This allows strong predictions when temp diff, precip, sky conditions align
+      probabilityCap = 70;
+      console.log('⚠️ PRESSURE VETO: Pressure change failed, capping at 70%');
     }
 
-    // CONSERVATIVE MODE - Enhanced with critical factor consideration
+    // ENHANCED BONUS SYSTEM - June 20, 2025: More generous for strong factor alignment
     let bonusMultiplier = 1.0;
     const factorsMet = Object.values(factors).filter(f => f.meets).length;
     
-    // Reduce bonuses when critical factors are missing
+    // More generous bonuses - 4/5 factors should be quite strong
     if (failedCriticalFactors.length > 0) {
-      console.log('📉 Reducing bonuses due to failed critical factors');
+      console.log('📉 Reducing bonuses due to failed pressure change');
       if (factorsMet === 5) {
-        bonusMultiplier = 1.10; // Reduced from 1.15
+        bonusMultiplier = 1.15; // Still give good bonus even with pressure issue
       } else if (factorsMet >= 4) {
-        bonusMultiplier = 1.0;  // Reduced from 1.05
+        bonusMultiplier = 1.10; // Increased from 1.0 - 4/5 should be strong
       } else if (factorsMet >= 3) {
-        bonusMultiplier = 0.95; // Penalty for 3/5 with critical failures
+        bonusMultiplier = 1.0;  // Neutral for 3/5 with pressure issues
       } else {
-        bonusMultiplier = 0.75; // Strong penalty for <3 factors + critical failures
+        bonusMultiplier = 0.85; // Penalty for <3 factors + pressure issues
       }
     } else {
-      // Original bonuses when no critical factors fail
+      // Enhanced bonuses when pressure is good
       if (factorsMet === 5) {
-        bonusMultiplier = 1.15;
+        bonusMultiplier = 1.25; // Increased from 1.15 - perfect conditions
       } else if (factorsMet >= 4) {
-        bonusMultiplier = 1.05;
+        bonusMultiplier = 1.15; // Increased from 1.05 - very strong conditions
       } else if (factorsMet >= 3) {
-        bonusMultiplier = 1.0;
+        bonusMultiplier = 1.05; // Increased from 1.0 - solid conditions
       } else {
-        bonusMultiplier = 0.85;
+        bonusMultiplier = 0.90; // Less penalty for <3 factors when pressure is good
       }
     }
 
-    // Special bonus for critical combinations - but only if no critical factors fail
-    if (failedCriticalFactors.length === 0) {
-      const hasCriticalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
-      if (hasCriticalCombo) {
-        bonusMultiplier += 0.05;
-      }
+    // Special bonus for strong thermal conditions - the core of katabatic formation
+    const hasThermalCombo = factors.precipitation.meets && factors.skyConditions.meets && factors.temperatureDifferential.meets;
+    if (hasThermalCombo) {
+      bonusMultiplier += 0.08; // Increased from 0.05 - thermal conditions are key
+    }
 
-      if (factors.wavePattern.waveEnhancement === 'positive') {
-        bonusMultiplier += 0.08;
-      }
+    // Wave enhancement bonus - but smaller since it's not critical
+    if (factors.wavePattern.waveEnhancement === 'positive') {
+      bonusMultiplier += 0.05; // Decreased from 0.08 - nice to have, not essential
     }
 
     const calculatedProbability = baseProbability * bonusMultiplier;
@@ -787,9 +890,18 @@ export class KatabaticAnalyzer {
     failureReason?: string;
   } {
     const today = new Date(currentTime);
+    const currentHour = currentTime.getHours();
     
     // Look for today's afternoon maximum temperature
-    const morrisonMaxTemp = this.findAfternoonMaxTemperature(morrisonIndex, today);
+    let morrisonMaxTemp = this.findAfternoonMaxTemperature(morrisonIndex, today);
+    
+    // If we're in the evening but don't have today's afternoon data in forecast,
+    // this is normal because forecasts don't include past hours. We should rely on 
+    // the historical enhancement service to provide today's actual maximum.
+    if (morrisonMaxTemp === null && currentHour >= 18) {
+      console.log('📅 Evening thermal analysis: Today\'s afternoon data not in forecast (expected - forecasts are future-only)');
+      console.log('🔄 Will rely on historical enhancement service for today\'s actual temperatures');
+    }
     
     // Look for tomorrow's dawn minimum temperature
     const evergreenMinTemp = this.findPreDawnMinTemperature(mountainIndex, currentTime);
@@ -799,13 +911,22 @@ export class KatabaticAnalyzer {
     if (morrisonMaxTemp === null || evergreenMinTemp === null) {
       const reasons: string[] = [];
       if (morrisonMaxTemp === null) {
-        reasons.push('evening temperature data (6 PM)');
+        if (currentHour >= 18) {
+          reasons.push('today\'s afternoon maximum (will use historical data if available)');
+        } else {
+          reasons.push('afternoon temperature forecast');
+        }
       }
       if (evergreenMinTemp === null) {
         reasons.push('dawn temperature data (6 AM tomorrow)');
       }
       
-      failureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}. This may indicate weather API data gaps or insufficient forecast coverage.`;
+      if (currentHour >= 18 && morrisonMaxTemp === null && evergreenMinTemp !== null) {
+        // This is the normal case in evening - missing today's data but have tomorrow's dawn
+        failureReason = `Today's afternoon data not in forecast. Thermal analysis will use historical enhancement service for accurate today's maximum temperature.`;
+      } else {
+        failureReason = `Overnight analysis incomplete - missing ${reasons.join(' and ')}.`;
+      }
     }
     
     return {
@@ -828,6 +949,8 @@ export class KatabaticAnalyzer {
       return 0; // No confidence when proper data isn't available
     }
     
+    // For thermal cycle analysis, provide reasonable confidence even with approximations
+    // Historical enhancement will improve this if available
     return meets 
       ? Math.min(100, (differential / criteria.minTemperatureDifferential) * 75)
       : Math.max(30, (differential / criteria.minTemperatureDifferential) * 55);
@@ -896,6 +1019,12 @@ export class KatabaticAnalyzer {
     analysisType: 'thermal_cycle' | 'unavailable',
     thermalCycleFailureReason?: string
   ) {
+    // Update failure reason for better user understanding
+    let updatedFailureReason = thermalCycleFailureReason;
+    if (analysisType === 'thermal_cycle' && thermalCycleFailureReason?.includes('Today\'s afternoon data not in forecast')) {
+      updatedFailureReason = 'Using current temperature as afternoon maximum approximation. Historical enhancement will improve accuracy if available.';
+    }
+    
     return {
       meets,
       differential,
@@ -904,7 +1033,7 @@ export class KatabaticAnalyzer {
       confidence,
       dataSource: 'hybrid_thermal_cycle' as const,
       analysisType,
-      thermalCycleFailureReason: thermalCycleFailureReason || undefined,
+      thermalCycleFailureReason: updatedFailureReason || undefined,
       thermalWindow: analysisType === 'thermal_cycle' ? {
         morrisonMax: '18:00 (Evening - start of cooling cycle)',
         evergreenMin: '06:00 (Dawn - end of cooling cycle)'

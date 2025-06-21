@@ -441,6 +441,39 @@ node scripts/debug-evening-refresh.mjs
 ### Configuration
 The service automatically initializes when the app starts and requires notification permissions to function properly. No additional configuration is needed.
 
+## Prediction Lifecycle Management
+
+The app implements a robust prediction lifecycle management system to ensure wind predictions are locked at appropriate times and maintain consistency throughout the prediction window.
+
+### Purpose
+The prediction lifecycle management solves timing issues where predictions would dramatically change after midnight due to forecast data transitions. It implements a structured approach to prediction reliability:
+
+### Lifecycle Stages
+1. **Preview (Morning-Evening)**: Predictions calculated normally, updated with fresh data
+2. **Evening Lock (6 PM)**: First lock point - prediction locked for evening review
+3. **Final Lock (11 PM)**: Second lock point - prediction locked for dawn execution
+4. **Active (Midnight-8 AM)**: Locked prediction used, no recalculation
+5. **Verification (8 AM)**: Compare predicted vs actual conditions
+
+### Key Features
+- **Automatic Locking**: Predictions automatically lock at 6 PM and 11 PM
+- **State Persistence**: Locked predictions saved and restored between app sessions
+- **Consistent Results**: Same prediction shown from evening through dawn
+- **Verification**: Post-event analysis to improve prediction accuracy
+
+### Key Files
+- `services/predictionStateManager.ts` - Core prediction lifecycle management
+- `services/katabaticAnalyzer.ts` - Integrated prediction analysis with state management
+
+### Testing
+```bash
+# Debug current prediction state and real wind data
+npm run debug-stations  # Shows real wind data for verification
+```
+
+### Configuration
+The prediction lifecycle system automatically initializes when first accessed and requires no manual configuration. It uses AsyncStorage for persistence and includes automatic cleanup of old predictions.
+
 ## Getting Help
 
 - **Issues**: Create GitHub issues for bugs or feature requests  

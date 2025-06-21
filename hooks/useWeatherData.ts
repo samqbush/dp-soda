@@ -131,12 +131,12 @@ export const useWeatherData = () => {
    * Enhanced temperature differential calculation using thermal cycles
    * Uses the KatabaticAnalyzer to avoid code duplication
    */
-  const getKatabaticTemperatureDifferential = useCallback(() => {
+  const getKatabaticTemperatureDifferential = useCallback(async () => {
     if (!weatherData) return null;
     
     try {
       // Use the existing katabatic analyzer to get temperature differential analysis
-      const analysis = katabaticAnalyzer.analyzePrediction(weatherData);
+      const analysis = await katabaticAnalyzer.analyzePrediction(weatherData);
       const tempFactor = analysis.factors.temperatureDifferential;
       
       if (tempFactor.analysisType === 'unavailable') {
@@ -241,7 +241,7 @@ export const useWeatherData = () => {
    * Get preliminary katabatic prediction for tomorrow
    * Note: This is a preliminary prediction based on current forecast models
    */
-  const getTomorrowPrediction = useCallback(() => {
+  const getTomorrowPrediction = useCallback(async () => {
     if (!weatherData) return null;
     
     try {
@@ -280,7 +280,7 @@ export const useWeatherData = () => {
       }
       
       // Run katabatic analysis on tomorrow's data
-      const prediction = katabaticAnalyzer.analyzePrediction(tomorrowWeatherData);
+      const prediction = await katabaticAnalyzer.analyzePrediction(tomorrowWeatherData);
       
       return {
         prediction,
@@ -300,7 +300,7 @@ export const useWeatherData = () => {
   /**
    * Get katabatic prediction for a specific day (0 = today, 1 = tomorrow, etc.)
    */
-  const getDayPrediction = useCallback((dayOffset: number) => {
+  const getDayPrediction = useCallback(async (dayOffset: number) => {
     if (!weatherData) return null;
     
     try {
@@ -356,7 +356,7 @@ export const useWeatherData = () => {
       }
       
       // Run katabatic analysis on the day's data
-      const prediction = katabaticAnalyzer.analyzePrediction(dayWeatherData);
+      const prediction = await katabaticAnalyzer.analyzePrediction(dayWeatherData);
       
       // Determine data quality and preliminary status
       const dataQuality = dayWeatherData.morrison.hourlyForecast.length >= 18 ? 'good' : 'limited';
@@ -386,14 +386,14 @@ export const useWeatherData = () => {
   /**
    * Get predictions for the next 5 days (maximum available from free API)
    */
-  const getWeeklyPredictions = useCallback(() => {
+  const getWeeklyPredictions = useCallback(async () => {
     if (!weatherData) return [];
     
     const predictions = [];
     
     // Get predictions for today through day 4 (5 days total)
     for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
-      const prediction = getDayPrediction(dayOffset);
+      const prediction = await getDayPrediction(dayOffset);
       if (prediction) {
         predictions.push(prediction);
       }

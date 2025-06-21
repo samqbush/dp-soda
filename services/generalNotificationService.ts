@@ -24,7 +24,8 @@ class GeneralNotificationService {
    * Check if notifications are supported on this platform
    */
   isNotificationSupported(): boolean {
-    return Platform.OS !== 'web';
+    // iOS and Android always support notifications
+    return true;
   }
 
   /**
@@ -32,23 +33,27 @@ class GeneralNotificationService {
    */
   async requestPermissions(): Promise<boolean> {
     try {
-      if (Platform.OS === 'web') {
-        AlarmLogger.warning('Notifications not supported on web platform');
-        return false;
-      }
+      AlarmLogger.info('🔔 Checking notification permissions...');
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      AlarmLogger.info(`📋 Current permission status: ${existingStatus}`);
       let finalStatus = existingStatus;
 
       // Only ask for permissions if we don't already have them
       if (existingStatus !== 'granted') {
+        AlarmLogger.info('📱 Requesting notification permissions from user...');
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        AlarmLogger.info(`📋 Permission request result: ${status}`);
+      } else {
+        AlarmLogger.info('✅ Notification permissions already granted');
       }
 
-      return finalStatus === 'granted';
+      const hasPermission = finalStatus === 'granted';
+      AlarmLogger.info(`🔔 Final permission status: ${hasPermission ? 'GRANTED' : 'DENIED'}`);
+      return hasPermission;
     } catch (error) {
-      AlarmLogger.error('Error requesting notification permissions:', error);
+      AlarmLogger.error('❌ Error requesting notification permissions:', error);
       return false;
     }
   }
@@ -64,7 +69,10 @@ class GeneralNotificationService {
     data?: any
   ): Promise<string | null> {
     try {
+      AlarmLogger.info(`📅 Scheduling notification: "${title}" for ${triggerDate.toLocaleString()}`);
+
       if (!this.isNotificationSupported()) {
+        AlarmLogger.error('❌ Notifications not supported on this platform');
         return null;
       }
 
@@ -72,17 +80,18 @@ class GeneralNotificationService {
       const msUntilTrigger = triggerDate.getTime() - now.getTime();
       
       if (msUntilTrigger <= 0) {
-        AlarmLogger.warning(`Cannot schedule notification for past date: ${triggerDate.toLocaleString()}`);
+        AlarmLogger.warning(`⚠️ Cannot schedule notification for past date: ${triggerDate.toLocaleString()}`);
         return null;
       }
 
       const secondsUntilTrigger = Math.ceil(msUntilTrigger / 1000);
+      AlarmLogger.info(`⏰ Scheduling notification for ${secondsUntilTrigger} seconds from now`);
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
-          sound: undefined, // Silent by default for general notifications
+          sound: false, // Silent by default for general notifications (false = no sound)
           priority: 'normal',
           data: {
             ...data,
@@ -95,10 +104,10 @@ class GeneralNotificationService {
         },
       });
 
-      AlarmLogger.info(`General notification scheduled with ID: ${identifier}`);
+      AlarmLogger.success(`✅ General notification scheduled successfully with ID: ${identifier}`);
       return identifier;
     } catch (error) {
-      AlarmLogger.error('Error scheduling general notification:', error);
+      AlarmLogger.error('❌ Failed to schedule general notification:', error);
       return null;
     }
   }
@@ -126,7 +135,6 @@ class GeneralNotificationService {
           name: 'General Notifications',
           description: 'General app notifications and updates',
           importance: Notifications.AndroidImportance.DEFAULT,
-          sound: undefined, // Silent
           enableVibrate: false,
           showBadge: false,
         });
@@ -136,7 +144,6 @@ class GeneralNotificationService {
           name: 'Weather Data Refresh',
           description: 'Automatic weather data updates for wind predictions',
           importance: Notifications.AndroidImportance.DEFAULT,
-          sound: undefined, // Silent
           enableVibrate: false,
           showBadge: false,
         });

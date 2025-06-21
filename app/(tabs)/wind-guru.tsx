@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -42,15 +42,15 @@ export default function WindGuruScreen() {
     if (!refreshStatus.isInitialized) {
       return {
         status: 'initializing',
-        message: '🔄 Evening refresh starting...',
+        message: '🔄 Setting up evening refresh...',
         color: '#FF9800'
       };
     }
     
     if (!refreshStatus.isScheduled) {
       return {
-        status: 'disabled',
-        message: '⚠️ Evening refresh not scheduled',
+        status: 'error',
+        message: '⚠️ Evening refresh initialization failed',
         color: '#F44336'
       };
     }
@@ -88,6 +88,30 @@ export default function WindGuruScreen() {
     // getPredictionAccuracy,
     // validatePastPredictions,
   } = useWeatherData();
+
+  // State for async tomorrow prediction
+  const [tomorrowPrediction, setTomorrowPrediction] = useState<any>(null);
+  const [isLoadingTomorrowPrediction, setIsLoadingTomorrowPrediction] = useState(false);
+
+  // Load tomorrow prediction asynchronously
+  useEffect(() => {
+    const loadTomorrowPrediction = async () => {
+      if (!weatherData) return;
+      
+      setIsLoadingTomorrowPrediction(true);
+      try {
+        const prediction = await getTomorrowPrediction();
+        setTomorrowPrediction(prediction);
+      } catch (error) {
+        console.error('Failed to load tomorrow prediction:', error);
+        setTomorrowPrediction(null);
+      } finally {
+        setIsLoadingTomorrowPrediction(false);
+      }
+    };
+
+    loadTomorrowPrediction();
+  }, [weatherData, getTomorrowPrediction]);
 
   // Import Soda Lake wind data for prediction validation
   const { windData: sodaLakeWindData, refreshData: refreshSodaLakeData } = useSodaLakeWind();
@@ -296,7 +320,7 @@ export default function WindGuruScreen() {
   const pressureTrend = getPressureTrend('morrison', 24); // 24 hours for comprehensive chart
   const overnightTemperature = getOvernightTemperatureAnalysis(); // NEW: Overnight temperature differential analysis
   const katabaticConditions = getBasicKatabaticConditions();
-  const tomorrowPrediction = getTomorrowPrediction();
+  // tomorrowPrediction is now loaded asynchronously via useEffect above
   
   // REMOVED: Phase 2.5 Extended forecast data and Phase 3 prediction tracking
   // const weeklyPredictions = getWeeklyPredictions();

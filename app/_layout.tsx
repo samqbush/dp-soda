@@ -98,6 +98,12 @@ export default function RootLayout() {
           console.log('🌅 Initializing evening weather refresh service...');
           await eveningWeatherRefreshService.initialize();
           console.log('✅ Evening weather refresh service initialized');
+          
+          // Initialize prediction state manager
+          console.log('🔮 Initializing prediction state manager...');
+          const { predictionStateManager } = await import('@/services/predictionStateManager');
+          await predictionStateManager.initialize();
+          console.log('✅ Prediction state manager initialized');
         }
         
       } catch (e) {
