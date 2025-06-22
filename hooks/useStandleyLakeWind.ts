@@ -1,12 +1,10 @@
 import {
-    clearEnhancedDeviceCache,
+    clearDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
+    fetchEcowittCombinedWindDataForDevice,
     fetchEcowittRealTimeWindData,
-    fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
-    getEnhancedCachedData,
-    smartRefreshEcowittData,
     type EcowittCurrentWindConditions,
     type EcowittWindDataPoint
 } from '@/services/ecowittService';
@@ -72,43 +70,14 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   const loadCachedData = useCallback(async (): Promise<boolean> => {
     try {
       console.log('📱 Loading cached Standley Lake wind data...');
-      const cachedData = await getEnhancedCachedData('DP Standley West');
-      
-      if (cachedData && cachedData.data.length > 0) {
-        setWindData(cachedData.data);
-        setLastUpdated(new Date(cachedData.metadata.lastUpdated));
-        
-        // Analyze the cached data
-        const converted = convertToWindDataPoint(cachedData.data);
-        if (converted.length > 0) {
-          // Use Standley Lake specific criteria with user-configured minimum speed
-          const defaultCriteria: AlarmCriteria = {
-            minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
-            directionConsistencyThreshold: 70,
-            minimumConsecutivePoints: 4,
-            directionDeviationThreshold: 45,
-            preferredDirection: 270, // West wind for Standley Lake
-            preferredDirectionRange: 45,
-            useWindDirection: true,
-            alarmEnabled: false,
-            alarmTime: "06:00" // Later start time for Standley Lake
-          };
-          
-          const windAnalysis = analyzeRecentWindData(converted, defaultCriteria);
-          setAnalysis(windAnalysis);
-        }
-        
-        console.log('✅ Loaded cached Standley Lake data:', cachedData.data.length, 'points');
-        return true;
-      }
-      
+      // For now, just return false as we're using combined data approach
+      console.log('⚠️ No cached data available - using combined real-time + historical data');
       return false;
     } catch (error) {
       console.error('❌ Error loading cached Standley Lake data:', error);
-      setError('Failed to load cached data');
       return false;
     }
-  }, [userMinimumSpeed]);
+  }, []);
 
   /**
    * Refresh current conditions (real-time data)
@@ -151,8 +120,8 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
         return;
       }
 
-      // Use smart refresh (incremental or full based on cache state)
-      const freshData = await smartRefreshEcowittData('DP Standley West');
+      // Use combined data (historical + real-time) for complete coverage
+      const freshData = await fetchEcowittCombinedWindDataForDevice('DP Standley West');
       
       setWindData(freshData);
       setLastUpdated(new Date());
@@ -208,7 +177,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
    */
   const clearCache = useCallback(async (): Promise<void> => {
     try {
-      await clearEnhancedDeviceCache('DP Standley West');
+      await clearDeviceCache('DP Standley West');
       setWindData([]);
       setAnalysis(null);
       setLastUpdated(null);

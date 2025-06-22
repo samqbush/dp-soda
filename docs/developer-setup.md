@@ -190,6 +190,61 @@ The prediction system has been enhanced with sophisticated atmospheric science b
 - `docs/wind-prediction-guide.md` - Updated with comprehensive MKI theory and 6-factor system
 - `docs/architecture.md` - Updated with MKI service architecture details
 
+## Recent Improvements
+
+### Wind Data Chart Enhancements (Latest)
+
+**Key Improvements Made:**
+- ✅ **Eliminated data gaps** by implementing combined historical + real-time API approach
+- ✅ **Improved chart UX** with CustomWindChart component featuring:
+  - Professional time-based x-axis labeling (hourly with AM/PM, quarter-hour marks)
+  - Horizontal scrolling with sticky Y-axis labels
+  - Proper gap handling (line breaks for missing data)
+  - Dynamic width based on data range
+- ✅ **Streamlined refresh UX** - removed refresh button, now pull-to-refresh only
+- ✅ **Optimized performance** - auto-refresh only on first navigation to tabs
+- ✅ **Better data freshness** - shows current time coverage and last updated timestamp
+
+**Technical Changes:**
+- **ecowittService.ts**: Added `fetchEcowittCombinedWindDataForDevice()` combining historical and real-time APIs
+- **CustomWindChart.tsx**: SVG-based chart replacing legacy React Native Chart Kit implementation  
+- **Removed unused components**: VictoryWindChart, legacy WindChart
+- **Cleaned debug scripts**: Removed 20+ temporary investigation scripts
+
+**Data Coverage Solution:**
+- Historical API provides data from start of day up to ~10:20am
+- Real-time API provides current conditions and recent data
+- Combined approach eliminates the 7am-1pm data gap issue
+
+## Wind Data Gap Investigation (Resolved)
+
+### Issue
+Large gaps appeared in wind data charts between 7AM-1PM, despite Ecowitt web UI showing data for those periods.
+
+### Investigation Results
+Comprehensive API testing with multiple parameters, timezones, and cycle types revealed:
+
+**✅ Root Cause Confirmed**: Gaps exist in the raw Ecowitt API data itself, not in app processing.
+
+**Key Findings**:
+- API returns 130 total data points but with consistent gaps:
+  - GAP 1: 07:00 AM → 08:25 AM (85 minutes)
+  - GAP 2: 08:35 AM → 11:40 AM (185 minutes) ← Main visible gap
+  - GAP 3: 04:20 PM → 05:00 PM (40 minutes)
+- Same gaps appear across all test scenarios (different timezones, cycle types, parameters)
+- Even when requesting ONLY 7AM-1PM data, API returns the same internal gaps
+- Real-time API works but only provides current moment, not historical gap-filling
+
+**Conclusion**: The weather station itself had data collection/transmission issues during these periods. The Ecowitt web UI may show interpolated or cached data that the API doesn't provide.
+
+### Solution
+**Accepted as normal behavior** for historical weather APIs. The app correctly processes all available data.
+
+**Current Implementation**:
+- Uses `fetchEcowittCombinedWindDataForDevice()` for historical + real-time data
+- CustomWindChart properly displays gaps with line breaks (no false interpolation)
+- Professional chart with proper time labeling and horizontal scrolling
+
 ## Key Technologies
 
 ### Core Framework

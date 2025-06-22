@@ -16,6 +16,14 @@ export default function WindGuruScreen() {
   
   // State for collapsible sections - must be called before any conditional returns
   const [isHowItWorksExpanded, setIsHowItWorksExpanded] = useState(false);
+  
+  // State for cache status (Open-Meteo aggressive caching)
+  const [cacheStatus, setCacheStatus] = useState<{
+    isCached: boolean;
+    cacheAge?: number;
+    expiresIn?: number;
+    dataSource?: string;
+  } | null>(null);
 
   // Temperature conversion helper
   const celsiusToFahrenheit = (celsius: number): number => {
@@ -72,7 +80,7 @@ export default function WindGuruScreen() {
     }
   };
 
-  // Use the weather data hook with Phase 2 prediction engine - must be called unconditionally
+  // Use the weather data hook with Open-Meteo API (free, unlimited) - must be called unconditionally
   const {
     weatherData,
     isLoading,
@@ -83,6 +91,7 @@ export default function WindGuruScreen() {
     getBasicKatabaticConditions,
     katabaticAnalysis,
     getTomorrowPrediction,
+    getCacheStatus,
     // Phase 3: Prediction tracking (June 14, 2025) - REMOVED
     // logCurrentPrediction,
     // getPredictionAccuracy,
@@ -91,27 +100,38 @@ export default function WindGuruScreen() {
 
   // State for async tomorrow prediction
   const [tomorrowPrediction, setTomorrowPrediction] = useState<any>(null);
-  const [isLoadingTomorrowPrediction, setIsLoadingTomorrowPrediction] = useState(false);
 
   // Load tomorrow prediction asynchronously
   useEffect(() => {
     const loadTomorrowPrediction = async () => {
       if (!weatherData) return;
       
-      setIsLoadingTomorrowPrediction(true);
       try {
         const prediction = await getTomorrowPrediction();
         setTomorrowPrediction(prediction);
       } catch (error) {
         console.error('Failed to load tomorrow prediction:', error);
         setTomorrowPrediction(null);
-      } finally {
-        setIsLoadingTomorrowPrediction(false);
       }
     };
 
     loadTomorrowPrediction();
   }, [weatherData, getTomorrowPrediction]);
+
+  // Load cache status for debugging info
+  useEffect(() => {
+    const loadCacheStatus = async () => {
+      try {
+        const status = await getCacheStatus();
+        setCacheStatus(status);
+      } catch (error) {
+        console.error('Failed to load cache status:', error);
+        setCacheStatus(null);
+      }
+    };
+
+    loadCacheStatus();
+  }, [getCacheStatus, weatherData]);
 
   // Import Soda Lake wind data for prediction validation
   const { windData: sodaLakeWindData, refreshData: refreshSodaLakeData } = useSodaLakeWind();
@@ -440,6 +460,27 @@ export default function WindGuruScreen() {
                 return '🔴 Stale data';
               })()}
             </ThemedText>
+            
+            {/* New Open-Meteo data source info */}
+            <ThemedText style={[styles.dataSourceInfo, { color: '#4CAF50', fontSize: 11, marginTop: 4 }]}>
+              🌍 Open-Meteo API (Free • Unlimited • 6h Cache)
+            </ThemedText>
+            
+            {/* Cache status for debugging */}
+            {cacheStatus && __DEV__ && (
+              <ThemedText style={[styles.cacheDebugInfo, { 
+                color: textColor, 
+                opacity: 0.6,
+                fontSize: 10,
+                marginTop: 2
+              }]}>
+                {cacheStatus.isCached 
+                  ? `📦 Cached: ${cacheStatus.cacheAge}m old, expires in ${cacheStatus.expiresIn}m`
+                  : '🔄 Live API data'
+                }
+              </ThemedText>
+            )}
+            
             <ThemedText style={[styles.eveningRefreshStatus, { 
               color: getEveningRefreshInfo().color,
               opacity: 0.8
@@ -1336,14 +1377,19 @@ export default function WindGuruScreen() {
               ✅ Today & Tomorrow detailed analysis
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              🌤️ Using OpenWeatherMap API for reliable forecasts
+              � Using Open-Meteo API (Free • Unlimited • High Quality)
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
               📍 Morrison, CO - Katabatic wind analysis
             </ThemedText>
             <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
-              🚀 Simplified approach: Manual control of predictions
+              🚀 6-hour aggressive caching for better performance
             </ThemedText>
+            {cacheStatus && (
+              <ThemedText style={[styles.devText, { color: textColor, opacity: 0.6 }]}>
+                💾 Cache: {cacheStatus.isCached ? `${cacheStatus.cacheAge}m old` : 'Live data'}
+              </ThemedText>
+            )}
           </ThemedView>
         )}
 
@@ -1351,10 +1397,10 @@ export default function WindGuruScreen() {
         {!__DEV__ && (
           <ThemedView style={{ backgroundColor: 'rgba(0, 0, 0, 0.02)', borderRadius: 8, padding: 12, marginTop: 16 }}>
             <ThemedText style={{ color: textColor, opacity: 0.6, fontSize: 12, textAlign: 'center' }}>
-              🌤️ Wind Guru uses advanced 5-factor analysis with NOAA & OpenWeather data
+              � Wind Guru uses advanced 5-factor analysis with Open-Meteo free weather data
             </ThemedText>
             <ThemedText style={{ color: textColor, opacity: 0.5, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
-              Predictions improve over time as the system learns local patterns
+              High-quality European reanalysis data • No API limits • 6-hour smart caching
             </ThemedText>
           </ThemedView>
         )}
@@ -1911,5 +1957,14 @@ const styles = StyleSheet.create({
     color: '#FF9800',
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  // Open-Meteo data source styles
+  dataSourceInfo: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  cacheDebugInfo: {
+    fontSize: 10,
+    marginTop: 2,
   },
 });
