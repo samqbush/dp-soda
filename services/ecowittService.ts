@@ -20,6 +20,12 @@ export interface EcowittWindDataPoint {
   windDirection: number; // degrees
   temperature?: number; // optional temperature data
   humidity?: number; // optional humidity data
+  // Add transmission quality info
+  transmissionQuality?: {
+    isFullTransmission: boolean;
+    hasOutdoorSensors: boolean;
+    missingDataFields: string[];
+  };
 }
 
 export interface EcowittApiConfig {
@@ -58,7 +64,7 @@ export interface EcowittHistoricResponse {
   msg: string;
   time: string;
   data: {
-    wind: {
+    wind?: {
       wind_speed: {
         unit: string;
         list: { [timestamp: string]: string };
@@ -68,6 +74,26 @@ export interface EcowittHistoricResponse {
         list: { [timestamp: string]: string };
       };
       wind_direction: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+    };
+    outdoor?: {
+      temperature: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+      humidity: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+    };
+    indoor?: {
+      temperature: {
+        unit: string;
+        list: { [timestamp: string]: string };
+      };
+      humidity: {
         unit: string;
         list: { [timestamp: string]: string };
       };
@@ -125,6 +151,25 @@ export interface EcowittCurrentWindConditions {
   time: string; // ISO string
   temperature?: number; // optional temperature data
   humidity?: number; // optional humidity data
+}
+
+// Transmission quality interfaces
+export interface TransmissionQualityInfo {
+  isFullTransmission: boolean; // True if all outdoor sensors are transmitting
+  hasOutdoorSensors: boolean; // True if outdoor temp/humidity are available
+  hasWindData: boolean; // True if wind data is available
+  hasCompleteSensorData: boolean; // True if all expected sensors are working
+  transmissionGaps: TransmissionGap[]; // Array of detected gaps
+  lastGoodTransmissionTime: string | null; // ISO timestamp of last complete transmission
+  currentTransmissionStatus: 'good' | 'partial' | 'indoor-only' | 'offline';
+}
+
+export interface TransmissionGap {
+  startTime: string; // ISO timestamp
+  endTime: string; // ISO timestamp
+  durationMinutes: number;
+  type: 'antenna' | 'offline' | 'partial' | 'indoor-only' | 'temporal';
+  affectedSensors: string[]; // List of missing sensor types
 }
 
 // Storage keys
@@ -741,7 +786,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
       pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
       wind_unit: '7', // mph (7 = mph, 6 = m/s) - Changed to mph to match our processing
-      call_back: 'wind', // Request wind data
+      call_back: 'wind,outdoor,indoor', // Request wind data + outdoor/indoor for transmission quality detection
     };
 
     console.log(`📡 Making Ecowitt history API request for ${deviceName}`);
@@ -775,17 +820,16 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       throw new Error('Invalid response structure from Ecowitt API - missing wind data');
     }
 
-    const windData = response.data.data.wind;
-    if (!windData.wind_speed?.list || !windData.wind_direction?.list) {
-      console.error(`❌ Missing wind speed or direction data in response for ${deviceName}`);
-      throw new Error('Invalid response structure from Ecowitt API - missing wind measurements');
-    }
+    // Get available data sources for transmission quality analysis
+    const windSpeedData = response.data.data.wind;
+    const outdoorData = response.data.data.outdoor;
+    const indoorData = response.data.data.indoor;
 
     // Get timestamps from wind speed data (they should be consistent across all measurements)
-    const timestamps = Object.keys(windData.wind_speed.list);
+    const timestamps = Object.keys(windSpeedData.wind_speed.list);
     console.log(`📊 Received ${timestamps.length} data points for ${deviceName}`);
 
-    // Transform API response to our format
+    // Transform API response to our format with transmission quality analysis
     const windDataPoints: EcowittWindDataPoint[] = timestamps
       .map(timestamp => {
         // Convert timestamp to Date object and ISO string
@@ -795,13 +839,28 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
         
         // Extract wind data from the response structure
         // API now returns mph since we requested wind_unit: '7'
-        const windSpeedMph = parseFloat(windData.wind_speed.list[timestamp] || '0');
-        const windGustMph = parseFloat(windData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
-        const windDirection = parseFloat(windData.wind_direction.list[timestamp] || '0');
+        const windSpeedMph = parseFloat(windSpeedData.wind_speed.list[timestamp] || '0');
+        const windGustMph = parseFloat(windSpeedData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
+        const windDirection = parseFloat(windSpeedData.wind_direction.list[timestamp] || '0');
         
         // Convert mph to m/s for internal consistency
         const windSpeedMs = windSpeedMph / 2.237;
         const windGustMs = windGustMph / 2.237;
+
+        // Extract temperature and humidity data if available
+        const outdoorTemp = outdoorData?.temperature?.list?.[timestamp] ? 
+          parseFloat(outdoorData.temperature.list[timestamp]) : undefined;
+        const outdoorHumidity = outdoorData?.humidity?.list?.[timestamp] ? 
+          parseFloat(outdoorData.humidity.list[timestamp]) : undefined;
+
+        // Analyze transmission quality for this data point
+        const transmissionQuality = analyzeDataPointTransmissionQuality(
+          windSpeedData.wind_speed.list,
+          outdoorData?.temperature?.list,
+          outdoorData?.humidity?.list,
+          indoorData?.temperature?.list,
+          timestamp
+        );
         
         return {
           time: timeString,
@@ -811,11 +870,21 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
           windGust: windGustMs,
           windGustMph,
           windDirection,
-          temperature: undefined, // Not available in wind-only response
-          humidity: undefined // Not available in wind-only response
+          temperature: outdoorTemp,
+          humidity: outdoorHumidity,
+          transmissionQuality
         };
       })
-      .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
+      .filter(point => {
+        // Only filter out points that have NaN wind speed and are not indoor-only transmissions
+        const hasValidWindData = !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0;
+        const isIndoorOnlyTransmission = point.transmissionQuality && 
+          !point.transmissionQuality.hasOutdoorSensors && 
+          point.transmissionQuality.missingDataFields.includes('wind');
+        
+        // Keep the point if it has valid wind data OR if it's an indoor-only transmission (for gap detection)
+        return hasValidWindData || isIndoorOnlyTransmission;
+      })
       .sort((a, b) => a.timestamp - b.timestamp);
 
     // Cache the data using enhanced caching (TODO: Re-implement caching)
@@ -1019,6 +1088,84 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
 }
 
 /**
+ * Analyze transmission quality for real-time data by fetching additional sensor data
+ */
+async function analyzeRealTimeTransmissionQuality(config: EcowittApiConfig): Promise<{
+  isFullTransmission: boolean;
+  hasOutdoorSensors: boolean;
+  missingDataFields: string[];
+}> {
+  try {
+    console.log('🔍 Fetching all sensor data for real-time transmission quality analysis...');
+    
+    // Fetch real-time data for all sensors (not just wind)
+    const params = {
+      application_key: config.applicationKey,
+      api_key: config.apiKey,
+      mac: config.macAddress,
+      call_back: 'all', // Request all sensor data
+    };
+
+    const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
+      params,
+      timeout: 10000,
+      headers: {
+        'User-Agent': Platform.select({
+          ios: 'DawnPatrol/1.0 (iOS)',
+          android: 'DawnPatrol/1.0 (Android)',
+          default: 'DawnPatrol/1.0'
+        })
+      }
+    });
+
+    if (response.data.code !== 0) {
+      throw new Error(`Ecowitt real-time API error: ${response.data.msg}`);
+    }
+
+    const data = response.data.data;
+    const missingFields: string[] = [];
+    
+    // Check for wind data
+    if (!data.wind?.wind_speed?.value) {
+      missingFields.push('wind');
+    }
+    
+    // Check for outdoor sensors
+    if (!data.outdoor?.temperature?.value && !data.outdoor?.humidity?.value) {
+      missingFields.push('outdoor');
+    }
+    
+    // Note: Real-time API may not provide indoor data, so we don't check for it
+    // This is a limitation of the real-time endpoint
+    
+    const hasOutdoorSensors = !missingFields.includes('outdoor') || !missingFields.includes('wind');
+    const isFullTransmission = missingFields.length === 0;
+    
+    console.log('📊 Real-time transmission analysis:', {
+      hasWind: !missingFields.includes('wind'),
+      hasOutdoor: !missingFields.includes('outdoor'),
+      missingFields,
+      status: isFullTransmission ? 'good' : hasOutdoorSensors ? 'partial' : 'poor'
+    });
+    
+    return {
+      isFullTransmission,
+      hasOutdoorSensors,
+      missingDataFields: missingFields
+    };
+    
+  } catch (error) {
+    console.error('❌ Error analyzing real-time transmission quality:', error);
+    // Fallback: if we can't analyze, assume partial transmission since we have wind data
+    return {
+      isFullTransmission: false,
+      hasOutdoorSensors: true,
+      missingDataFields: [] // Conservative assumption - don't assume anything is missing
+    };
+  }
+}
+
+/**
  * Fetch combined wind data: historical + real-time for complete coverage
  */
 export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoint[]> {
@@ -1056,8 +1203,28 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
           humidity: realTimeData.humidity
         };
         
+        // Add transmission quality analysis for real-time data
+        // Since real-time endpoint only provides wind data, we need to fetch additional data
+        try {
+          console.log('🔍 Analyzing transmission quality for real-time data...');
+          realTimePoint.transmissionQuality = await analyzeRealTimeTransmissionQuality(config);
+          console.log('✅ Added transmission quality to real-time data:', {
+            isFullTransmission: realTimePoint.transmissionQuality.isFullTransmission,
+            hasOutdoorSensors: realTimePoint.transmissionQuality.hasOutdoorSensors,
+            missingFields: realTimePoint.transmissionQuality.missingDataFields
+          });
+        } catch (qualityError) {
+          console.warn('⚠️ Could not analyze real-time transmission quality:', qualityError);
+          // Fallback: assume we have wind data but no info about other sensors
+          realTimePoint.transmissionQuality = {
+            isFullTransmission: false,
+            hasOutdoorSensors: true, // We have wind, so outdoor sensors are working
+            missingDataFields: [] // We don't know what's missing, so don't assume
+          };
+        }
+        
         combinedData.push(realTimePoint);
-        console.log('✅ Added real-time data point to historical data');
+        console.log('✅ Added real-time data point to historical data with transmission quality');
       } else {
         console.log('⚠️ Real-time data is not newer than historical data');
       }
@@ -1117,8 +1284,27 @@ export async function fetchEcowittCombinedWindDataForDevice(deviceName: string):
           humidity: realTimeData.humidity
         };
         
+        // Add transmission quality analysis for real-time data
+        try {
+          console.log('🔍 Analyzing transmission quality for real-time data...');
+          realTimePoint.transmissionQuality = await analyzeRealTimeTransmissionQuality(config);
+          console.log('✅ Added transmission quality to real-time data:', {
+            isFullTransmission: realTimePoint.transmissionQuality.isFullTransmission,
+            hasOutdoorSensors: realTimePoint.transmissionQuality.hasOutdoorSensors,
+            missingFields: realTimePoint.transmissionQuality.missingDataFields
+          });
+        } catch (qualityError) {
+          console.warn('⚠️ Could not analyze real-time transmission quality:', qualityError);
+          // Fallback: assume we have wind data but limited info about other sensors
+          realTimePoint.transmissionQuality = {
+            isFullTransmission: false,
+            hasOutdoorSensors: true, // We have wind, so outdoor sensors are working
+            missingDataFields: [] // Conservative - don't assume anything is missing
+          };
+        }
+        
         combinedData.push(realTimePoint);
-        console.log(`✅ Added real-time data point for ${deviceName}`);
+        console.log(`✅ Added real-time data point for ${deviceName} with transmission quality`);
       } else {
         console.log(`⚠️ Real-time data for ${deviceName} is not newer than historical data`);
       }
@@ -1166,4 +1352,207 @@ export async function clearDeviceCache(deviceName: string): Promise<void> {
   } catch (error) {
     console.error(`Error clearing cache for ${deviceName}:`, error);
   }
+}
+
+/**
+ * Analyze transmission quality for a single data point based on available sensor data
+ * Detects antenna problems that cause only indoor data to be transmitted
+ */
+function analyzeDataPointTransmissionQuality(
+  windData: { [timestamp: string]: string } | undefined,
+  outdoorTemp: { [timestamp: string]: string } | undefined,
+  outdoorHumidity: { [timestamp: string]: string } | undefined,
+  indoorTemp: { [timestamp: string]: string } | undefined,
+  timestamp: string
+): { isFullTransmission: boolean; hasOutdoorSensors: boolean; missingDataFields: string[] } {
+  const hasWind = !!(windData && windData[timestamp] && windData[timestamp] !== '-' && windData[timestamp] !== '');
+  const hasOutdoorTemp = !!(outdoorTemp && outdoorTemp[timestamp] && outdoorTemp[timestamp] !== '-' && outdoorTemp[timestamp] !== '');
+  const hasOutdoorHumidity = !!(outdoorHumidity && outdoorHumidity[timestamp] && outdoorHumidity[timestamp] !== '-' && outdoorHumidity[timestamp] !== '');
+  const hasIndoor = !!(indoorTemp && indoorTemp[timestamp] && indoorTemp[timestamp] !== '-' && indoorTemp[timestamp] !== '');
+  
+  const missingFields: string[] = [];
+  
+  if (!hasWind) missingFields.push('wind');
+  
+  // Only check for outdoor sensors if the API response included outdoor data sections
+  // If outdoor data sections are not present in the API response, assume they weren't requested
+  // and don't mark them as missing (this is normal when only wind data is fetched)
+  if (outdoorTemp !== undefined && !hasOutdoorTemp) missingFields.push('outdoor_temperature');
+  if (outdoorHumidity !== undefined && !hasOutdoorHumidity) missingFields.push('outdoor_humidity');
+  
+  // Full transmission: has wind data and (if outdoor data was requested) outdoor sensors are working
+  // If outdoor data wasn't included in API response, just having wind data means full transmission
+  const isFullTransmission = hasWind && 
+    (outdoorTemp === undefined || hasOutdoorTemp) && 
+    (outdoorHumidity === undefined || hasOutdoorHumidity);
+  
+  // Has outdoor sensors: at least outdoor temp or humidity (only relevant if outdoor data was requested)
+  const hasOutdoorSensors = outdoorTemp !== undefined || outdoorHumidity !== undefined ? 
+    (hasOutdoorTemp || hasOutdoorHumidity) : true; // If no outdoor data requested, assume sensors are working
+  
+  return {
+    isFullTransmission,
+    hasOutdoorSensors,
+    missingDataFields: missingFields
+  };
+}
+
+/**
+ * Analyze transmission gaps and quality issues over a time period
+ */
+export function analyzeOverallTransmissionQuality(windDataPoints: EcowittWindDataPoint[]): TransmissionQualityInfo {
+  if (windDataPoints.length === 0) {
+    return {
+      isFullTransmission: false,
+      hasOutdoorSensors: false,
+      hasWindData: false,
+      hasCompleteSensorData: false,
+      transmissionGaps: [],
+      lastGoodTransmissionTime: null,
+      currentTransmissionStatus: 'offline'
+    };
+  }
+
+  let lastGoodTransmissionTime: string | null = null;
+  const transmissionGaps: TransmissionGap[] = [];
+  let currentGap: TransmissionGap | null = null;
+  const MIN_GAP_DURATION_MINUTES = 15; // Report gaps of 15+ minutes
+  
+  console.log(`🔍 Analyzing ${windDataPoints.length} data points for transmission gaps (min duration: ${MIN_GAP_DURATION_MINUTES} min)...`);
+  
+  // Analyze each data point for transmission quality
+  for (let i = 0; i < windDataPoints.length; i++) {
+    const point = windDataPoints[i];
+    const quality = point.transmissionQuality;
+    
+    // Check for temporal gaps (missing data periods)
+    if (i > 0) {
+      const prevPoint = windDataPoints[i - 1];
+      const timeDiff = (new Date(point.time).getTime() - new Date(prevPoint.time).getTime()) / 60000; // minutes
+      
+      // If there's a gap of 10+ minutes between data points, consider it a temporal gap
+      if (timeDiff > 10 && timeDiff >= MIN_GAP_DURATION_MINUTES) {
+        transmissionGaps.push({
+          startTime: prevPoint.time,
+          endTime: point.time,
+          durationMinutes: Math.round(timeDiff),
+          type: 'temporal',
+          affectedSensors: ['all']
+        });
+      }
+    }
+    
+    if (quality?.isFullTransmission) {
+      lastGoodTransmissionTime = point.time;
+      
+      // End current gap if we had one and it meets minimum duration
+      if (currentGap) {
+        currentGap.endTime = point.time;
+        currentGap.durationMinutes = Math.round((new Date(point.time).getTime() - new Date(currentGap.startTime).getTime()) / 60000);
+        
+        // Only report gaps that meet minimum duration threshold
+        if (currentGap.durationMinutes >= MIN_GAP_DURATION_MINUTES) {
+          transmissionGaps.push(currentGap);
+        }
+        currentGap = null;
+      }
+    } else {
+      // Start a new gap or continue existing one
+      if (!currentGap) {
+        const gapType = quality?.hasOutdoorSensors ? 'partial' : 
+                       quality?.missingDataFields.includes('wind') && 
+                       quality?.missingDataFields.includes('outdoor_temperature') ? 'indoor-only' : 'offline';
+        
+        currentGap = {
+          startTime: point.time,
+          endTime: point.time, // Will be updated
+          durationMinutes: 0,
+          type: gapType,
+          affectedSensors: quality?.missingDataFields || ['all']
+        };
+      } else {
+        // Update gap type if it changes (e.g., from partial to indoor-only)
+        const currentGapType = quality?.hasOutdoorSensors ? 'partial' : 
+                              quality?.missingDataFields.includes('wind') && 
+                              quality?.missingDataFields.includes('outdoor_temperature') ? 'indoor-only' : 'offline';
+        
+        // If gap type changes significantly, end current gap and start new one
+        if ((currentGap.type === 'partial' && currentGapType === 'indoor-only') ||
+            (currentGap.type === 'indoor-only' && currentGapType === 'offline') ||
+            (currentGap.type === 'partial' && currentGapType === 'offline')) {
+          
+          // End current gap if it meets minimum duration
+          currentGap.endTime = point.time;
+          currentGap.durationMinutes = Math.round((new Date(point.time).getTime() - new Date(currentGap.startTime).getTime()) / 60000);
+          
+          if (currentGap.durationMinutes >= MIN_GAP_DURATION_MINUTES) {
+            transmissionGaps.push(currentGap);
+          }
+          
+          // Start new gap
+          currentGap = {
+            startTime: point.time,
+            endTime: point.time,
+            durationMinutes: 0,
+            type: currentGapType,
+            affectedSensors: quality?.missingDataFields || ['all']
+          };
+        }
+      }
+    }
+  }
+  
+  // Close any remaining gap
+  if (currentGap) {
+    const lastPoint = windDataPoints[windDataPoints.length - 1];
+    currentGap.endTime = lastPoint.time;
+    currentGap.durationMinutes = Math.round((new Date(lastPoint.time).getTime() - new Date(currentGap.startTime).getTime()) / 60000);
+    
+    // Only add if it meets minimum duration threshold
+    if (currentGap.durationMinutes >= MIN_GAP_DURATION_MINUTES) {
+      transmissionGaps.push(currentGap);
+    }
+  }
+
+  // Log detected gaps
+  console.log(`📊 Gap detection complete: ${transmissionGaps.length} gaps found (≥${MIN_GAP_DURATION_MINUTES} min)`);
+  transmissionGaps.forEach((gap, index) => {
+    console.log(`  Gap ${index + 1}: ${gap.type} (${gap.durationMinutes} min) from ${new Date(gap.startTime).toLocaleTimeString()} to ${new Date(gap.endTime).toLocaleTimeString()}`);
+  });
+
+  // Determine current status based on the latest data point
+  const latestPoint = windDataPoints[windDataPoints.length - 1];
+  const latestQuality = latestPoint.transmissionQuality;
+  
+  let currentStatus: 'good' | 'partial' | 'indoor-only' | 'offline' = 'offline';
+  if (latestQuality?.isFullTransmission) {
+    currentStatus = 'good';
+  } else if (latestQuality?.hasOutdoorSensors) {
+    currentStatus = 'partial';
+  } else if (latestQuality && latestQuality.missingDataFields.includes('outdoor') && latestQuality.missingDataFields.includes('wind') && !latestQuality.missingDataFields.includes('indoor')) {
+    // Indoor data only - no outdoor or wind data
+    currentStatus = 'indoor-only';
+  }
+
+  console.log('📊 Current transmission status analysis:', {
+    hasLatestQuality: !!latestQuality,
+    isFullTransmission: latestQuality?.isFullTransmission,
+    hasOutdoorSensors: latestQuality?.hasOutdoorSensors,
+    missingFields: latestQuality?.missingDataFields,
+    determinedStatus: currentStatus
+  });
+
+  const hasWindData = windDataPoints.some(p => p.transmissionQuality?.missingDataFields && !p.transmissionQuality.missingDataFields.includes('wind')) || false;
+  const hasOutdoorSensors = windDataPoints.some(p => p.transmissionQuality?.hasOutdoorSensors === true) || false;
+  const isFullTransmission = windDataPoints.some(p => p.transmissionQuality?.isFullTransmission === true) || false;
+  
+  return {
+    isFullTransmission,
+    hasOutdoorSensors,
+    hasWindData,
+    hasCompleteSensorData: isFullTransmission,
+    transmissionGaps,
+    lastGoodTransmissionTime,
+    currentTransmissionStatus: currentStatus
+  };
 }

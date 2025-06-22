@@ -22,6 +22,7 @@ export default function SodaLakeScreen() {
     chartData,
     currentConditions,
     analysis,
+    transmissionQuality,
     isLoading,
     isLoadingCurrent,
     error,
@@ -248,6 +249,15 @@ export default function SodaLakeScreen() {
           <ThemedText style={styles.freshnessMessage}>
             {getDataFreshnessMessage()}
           </ThemedText>
+          {/* Transmission quality indicator */}
+          {transmissionQuality && (
+            <ThemedText style={styles.transmissionStatusMessage}>
+              {transmissionQuality.currentTransmissionStatus === 'good' ? '📡 Full transmission' :
+               transmissionQuality.currentTransmissionStatus === 'partial' ? '⚠️ Partial transmission' :
+               transmissionQuality.currentTransmissionStatus === 'indoor-only' ? '📡 Indoor only' :
+               '🔴 Offline'}
+            </ThemedText>
+          )}
         </View>
 
         {/* Wind Chart */}
@@ -321,6 +331,88 @@ export default function SodaLakeScreen() {
             </ThemedText>
           </TouchableOpacity>
         </View>
+
+        {/* Transmission Quality Alerts */}
+        {transmissionQuality && transmissionQuality.currentTransmissionStatus !== 'good' && (
+          <View style={styles.transmissionQualityContainer}>
+            {transmissionQuality.currentTransmissionStatus === 'indoor-only' ? (
+              <>
+                <ThemedText style={styles.antennaWarningText}>
+                  📡 Antenna Issue Detected
+                </ThemedText>
+                <ThemedText style={styles.antennaWarningSubtext}>
+                  Station is only transmitting indoor temperature and humidity. Wind data may have gaps due to antenna transmission problems.
+                </ThemedText>
+                {transmissionQuality.lastGoodTransmissionTime && (
+                  <ThemedText style={styles.lastGoodTransmissionText}>
+                    Last complete transmission: {new Date(transmissionQuality.lastGoodTransmissionTime).toLocaleTimeString()}
+                  </ThemedText>
+                )}
+              </>
+            ) : transmissionQuality.currentTransmissionStatus === 'partial' ? (
+              <>
+                <ThemedText style={styles.partialWarningText}>
+                  ⚠️ Partial Data Transmission
+                </ThemedText>
+                <ThemedText style={styles.partialWarningSubtext}>
+                  Some sensors are not transmitting data. Wind readings may be incomplete.
+                </ThemedText>
+              </>
+            ) : (
+              <>
+                <ThemedText style={styles.offlineWarningText}>
+                  🔴 Station Offline
+                </ThemedText>
+                <ThemedText style={styles.offlineWarningSubtext}>
+                  No data is being received from the weather station.
+                </ThemedText>
+              </>
+            )}
+            
+            {transmissionQuality.transmissionGaps.length > 0 && (
+              <ThemedText style={styles.gapSummaryText}>
+                {transmissionQuality.transmissionGaps.length} transmission gap{transmissionQuality.transmissionGaps.length !== 1 ? 's' : ''} detected today
+              </ThemedText>
+            )}
+          </View>
+        )}
+
+        {/* Transmission Quality Summary - Always visible for transparency */}
+        {transmissionQuality && windData.length > 0 && (
+          <View style={styles.transmissionSummaryContainer}>
+            <ThemedText style={styles.transmissionSummaryTitle}>
+              📊 Data Quality Summary
+            </ThemedText>
+            
+            {transmissionQuality.transmissionGaps.length === 0 ? (
+              <ThemedText style={styles.goodQualityText}>
+                ✅ Complete data transmission detected for today&apos;s wind readings. All chart data represents actual wind conditions.
+              </ThemedText>
+            ) : (
+              <>
+                <ThemedText style={styles.gapDetectedText}>
+                  ⚠️ {transmissionQuality.transmissionGaps.length} transmission gap{transmissionQuality.transmissionGaps.length !== 1 ? 's' : ''} detected in today&apos;s data.
+                </ThemedText>
+                <ThemedText style={styles.gapExplanationText}>
+                  Gaps in the wind chart below are caused by antenna transmission issues, not lack of wind. The station continues monitoring but only transmits indoor data during these periods.
+                </ThemedText>
+                
+                {/* Show gap details */}
+                {transmissionQuality.transmissionGaps.slice(0, 3).map((gap, index) => (
+                  <ThemedText key={index} style={styles.gapDetailText}>
+                    • {gap.type} gap: {gap.durationMinutes} min ({new Date(gap.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - {new Date(gap.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })})
+                  </ThemedText>
+                ))}
+                
+                {transmissionQuality.transmissionGaps.length > 3 && (
+                  <ThemedText style={styles.gapDetailText}>
+                    • ... and {transmissionQuality.transmissionGaps.length - 3} more gap{transmissionQuality.transmissionGaps.length - 3 !== 1 ? 's' : ''}
+                  </ThemedText>
+                )}
+              </>
+            )}
+          </View>
+        )}
 
         {/* Debug Actions */}
         {__DEV__ && (
@@ -534,5 +626,129 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     fontSize: 14,
+  },
+  transmissionQualityContainer: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  antennaWarningText: {
+    color: '#FF9500',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  antennaWarningSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  lastGoodTransmissionText: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  partialWarningText: {
+    color: '#FFCC00',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  partialWarningSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
+    lineHeight: 20,
+  },
+  offlineWarningText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  offlineWarningSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
+    lineHeight: 20,
+  },
+  gapSummaryText: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  chartContextContainer: {
+    margin: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 152, 219, 0.3)',
+  },
+  chartContextTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#3498DB',
+  },
+  chartContextText: {
+    fontSize: 12,
+    opacity: 0.8,
+    lineHeight: 18,
+  },
+  transmissionStatusMessage: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    opacity: 0.8,
+    fontWeight: '500',
+  },
+  transmissionSummaryContainer: {
+    margin: 16,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(120, 120, 128, 0.2)',
+    backgroundColor: 'rgba(120, 120, 128, 0.05)',
+  },
+  transmissionSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#1D1D1F',
+  },
+  goodQualityText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#34C759',
+    fontWeight: '500',
+  },
+  gapDetectedText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#FF9500',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  gapExplanationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.8,
+    marginBottom: 8,
+  },
+  gapDetailText: {
+    fontSize: 12,
+    lineHeight: 18,
+    opacity: 0.7,
+    marginLeft: 8,
+    marginBottom: 2,
+    fontFamily: 'monospace',
   },
 });

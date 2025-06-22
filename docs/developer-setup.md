@@ -545,3 +545,92 @@ Once you have the development environment set up:
 4. **Make your first change** - Try updating a component or adding a feature
 5. **Test thoroughly** - Ensure changes work on both iOS and Android
 6. **Deploy** - Push to main branch to trigger automated build and release
+
+## Ecowitt Sensor Investigation & Troubleshooting
+
+The app uses real weather data from Ecowitt weather stations at Standley Lake and Soda Lake. This section documents investigation findings and troubleshooting procedures.
+
+### Current Status (Last Updated: June 2025)
+
+**Standley Lake Station (GW2000B_V3.2.5)**:
+- ✅ **Excellent reliability**: 100% data coverage with no gaps
+- ✅ **All sensors operational**: Wind, temperature, humidity, pressure, rain, solar
+- ✅ **Consistent wind data**: Reliable source for wind predictions
+- 📍 **Location**: 39.870467, -105.151622
+
+**Soda Lake Station (GW3000B_V1.0.6)**:  
+- ⚠️ **Intermittent wind data**: ~52% coverage (151/288 daily readings have wind data)
+- ✅ **Sensors functional**: When connected, all sensors work properly
+- ✅ **Temperature/humidity reliable**: Consistent outdoor readings
+- 🔧 **Issue**: Periodic RF connectivity problems with wind sensor array
+- 📍 **Location**: 39.646115, -105.174958
+
+### Device Comparison
+
+| Feature | Standley (GW2000B) | Soda (GW3000B) |
+|---------|-------------------|----------------|
+| **Gateway Type** | Basic outdoor gateway | Advanced console with display |
+| **Indoor Sensors** | Via external sensors only | Built-in to console unit |
+| **Reliability** | Excellent (100%) | Good but intermittent wind |
+| **Sensor Array** | Haptic array, 2.6V battery | Haptic array, 3.18V battery |
+| **Connectivity** | Stable RF connection | Intermittent RF issues |
+
+### Common Issues & Solutions
+
+**Missing Wind Data**:
+- **Symptom**: Historical data shows gaps in wind readings
+- **Cause**: RF interference or signal strength issues 
+- **Solution**: Improve Soda Lake RF connectivity (antenna placement, signal strength)
+
+**Indoor Temperature Readings**:
+- **Normal Behavior**: GW3000B consoles measure indoor conditions where installed
+- **Explanation**: Gateway unit placed indoors provides indoor temp/humidity
+- **Not a Bug**: This is expected behavior for console-type devices
+
+**Battery Status**:
+- **Healthy Range**: 2.4V - 3.2V for sensor arrays
+- **Warning**: <2.4V may cause connectivity issues
+- **Critical**: <2.2V requires immediate battery replacement
+
+### Investigation Tools
+
+Use these debugging scripts to investigate sensor issues:
+
+```bash
+# Check individual station data and connectivity
+npm run debug-stations
+
+# Verify device connectivity and sensor status
+npm run debug-devices
+
+# Verify NOAA weather data quality  
+npm run verify-noaa
+```
+
+### Key Findings from Investigation
+
+1. **API Data Accuracy**: Ecowitt API returns correct data counts (288 5-minute intervals = 24 hours)
+2. **Sensor Connectivity**: Both stations show all sensors connected in real-time checks
+3. **Intermittent Issues**: Soda Lake wind sensor has periodic RF connectivity problems
+4. **Hardware Status**: All sensor batteries healthy, no hardware failures detected
+5. **Indoor Sensors**: Normal operation for GW3000B console units
+
+### Recommendations for App Development
+
+1. **Data Quality Focus**: Improve Soda Lake sensor connectivity for more reliable wind data
+2. **Data Validation**: Add checks for missing wind periods and implement graceful fallbacks
+3. **User Feedback**: Display data quality indicators and gaps clearly in UI
+4. **Monitoring**: Set up alerts for extended sensor outages at the primary location
+5. **RF Optimization**: Consider antenna placement and signal strength improvements
+
+### Technical Details
+
+**Compatible Sensor Arrays**:
+- WS85, WS90, WS80, WS68, WS69 (wind/weather arrays)
+- WH40 (rain gauge), WH57 (lightning detector)
+- WH45/WH46 (air quality), WN34L/S/D (temperature sensors)
+
+**RF Specifications**:
+- Frequency: 915MHz (US), 868MHz (EU), 433MHz (Asia)
+- Range: 100+ meters in open areas
+- Protocol: Proprietary Ecowitt wireless

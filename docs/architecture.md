@@ -12,6 +12,7 @@ Complete technical architecture overview of the Dawn Patrol Alarm application.
 6. [API Integration](#api-integration)
 7. [Android Optimizations](#android-optimizations)
 8. [Performance Considerations](#performance-considerations)
+9. [Transmission Quality Monitoring](#transmission-quality-monitoring)
 
 ## System Architecture
 
@@ -364,7 +365,7 @@ const weatherConfig = {
 ### Rendering Optimization
 
 1. **Component Memoization**: Prevent unnecessary re-renders
-2. **State Colococation**: Keep state close to where it's used
+2. **State Colocational**: Keep state close to where it's used
 3. **Virtualization**: Efficient list rendering for large datasets (future consideration)
 
 ### Bundle Size Management
@@ -443,4 +444,62 @@ MKI Integration & Enhancement Calculation
 - **No User Tracking**: No personal data collection
 - **Minimal Permissions**: Request only necessary device permissions
 
-This architecture provides a solid foundation for reliable, maintainable, and performant mobile application development while addressing the unique challenges of cross-platform React Native development.
+## Transmission Quality Monitoring
+
+### Overview
+
+The app includes comprehensive transmission quality monitoring to detect and handle antenna issues that cause incomplete data transmission from weather stations.
+
+### Implementation
+
+#### Core Components
+
+1. **TransmissionQualityInfo Interface**
+   - `isFullTransmission`: Boolean indicating complete sensor data
+   - `hasOutdoorSensors`: Boolean for outdoor temperature/humidity availability
+   - `hasWindData`: Boolean for wind sensor availability
+   - `transmissionGaps`: Array of detected gaps with timing and type
+   - `currentTransmissionStatus`: Current status (good/partial/indoor-only/offline)
+
+2. **Data Point Analysis**
+   - `analyzeDataPointTransmissionQuality()`: Analyzes individual readings
+   - Detects missing outdoor sensors vs. indoor-only transmissions
+   - Identifies antenna issues when only indoor data is transmitted
+
+3. **Temporal Analysis**
+   - `analyzeOverallTransmissionQuality()`: Analyzes patterns over time
+   - Detects gaps and their duration
+   - Categorizes gap types (antenna, offline, partial)
+
+#### Integration Points
+
+1. **Data Fetching**
+   - Modified API calls to request wind + outdoor + indoor data
+   - Enhanced response parsing to detect missing fields
+   - Quality metadata attached to each data point
+
+2. **Hook Updates**
+   - `useSodaLakeWind` and `useStandleyLakeWind` now include transmission quality
+   - Automatic analysis on data refresh
+   - State management for quality information
+
+3. **UI Components**
+   - Transmission status indicators in current conditions
+   - Detailed alerts for antenna issues
+   - Chart context explanations for data gaps
+   - Color-coded status messages
+
+#### Data Flow
+
+```
+API Response → Data Point Analysis → Quality Metadata → Hook State → UI Alerts
+     ↓                                      ↓                          ↓
+Enhanced Parsing → Individual Assessment → Overall Analysis → User Warnings
+```
+
+### Benefits
+
+1. **User Understanding**: Clear distinction between technical issues and weather conditions
+2. **Data Transparency**: Users know when gaps are due to transmission problems
+3. **Reliability**: Better interpretation of incomplete data
+4. **Troubleshooting**: Helps identify station hardware issues

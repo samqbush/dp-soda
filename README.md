@@ -197,3 +197,26 @@ For details on setting up the CI/CD environment:
 
 For questions, feature requests, or support open a GitHub issue in this repository
 
+## Transmission Quality Monitoring
+
+The app now includes advanced transmission quality monitoring to detect and warn users about antenna issues that can cause gaps in wind data:
+
+### Transmission Quality Features
+
+- **Antenna Issue Detection**: Automatically detects when weather stations are only transmitting indoor temperature/humidity due to antenna problems
+- **Gap Analysis**: Identifies periods where outdoor sensors (wind, temperature, humidity) are not transmitting
+- **Status Indicators**: Shows current transmission status (Good, Partial, Indoor-only, Offline)
+- **User Alerts**: Clear warnings when data gaps are caused by transmission issues, not weather conditions
+- **Chart Context**: Explains gaps in wind speed charts so users understand they're caused by antenna issues, not lack of wind
+
+### Transmission Status Types
+
+- 🟢 **Good**: All sensors transmitting normally
+- 🟡 **Partial**: Some sensors missing data
+- 🟠 **Indoor-only**: Only indoor temperature/humidity transmitting (antenna issue)
+- 🔴 **Offline**: No data being received
+
+### Why This Matters
+
+Weather stations can experience periodic antenna transmission problems that cause only indoor data to be transmitted while outdoor sensors (including wind) stop reporting. This creates gaps in wind charts that users might interpret as "no wind" when actually the station just couldn't transmit the data. The app now clearly distinguishes between these technical issues and actual weather conditions.
+

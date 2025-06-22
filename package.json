@@ -9,13 +9,11 @@
     "web": "expo start --web",
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
     "debug-devices": "node scripts/debug-ecowitt-devices.mjs",
-    "debug-weather": "node scripts/debug-openweather-api.mjs",
-    "debug-noaa": "node scripts/debug-noaa-api.mjs",
     "verify-noaa": "node scripts/verify-noaa-data.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
     "increment-version": "node scripts/increment-version.mjs",
     "debug-stations": "node scripts/debug-dp-stations.mjs",
-    "test-open-meteo": "node scripts/test-open-meteo-integration.mjs",
+    "debug-transmission": "node scripts/DEBUG-transmission-quality-analysis.mjs",
     "prepare": "husky"
   },
   "dependencies": {
