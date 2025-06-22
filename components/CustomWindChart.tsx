@@ -114,6 +114,14 @@ export function CustomWindChart({
     return isNaN(gust) ? 0 : Math.max(0, gust);
   });
 
+  // Process wind direction data
+  const directions = recentData.map(point => {
+    const direction = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
+    return isNaN(direction) ? null : direction;
+  });
+
+  console.log('🧭 Wind directions sample:', directions.slice(0, 5).map(d => d?.toFixed(0) + '°').join(', '));
+
   // Calculate scale
   const maxValue = Math.max(...speeds, ...gusts, idealWindSpeed);
   const yMax = Math.ceil(maxValue / 5) * 5; // Round up to nearest 5
@@ -192,6 +200,48 @@ export function CustomWindChart({
   }
 
   console.log('📊 Chart labels:', labelData.map(l => l?.label).join(', '));
+
+  // Helper function to create wind direction arrow path
+  const createArrowPath = (centerX: number, centerY: number, direction: number, size = 8): string => {
+    // Convert meteorological direction (where wind comes from) to mathematical angle
+    // Meteorological: 0° = North (wind from north), 90° = East (wind from east)
+    // Mathematical: 0° = East, 90° = North
+    // We need to rotate 90° and flip because arrows point TO direction wind goes
+    const angleRad = ((direction + 180) * Math.PI) / 180; // +180 to show where wind goes, not where it comes from
+    
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    
+    // Arrow points: tip, left wing, right wing
+    const tipX = centerX + cos * size;
+    const tipY = centerY + sin * size;
+    
+    const leftX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
+    const leftY = centerY + sin * (-size * 0.6) - cos * (-size * 0.4);
+    
+    const rightX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
+    const rightY = centerY + sin * (-size * 0.6) - cos * (size * 0.4);
+    
+    return `M ${tipX} ${tipY} L ${leftX} ${leftY} M ${tipX} ${tipY} L ${rightX} ${rightY}`;
+  };
+
+  // Calculate wind direction arrow positions (show every 3rd point to avoid crowding)
+  const windArrows = directions
+    .map((direction, index) => {
+      if (direction === null || index % 3 !== 0) return null; // Show every 3rd arrow
+      
+      const x = padding.left + index * xScale;
+      const speed = speeds[index];
+      const y = padding.top + (yMax - speed) * yScale - 20; // Position above the speed line
+      
+      return {
+        x,
+        y: Math.max(y, padding.top + 10), // Ensure arrows don't go above chart area
+        direction,
+        index
+      };
+    })
+    .filter(Boolean);
 
   // Helper function to detect significant time gaps
   const hasSignificantGap = (currentTime: string, nextTime: string): boolean => {
@@ -370,6 +420,19 @@ export function CustomWindChart({
                 />
               ))}
 
+              {/* Wind direction arrows */}
+              {windArrows.map((arrow, index) => (
+                <Path
+                  key={`arrow-${index}`}
+                  d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
+                  stroke={textColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity={0.7}
+                />
+              ))}
+
               {/* X-axis labels */}
               {labelData.map((label, index) => (
                 <Text
@@ -415,6 +478,21 @@ export function CustomWindChart({
         <View style={styles.legendItem}>
           <View style={[styles.legendLine, { backgroundColor: '#FF6B6B' }]} />
           <ThemedText style={styles.legendText}>Gusts</ThemedText>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={styles.legendArrow}>
+            <Svg width={16} height={12}>
+              <Path
+                d="M 12 6 L 6 3 M 12 6 L 6 9"
+                stroke={textColor}
+                strokeWidth={2}
+                strokeLinecap="round"
+                fill="none"
+                opacity={0.7}
+              />
+            </Svg>
+          </View>
+          <ThemedText style={styles.legendText}>Wind Direction</ThemedText>
         </View>
         {showIdealLine && (
           <View style={styles.legendItem}>
@@ -499,6 +577,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     marginRight: 6,
+  },
+  legendArrow: {
+    width: 16,
+    height: 12,
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   legendText: {
     fontSize: 12,
