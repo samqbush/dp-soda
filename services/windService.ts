@@ -729,7 +729,8 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     const deviceName = 'DP Soda Lakes';
     
     // Fetch current real-time wind data (not historical)
-    const currentConditions = await fetchEcowittRealTimeWindData(deviceName);
+    const currentResult = await fetchEcowittRealTimeWindData(deviceName);
+    const currentConditions = currentResult.conditions;
     
     if (!currentConditions) {
       return {

@@ -92,7 +92,8 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     try {
       console.log('⚡ Refreshing current conditions for Soda Lake...');
       
-      const realTimeData = await fetchEcowittRealTimeWindData('DP Soda Lakes');
+      const realTimeResult = await fetchEcowittRealTimeWindData('DP Soda Lakes');
+      const realTimeData = realTimeResult.conditions;
       
       if (realTimeData) {
         setCurrentConditions(realTimeData);

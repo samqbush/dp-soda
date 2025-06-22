@@ -91,7 +91,8 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       setIsLoadingCurrent(true);
       console.log('🏔️ Refreshing Standley Lake current conditions...');
       
-      const freshConditions = await fetchEcowittRealTimeWindData('DP Standley West');
+      const realTimeResult = await fetchEcowittRealTimeWindData('DP Standley West');
+      const freshConditions = realTimeResult.conditions;
       setCurrentConditions(freshConditions);
       setCurrentConditionsUpdated(new Date());
       

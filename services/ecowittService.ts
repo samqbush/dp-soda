@@ -593,6 +593,27 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       // Convert to Mountain Time for the API request
       // In summer (MDT), this is UTC-6; in winter (MST), this is UTC-7
       // For June 2025, we're in Mountain Daylight Time (UTC-6)
+      
+      // Fallback implementation for Android devices without Intl support
+      if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
+        // Manual conversion to Mountain Time (UTC-6 for MDT, UTC-7 for MST)
+        // For simplicity, we'll assume MDT (UTC-6) during summer months
+        const utcTime = date.getTime();
+        const isDST = isDaylightSavingTime(date);
+        const mtOffset = isDST ? -6 : -7; // MDT = UTC-6, MST = UTC-7
+        const mtTime = new Date(utcTime + (mtOffset * 60 * 60 * 1000));
+        
+        const year = mtTime.getUTCFullYear();
+        const month = String(mtTime.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(mtTime.getUTCDate()).padStart(2, '0');
+        const hour = String(mtTime.getUTCHours()).padStart(2, '0');
+        const minute = String(mtTime.getUTCMinutes()).padStart(2, '0');
+        const second = String(mtTime.getUTCSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+      }
+      
+      // Use Intl when available (iOS and modern Android)
       const options: Intl.DateTimeFormatOptions = {
         timeZone: 'America/Denver',
         year: 'numeric',
@@ -748,6 +769,26 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     // The device is in America/Denver timezone, and the API expects dates in device local time
     const formatEcowittDate = (date: Date): string => {
       // Convert to Mountain Time for the API request
+      
+      // Fallback implementation for Android devices without Intl support
+      if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
+        // Manual conversion to Mountain Time (UTC-6 for MDT, UTC-7 for MST)
+        const utcTime = date.getTime();
+        const isDST = isDaylightSavingTime(date);
+        const mtOffset = isDST ? -6 : -7; // MDT = UTC-6, MST = UTC-7
+        const mtTime = new Date(utcTime + (mtOffset * 60 * 60 * 1000));
+        
+        const year = mtTime.getUTCFullYear();
+        const month = String(mtTime.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(mtTime.getUTCDate()).padStart(2, '0');
+        const hour = String(mtTime.getUTCHours()).padStart(2, '0');
+        const minute = String(mtTime.getUTCMinutes()).padStart(2, '0');
+        const second = String(mtTime.getUTCSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+      }
+      
+      // Use Intl when available (iOS and modern Android)
       const options: Intl.DateTimeFormatOptions = {
         timeZone: 'America/Denver',
         year: 'numeric',
@@ -915,8 +956,12 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
 /**
  * Fetch real-time wind data from Ecowitt API for specific device
  * This provides more current data (within 2 hours) compared to historical data
+ * Returns both wind data and transmission quality info to avoid multiple API calls
  */
-export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<EcowittCurrentWindConditions | null> {
+export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<{
+  conditions: EcowittCurrentWindConditions | null;
+  transmissionQuality?: { isFullTransmission: boolean; hasOutdoorSensors: boolean; missingDataFields: string[] };
+}> {
   console.log(`⚡ Fetching real-time Ecowitt wind data for ${deviceName}...`);
   
   try {
@@ -926,7 +971,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
       application_key: config.applicationKey,
       api_key: config.apiKey,
       mac: config.macAddress,
-      call_back: 'wind,outdoor', // Request wind and outdoor data
+      call_back: 'all', // Request all sensor data to analyze transmission quality in one call
       wind_speed_unitid: '6', // m/s
       temp_unitid: '1', // Celsius
     };
@@ -952,7 +997,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
     // Handle empty data response gracefully
     if (!response.data.data || !response.data.data.wind) {
       console.warn(`⚠️ No real-time wind data available from ${deviceName}`);
-      return null;
+      return { conditions: null };
     }
 
     const windData = response.data.data.wind;
@@ -977,13 +1022,36 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
       humidity: outdoorData?.humidity ? parseFloat(outdoorData.humidity.value) : undefined,
     };
 
+    // Analyze transmission quality from the same API response
+    const missingFields: string[] = [];
+    
+    // Check for wind data
+    if (!windData?.wind_speed?.value) {
+      missingFields.push('wind');
+    }
+    
+    // Check for outdoor sensors
+    if (!outdoorData?.temperature?.value && !outdoorData?.humidity?.value) {
+      missingFields.push('outdoor');
+    }
+    
+    const hasOutdoorSensors = !missingFields.includes('outdoor') || !missingFields.includes('wind');
+    const isFullTransmission = missingFields.length === 0;
+    
+    const transmissionQuality = {
+      isFullTransmission,
+      hasOutdoorSensors,
+      missingDataFields: missingFields
+    };
+
     console.log(`✅ Retrieved real-time wind data for ${deviceName}:`, {
       windSpeed: currentConditions.windSpeedMph,
       direction: currentConditions.windDirection,
-      timestamp: new Date(currentConditions.timestamp).toLocaleString()
+      timestamp: new Date(currentConditions.timestamp).toLocaleString(),
+      transmissionStatus: isFullTransmission ? 'good' : hasOutdoorSensors ? 'partial' : 'poor'
     });
 
-    return currentConditions;
+    return { conditions: currentConditions, transmissionQuality };
 
   } catch (error) {
     console.error(`❌ Error fetching real-time wind data for ${deviceName}:`, error);
@@ -993,7 +1061,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
       console.error('Real-time API request failed:', error.response?.data || error.message);
     }
     
-    return null;
+    return { conditions: null };
   }
 }
 
@@ -1088,84 +1156,6 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
 }
 
 /**
- * Analyze transmission quality for real-time data by fetching additional sensor data
- */
-async function analyzeRealTimeTransmissionQuality(config: EcowittApiConfig): Promise<{
-  isFullTransmission: boolean;
-  hasOutdoorSensors: boolean;
-  missingDataFields: string[];
-}> {
-  try {
-    console.log('🔍 Fetching all sensor data for real-time transmission quality analysis...');
-    
-    // Fetch real-time data for all sensors (not just wind)
-    const params = {
-      application_key: config.applicationKey,
-      api_key: config.apiKey,
-      mac: config.macAddress,
-      call_back: 'all', // Request all sensor data
-    };
-
-    const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
-      params,
-      timeout: 10000,
-      headers: {
-        'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
-        })
-      }
-    });
-
-    if (response.data.code !== 0) {
-      throw new Error(`Ecowitt real-time API error: ${response.data.msg}`);
-    }
-
-    const data = response.data.data;
-    const missingFields: string[] = [];
-    
-    // Check for wind data
-    if (!data.wind?.wind_speed?.value) {
-      missingFields.push('wind');
-    }
-    
-    // Check for outdoor sensors
-    if (!data.outdoor?.temperature?.value && !data.outdoor?.humidity?.value) {
-      missingFields.push('outdoor');
-    }
-    
-    // Note: Real-time API may not provide indoor data, so we don't check for it
-    // This is a limitation of the real-time endpoint
-    
-    const hasOutdoorSensors = !missingFields.includes('outdoor') || !missingFields.includes('wind');
-    const isFullTransmission = missingFields.length === 0;
-    
-    console.log('📊 Real-time transmission analysis:', {
-      hasWind: !missingFields.includes('wind'),
-      hasOutdoor: !missingFields.includes('outdoor'),
-      missingFields,
-      status: isFullTransmission ? 'good' : hasOutdoorSensors ? 'partial' : 'poor'
-    });
-    
-    return {
-      isFullTransmission,
-      hasOutdoorSensors,
-      missingDataFields: missingFields
-    };
-    
-  } catch (error) {
-    console.error('❌ Error analyzing real-time transmission quality:', error);
-    // Fallback: if we can't analyze, assume partial transmission since we have wind data
-    return {
-      isFullTransmission: false,
-      hasOutdoorSensors: true,
-      missingDataFields: [] // Conservative assumption - don't assume anything is missing
-    };
-  }
-}
-
-/**
  * Fetch combined wind data: historical + real-time for complete coverage
  */
 export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoint[]> {
@@ -1203,28 +1193,15 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
           humidity: realTimeData.humidity
         };
         
-        // Add transmission quality analysis for real-time data
-        // Since real-time endpoint only provides wind data, we need to fetch additional data
-        try {
-          console.log('🔍 Analyzing transmission quality for real-time data...');
-          realTimePoint.transmissionQuality = await analyzeRealTimeTransmissionQuality(config);
-          console.log('✅ Added transmission quality to real-time data:', {
-            isFullTransmission: realTimePoint.transmissionQuality.isFullTransmission,
-            hasOutdoorSensors: realTimePoint.transmissionQuality.hasOutdoorSensors,
-            missingFields: realTimePoint.transmissionQuality.missingDataFields
-          });
-        } catch (qualityError) {
-          console.warn('⚠️ Could not analyze real-time transmission quality:', qualityError);
-          // Fallback: assume we have wind data but no info about other sensors
-          realTimePoint.transmissionQuality = {
-            isFullTransmission: false,
-            hasOutdoorSensors: true, // We have wind, so outdoor sensors are working
-            missingDataFields: [] // We don't know what's missing, so don't assume
-          };
-        }
+        // Simple transmission quality fallback for legacy function
+        realTimePoint.transmissionQuality = {
+          isFullTransmission: false,
+          hasOutdoorSensors: true,
+          missingDataFields: []
+        };
         
         combinedData.push(realTimePoint);
-        console.log('✅ Added real-time data point to historical data with transmission quality');
+        console.log('✅ Added real-time data point to historical data');
       } else {
         console.log('⚠️ Real-time data is not newer than historical data');
       }
@@ -1252,14 +1229,14 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
 export async function fetchEcowittCombinedWindDataForDevice(deviceName: string): Promise<EcowittWindDataPoint[]> {
   console.log(`🌬️ Fetching combined wind data for ${deviceName} (historical + real-time)...`);
   
-  const config = await getAutoEcowittConfigForDevice(deviceName);
-  
   try {
     // Fetch historical data for the day
     const historicalData = await fetchEcowittWindDataForDevice(deviceName);
     
-    // Fetch current real-time data
-    const realTimeData = await fetchEcowittRealTimeData(config);
+    // Fetch current real-time data (now includes transmission quality)
+    const realTimeResult = await fetchEcowittRealTimeWindData(deviceName);
+    const realTimeData = realTimeResult.conditions;
+    const realTimeTransmissionQuality = realTimeResult.transmissionQuality;
     
     // Combine the data
     let combinedData = [...historicalData];
@@ -1281,30 +1258,20 @@ export async function fetchEcowittCombinedWindDataForDevice(deviceName: string):
           windGustMph: realTimeData.windGustMph,
           windDirection: realTimeData.windDirection,
           temperature: realTimeData.temperature,
-          humidity: realTimeData.humidity
+          humidity: realTimeData.humidity,
+          transmissionQuality: realTimeTransmissionQuality || {
+            isFullTransmission: false,
+            hasOutdoorSensors: true,
+            missingDataFields: []
+          }
         };
         
-        // Add transmission quality analysis for real-time data
-        try {
-          console.log('🔍 Analyzing transmission quality for real-time data...');
-          realTimePoint.transmissionQuality = await analyzeRealTimeTransmissionQuality(config);
-          console.log('✅ Added transmission quality to real-time data:', {
-            isFullTransmission: realTimePoint.transmissionQuality.isFullTransmission,
-            hasOutdoorSensors: realTimePoint.transmissionQuality.hasOutdoorSensors,
-            missingFields: realTimePoint.transmissionQuality.missingDataFields
-          });
-        } catch (qualityError) {
-          console.warn('⚠️ Could not analyze real-time transmission quality:', qualityError);
-          // Fallback: assume we have wind data but limited info about other sensors
-          realTimePoint.transmissionQuality = {
-            isFullTransmission: false,
-            hasOutdoorSensors: true, // We have wind, so outdoor sensors are working
-            missingDataFields: [] // Conservative - don't assume anything is missing
-          };
-        }
-        
         combinedData.push(realTimePoint);
-        console.log(`✅ Added real-time data point for ${deviceName} with transmission quality`);
+        console.log(`✅ Added real-time data point for ${deviceName} with transmission quality:`, {
+          isFullTransmission: realTimeTransmissionQuality?.isFullTransmission,
+          hasOutdoorSensors: realTimeTransmissionQuality?.hasOutdoorSensors,
+          missingFields: realTimeTransmissionQuality?.missingDataFields
+        });
       } else {
         console.log(`⚠️ Real-time data for ${deviceName} is not newer than historical data`);
       }
@@ -1555,4 +1522,20 @@ export function analyzeOverallTransmissionQuality(windDataPoints: EcowittWindDat
     lastGoodTransmissionTime,
     currentTransmissionStatus: currentStatus
   };
+}
+
+// Helper function to determine if a date is during daylight saving time
+// DST in US Mountain Time: Second Sunday in March to First Sunday in November
+function isDaylightSavingTime(date: Date): boolean {
+  const year = date.getFullYear();
+  
+  // Second Sunday in March
+  const march = new Date(year, 2, 1); // March 1st
+  const dstStart = new Date(year, 2, 14 - march.getDay()); // Second Sunday
+  
+  // First Sunday in November  
+  const november = new Date(year, 10, 1); // November 1st
+  const dstEnd = new Date(year, 10, 7 - november.getDay()); // First Sunday
+  
+  return date >= dstStart && date < dstEnd;
 }
