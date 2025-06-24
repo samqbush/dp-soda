@@ -7,7 +7,7 @@ export default function StandleyLakeScreen() {
   
   const config = {
     name: 'Standley Lake Wind Monitor',
-    subtitle: 'Ecowitt monitor located on the west side the lake',
+    subtitle: 'Ecowitt monitor located on the west side of the lake',
     features: {
       // Standley Lake doesn't have transmission quality monitoring or external link
     }

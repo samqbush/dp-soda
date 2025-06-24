@@ -497,7 +497,7 @@ export function CustomWindChart({
         {showIdealLine && (
           <View style={styles.legendItem}>
             <View style={[styles.legendDashed, { borderColor: '#FF9500' }]} />
-            <ThemedText style={styles.legendText}>Ideal for Wind Sports (15mph)</ThemedText>
+            <ThemedText style={styles.legendText}>Your Wind Threshold ({idealWindSpeed}mph)</ThemedText>
           </View>
         )}
       </View>

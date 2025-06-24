@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
 import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useSimpleAlarm } from '@/hooks/useSimpleAlarm';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import {
@@ -48,6 +49,9 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
 
   const tintColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'card');
+
+  // Get wind threshold for the chart's yellow line
+  const { windThreshold } = useSimpleAlarm();
 
   // Track if we've loaded data initially
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
@@ -176,6 +180,8 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
               data={chartData}
               title="Today's Wind Speed"
               timeWindow={getWindChartTimeWindow()}
+              idealWindSpeed={windThreshold}
+              showIdealLine={true}
             />
           </View>
         ) : (
