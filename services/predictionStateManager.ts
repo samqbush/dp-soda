@@ -62,14 +62,20 @@ export class PredictionStateManager {
 
     console.log('📊 Initializing PredictionStateManager...');
     
-    this.initializationPromise = this.loadPersistedPredictions().then(() => {
-      this.isInitialized = true;
-      this.cleanupOldPredictions(); // Clean up old data on startup
-      console.log('✅ PredictionStateManager initialized successfully');
-    }).catch((error: Error) => {
-      console.error('❌ Failed to initialize PredictionStateManager:', error);
-      this.isInitialized = true; // Mark as initialized even if loading failed
-    });
+    this.initializationPromise = this.loadPersistedPredictions()
+      .then(() => {
+        // Only cleanup after successful load
+        this.cleanupOldPredictions();
+        this.isInitialized = true;
+        console.log('✅ PredictionStateManager initialized successfully');
+      })
+      .catch((error: Error) => {
+        console.error('❌ Failed to initialize PredictionStateManager:', error);
+        // Start with empty state on load failure, but still mark as initialized
+        this.predictions.clear();
+        this.isInitialized = true;
+        console.log('⚠️ PredictionStateManager initialized with empty state due to load failure');
+      });
 
     return this.initializationPromise;
   }
@@ -285,7 +291,12 @@ export class PredictionStateManager {
    * Clean up old predictions (older than 7 days)
    */
   public async cleanupOldPredictions(): Promise<void> {
-    await this.ensureInitialized();
+    // Don't require initialization for cleanup - it should be safe to call anytime
+    if (!this.predictions || this.predictions.size === 0) {
+      console.log('📊 No predictions to clean up');
+      return;
+    }
+
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 7);
     const cutoffStr = this.formatDate(cutoffDate);
