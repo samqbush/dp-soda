@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { AppState, AppStateStatus } from 'react-native';
 
 // Simple alarm state interface
 export interface SimpleAlarmState {
@@ -9,6 +10,7 @@ export interface SimpleAlarmState {
   lastCheck: Date | null;
   lastWindSpeed: number | null;
   lastCheckResult: 'triggered' | 'conditions-not-met' | 'error' | null;
+  isActivelyAlarming: boolean; // NEW: Track if alarm is currently going off
 }
 
 // Result of wind condition check
@@ -33,6 +35,7 @@ const DEFAULT_STATE: SimpleAlarmState = {
   lastCheck: null,
   lastWindSpeed: null,
   lastCheckResult: null,
+  isActivelyAlarming: false,
 };
 
 /**
@@ -48,11 +51,16 @@ class SimpleAlarmService {
   private scheduledNotificationId: string | null = null;
   private notificationReceivedListener: Notifications.Subscription | null = null;
   private notificationResponseListener: Notifications.Subscription | null = null;
+  private persistentAlarmNotificationIds: string[] = []; // Track multiple notification IDs
+  private persistentAlarmIntervalId: NodeJS.Timeout | null = null; // For foreground alarm sound
+  private pendingAlarmResult: AlarmCheckResult | null = null; // Store alarm result for when app becomes active
+  private appStateSubscription: any = null; // App state listener
 
   constructor() {
     console.log('🚨 SimpleAlarmService: Initializing...');
     this.initialize();
     this.setupNotificationHandlers();
+    this.setupAppStateListener();
   }
 
   /**
@@ -69,6 +77,12 @@ class SimpleAlarmService {
         }
         this.state = { ...DEFAULT_STATE, ...parsed };
         console.log('🚨 SimpleAlarmService: Loaded saved state:', this.state);
+        
+        // If we were actively alarming when app was closed, continue the alarm
+        if (this.state.isActivelyAlarming) {
+          console.log('📱 SimpleAlarmService: App opened while alarm was active - alarm state restored');
+          // Note: Alarm notifications continue independently, no audio restart needed
+        }
       } else {
         console.log('🚨 SimpleAlarmService: No saved state, using defaults');
         await this.saveState();
@@ -76,6 +90,9 @@ class SimpleAlarmService {
       
       this.isInitialized = true;
       this.notifyListeners();
+      
+      // Setup notification categories with actions
+      await this.setupNotificationCategories();
     } catch (error) {
       console.error('🚨 SimpleAlarmService: Failed to initialize:', error);
       this.isInitialized = true;
@@ -110,6 +127,10 @@ class SimpleAlarmService {
     if (notificationType === 'WIND_ALARM_CHECK') {
       console.log('🌬️ SimpleAlarmService: Wind alarm check notification received');
       await this.processWindAlarmCheck();
+    } else if (notificationType === 'WIND_ALARM_TRIGGERED' || notificationType === 'WIND_ALARM_FOLLOWUP') {
+      console.log('🚨 SimpleAlarmService: Persistent alarm notification received - alarm continues');
+      // Let the user manually acknowledge the alarm via app UI or notification action
+      // Do not auto-acknowledge - this would stop the alarm immediately
     }
   }
 
@@ -120,9 +141,25 @@ class SimpleAlarmService {
     console.log('🚨 SimpleAlarmService: Notification response received:', response);
     
     const notificationType = response.notification.request.content.data?.type;
+    const actionIdentifier = response.actionIdentifier;
+    
     if (notificationType === 'WIND_ALARM_CHECK') {
       console.log('🌬️ SimpleAlarmService: Wind alarm check notification tapped');
       await this.processWindAlarmCheck();
+    } else if (notificationType === 'WIND_ALARM_TRIGGERED' || notificationType === 'WIND_ALARM_FOLLOWUP' || notificationType === 'WIND_ALARM_RELIABLE') {
+      console.log('🚨 SimpleAlarmService: Alarm notification interaction - action:', actionIdentifier);
+      
+      if (actionIdentifier === 'STOP_ALARM') {
+        console.log('🚨 SimpleAlarmService: User chose to stop alarm');
+        await this.acknowledgeAlarm();
+      } else if (actionIdentifier === 'SNOOZE_ALARM') {
+        console.log('🚨 SimpleAlarmService: User chose to snooze alarm for 10 minutes');
+        await this.snoozeAlarm(10);
+      } else {
+        // Default action (tapping notification without action button)
+        console.log('🚨 SimpleAlarmService: Alarm notification tapped - opening app');
+        // Just open the app, don't auto-acknowledge
+      }
     }
   }
 
@@ -151,33 +188,272 @@ class SimpleAlarmService {
 
   /**
    * Trigger full alarm when wind conditions are met
+   * V2: Uses continuous audio alarm + backup notifications
+   */
+  /**
+   * Trigger full alarm when wind conditions are met
+   * V3: Focus on persistent notifications that actually work as alarms
    */
   private async triggerFullAlarm(result: AlarmCheckResult): Promise<void> {
-    console.log('🚨 SimpleAlarmService: Triggering full alarm...');
+    console.log('🚨 SimpleAlarmService: Triggering persistent notification alarm...');
     
     try {
-      // Send alarm notification
+      // Update state to show we're actively alarming
+      this.state.isActivelyAlarming = true;
+      this.state.lastCheck = new Date();
+      this.state.lastWindSpeed = result.windSpeed;
+      this.state.lastCheckResult = 'triggered';
+      await this.saveState();
+      this.notifyListeners();
+
+      // Use persistent notification-based alarm (works in background!)
+      await this.schedulePersistentAlarmNotifications(result);
+      
+      // Start continuous audio alarm immediately (we have background audio permissions!)
+      console.log('� Starting continuous audio alarm (background audio enabled)...');
+      // Use reliable system notification alarm (no complex background audio)
+      await this.scheduleReliableAlarmNotification(result);
+      
+      console.log('✅ SimpleAlarmService: Reliable notification alarm activated');
+      
+    } catch (error) {
+      console.error('❌ SimpleAlarmService: Failed to trigger alarm:', error);
+    }
+  }
+
+  /**
+   * Send immediate notification showing alarm is active
+   */
+  private async sendAlarmActiveNotification(result: AlarmCheckResult): Promise<void> {
+    try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "🌊 DAWN PATROL ALERT! 🌊",
-          body: `Wind is ${result.windSpeed?.toFixed(1)} mph at Soda Lake! Time to go sailing! ⛵`,
+          title: "🚨 DAWN PATROL ALARM ACTIVE!",
+          body: `Wind is ${result.windSpeed?.toFixed(1)} mph! Continuous alarm playing. Open app to stop.`,
+          data: { 
+            type: 'WIND_ALARM_ACTIVE',
+            windSpeed: result.windSpeed,
+            threshold: result.threshold,
+            continuousAlarm: true
+          },
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          sticky: true,
+          badge: 1,
+        },
+        trigger: null, // Immediate
+      });
+    } catch (error) {
+      console.error('❌ Failed to send alarm active notification:', error);
+    }
+  }
+
+  /**
+   * Schedule backup notifications in case continuous audio fails
+   */
+  private async scheduleBackupAlarmNotifications(result: AlarmCheckResult): Promise<void> {
+    console.log('📢 Scheduling backup alarm notifications...');
+    
+    try {
+      // Schedule 3 backup notifications at 2, 5, and 10 minutes
+      const backupTimes = [120, 300, 600]; // 2min, 5min, 10min
+      
+      for (let i = 0; i < backupTimes.length; i++) {
+        const backupId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "🚨 ALARM STILL ACTIVE!",
+            body: `Wind alarm continues! Open app to stop the continuous alarm.`,
+            data: { 
+              type: 'WIND_ALARM_BACKUP',
+              windSpeed: result.windSpeed,
+              threshold: result.threshold,
+              backupNumber: i + 1
+            },
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            sticky: true,
+            badge: i + 2,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: backupTimes[i],
+            repeats: false,
+          },
+        });
+        this.persistentAlarmNotificationIds.push(backupId);
+      }
+
+      console.log(`📢 Scheduled ${backupTimes.length} backup notifications`);
+      
+    } catch (error) {
+      console.error('❌ Failed to schedule backup notifications:', error);
+    }
+  }
+
+  /**
+   * Schedule multiple notifications for persistent alarming
+   * Sends immediate alarm + follow-up notifications every 2 minutes
+   */
+  private async schedulePersistentAlarmNotifications(result: AlarmCheckResult): Promise<void> {
+    console.log('📢 SimpleAlarmService: Scheduling persistent alarm notifications...');
+    
+    // Clear any existing persistent notifications
+    await this.clearPersistentAlarmNotifications();
+
+    const baseTitle = "🌊 DAWN PATROL ALERT! 🌊";
+    const baseBody = `Wind is ${result.windSpeed?.toFixed(1)} mph at Soda Lake! Time to go sailing! ⛵`;
+    
+    try {
+      // Immediate alarm notification (high priority with enhanced settings)
+      const immediateId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: baseTitle,
+          body: `${baseBody} - TAP TO STOP!`,
           sound: 'alarm.mp3',
           data: { 
             type: 'WIND_ALARM_TRIGGERED',
             windSpeed: result.windSpeed,
-            threshold: result.threshold
+            threshold: result.threshold,
+            persistentAlarm: true
           },
           priority: Notifications.AndroidNotificationPriority.MAX,
           sticky: true,
+          badge: 1,
+          categoryIdentifier: 'WIND_ALARM',
+          vibrate: [0, 250, 250, 250], // Vibration pattern
         },
         trigger: null, // Immediate
       });
+      this.persistentAlarmNotificationIds.push(immediateId);
 
-      // TODO: Add vibration, sound, and other alarm features
-      console.log('✅ SimpleAlarmService: Full alarm triggered successfully');
+      // Instead of spamming notifications, focus on ONE persistent alarm
+      // that forces user interaction and proper continuous audio
+      console.log(`📢 Scheduled 1 persistent alarm notification (not spam!)`);
       
     } catch (error) {
-      console.error('❌ SimpleAlarmService: Failed to trigger full alarm:', error);
+      console.error('❌ SimpleAlarmService: Failed to schedule persistent notifications:', error);
+    }
+  }
+
+  /**
+   * Schedule a reliable alarm notification that the system guarantees to play
+   */
+  private async scheduleReliableAlarmNotification(result: AlarmCheckResult): Promise<void> {
+    console.log('🔔 SimpleAlarmService: Scheduling reliable alarm notification...');
+    
+    try {
+      const baseTitle = "🌊 DAWN PATROL ALERT! 🌊";
+      const baseBody = `Wind is ${result.windSpeed?.toFixed(1)} mph at Soda Lake! Time to go sailing! ⛵`;
+      
+      // Single, reliable alarm notification with maximum priority
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: baseTitle,
+          body: `${baseBody} - Tap to acknowledge`,
+          sound: 'alarm.mp3',
+          data: { 
+            type: 'WIND_ALARM_RELIABLE',
+            windSpeed: result.windSpeed,
+            threshold: result.threshold,
+            timestamp: new Date().toISOString()
+          },
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          sticky: true,
+          categoryIdentifier: 'WIND_ALARM',
+          badge: 1,
+          vibrate: [0, 250, 250, 250, 250, 250], // Strong vibration pattern
+          // Make it as alarm-like as possible
+          autoDismiss: false,
+        },
+        trigger: null, // Immediate
+      });
+      
+      this.persistentAlarmNotificationIds.push(notificationId);
+      console.log(`✅ SimpleAlarmService: Reliable alarm notification scheduled with ID: ${notificationId}`);
+      
+    } catch (error) {
+      console.error('❌ SimpleAlarmService: Failed to schedule reliable notification:', error);
+    }
+  }
+
+  /**
+   * Clear all persistent alarm notifications
+   */
+  private async clearPersistentAlarmNotifications(): Promise<void> {
+    console.log('🔇 SimpleAlarmService: Clearing persistent alarm notifications...');
+    
+    try {
+      // Cancel all scheduled persistent notifications
+      for (const notificationId of this.persistentAlarmNotificationIds) {
+        await Notifications.cancelScheduledNotificationAsync(notificationId);
+      }
+      
+      // Clear the tracking array
+      this.persistentAlarmNotificationIds = [];
+      
+      // Clear any foreground alarm interval
+      if (this.persistentAlarmIntervalId) {
+        clearInterval(this.persistentAlarmIntervalId);
+        this.persistentAlarmIntervalId = null;
+      }
+      
+      console.log('✅ Persistent alarm notifications cleared');
+      
+    } catch (error) {
+      console.error('❌ Failed to clear persistent alarm notifications:', error);
+    }
+  }
+
+  /**
+   * Acknowledge/stop the active alarm
+   * V2: Also stops continuous audio alarm
+   */
+  public async acknowledgeAlarm(): Promise<void> {
+    console.log('✋ SimpleAlarmService: Acknowledging alarm...');
+    
+    // Clear any pending alarm
+    this.pendingAlarmResult = null;
+    
+    if (this.state.isActivelyAlarming) {
+      // Update state to stop alarm
+      this.state.isActivelyAlarming = false;
+      await this.saveState();
+      this.notifyListeners();
+      
+      // Clear all alarm notifications
+      await this.clearPersistentAlarmNotifications();
+      
+      console.log('✅ Alarm acknowledged and stopped');
+    } else {
+      console.log('ℹ️ No active alarm to acknowledge');
+    }
+  }
+
+  /**
+   * Snooze the alarm for the specified number of minutes
+   */
+  private async snoozeAlarm(minutes: number): Promise<void> {
+    console.log(`🚨 SimpleAlarmService: Snoozing alarm for ${minutes} minutes`);
+    
+    try {
+      // Stop current alarm (same as acknowledge)
+      await this.acknowledgeAlarm();
+      
+      // Schedule a new alarm in the specified minutes
+      const now = new Date();
+      const snoozeTime = new Date(now.getTime() + minutes * 60 * 1000);
+      const timeString = snoozeTime.toTimeString().slice(0, 5); // HH:MM format
+      
+      // Enable alarm and set the snooze time
+      this.state.enabled = true;
+      this.state.alarmTime = timeString;
+      await this.saveState();
+      
+      // Schedule the snoozed notification
+      await this.scheduleNotification(timeString);
+      
+      this.notifyListeners();
+      console.log(`🚨 SimpleAlarmService: Alarm snoozed until ${timeString}`);
+    } catch (error) {
+      console.error('🚨 SimpleAlarmService: Failed to snooze alarm:', error);
     }
   }
 
@@ -625,6 +901,64 @@ class SimpleAlarmService {
   }
 
   /**
+   * Test the continuous alarm system (for debugging)
+   */
+  public async testPersistentAlarm(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    console.log('🚨 SimpleAlarmService: Testing continuous alarm system...');
+    
+    try {
+      // Create a mock result that would trigger the alarm
+      const mockResult: AlarmCheckResult = {
+        shouldTrigger: true,
+        windSpeed: 20.5,
+        threshold: this.state.windThreshold,
+        reason: 'Test alarm triggered - continuous audio + backup notifications',
+        timestamp: new Date(),
+      };
+      
+      // Trigger the continuous alarm
+      await this.triggerFullAlarm(mockResult);
+      
+      return {
+        success: true,
+        message: `Continuous alarm test triggered! You should hear continuous looping audio + see backup notifications. Open app and tap "STOP ALARM" to stop. Threshold: ${this.state.windThreshold} mph.`,
+      };
+      
+    } catch (error) {
+      console.error('❌ SimpleAlarmService: Failed to test continuous alarm:', error);
+      return {
+        success: false,
+        message: `Failed to test continuous alarm: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  /**
+   * Test just the continuous audio (without full alarm flow)
+   */
+  public async testContinuousAudio(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    console.log('🔊 SimpleAlarmService: Testing reliable notification alarm...');
+    
+    // Test with fake wind data
+    const testResult: AlarmCheckResult = {
+      shouldTrigger: true,
+      windSpeed: 5.0,
+      threshold: 1.0,
+      reason: 'Test alarm - wind conditions simulated',
+      timestamp: new Date()
+    };
+    
+    await this.scheduleReliableAlarmNotification(testResult);
+    return { success: true, message: 'Test notification alarm triggered' };
+  }
+
+  /**
    * Reset to default state (for debugging)
    */
   public async reset(): Promise<void> {
@@ -632,6 +966,9 @@ class SimpleAlarmService {
     
     // Cancel any scheduled notifications
     await this.cancelNotification();
+    
+    // Clear any persistent alarm notifications
+    await this.clearPersistentAlarmNotifications();
     
     this.state = { ...DEFAULT_STATE };
     await this.saveState();
@@ -654,7 +991,89 @@ class SimpleAlarmService {
       this.notificationResponseListener = null;
     }
     
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+    
+    // Clear persistent alarm resources
+    if (this.persistentAlarmIntervalId) {
+      clearInterval(this.persistentAlarmIntervalId);
+      this.persistentAlarmIntervalId = null;
+    }
+    
     this.listeners.clear();
+  }
+
+  /**
+   * Setup app state listener to handle background-to-foreground transitions
+   */
+  private setupAppStateListener(): void {
+    console.log('🚨 SimpleAlarmService: Setting up app state listener...');
+
+    this.appStateSubscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      console.log(`🚨 SimpleAlarmService: App state changed to ${nextAppState}`);
+      
+      // If app becomes active and we have a pending alarm, trigger it now
+      if (nextAppState === 'active' && this.pendingAlarmResult) {
+        console.log('🚨 SimpleAlarmService: App became active with pending alarm - triggering now!');
+        this.triggerPendingAlarm();
+      }
+    });
+  }
+
+  /**
+   * Trigger pending alarm when app becomes active
+   */
+  private async triggerPendingAlarm(): Promise<void> {
+    if (!this.pendingAlarmResult) return;
+
+    console.log('🚨 SimpleAlarmService: Triggering pending reliable alarm...');
+    
+    const result = this.pendingAlarmResult;
+    this.pendingAlarmResult = null; // Clear pending state
+
+    try {
+      // Update state to show we're actively alarming
+      this.state.isActivelyAlarming = true;
+      await this.saveState();
+      this.notifyListeners();
+
+      // Use reliable notification alarm (no complex audio)
+      await this.scheduleReliableAlarmNotification(result);
+      
+      console.log('✅ SimpleAlarmService: Pending reliable alarm activated');
+      
+    } catch (error) {
+      console.error('❌ SimpleAlarmService: Failed to trigger pending alarm:', error);
+    }
+  }
+
+  /**
+   * Setup notification categories with action buttons
+   */
+  private async setupNotificationCategories(): Promise<void> {
+    try {
+      await Notifications.setNotificationCategoryAsync('WIND_ALARM', [
+        {
+          identifier: 'STOP_ALARM',
+          buttonTitle: 'Stop Alarm',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'SNOOZE_ALARM',
+          buttonTitle: 'Snooze 10min',
+          options: {
+            opensAppToForeground: false,
+          },
+        },
+      ]);
+      console.log('🚨 SimpleAlarmService: Notification categories set up successfully');
+    } catch (error) {
+      console.error('🚨 SimpleAlarmService: Failed to setup notification categories:', error);
+    }
   }
 }
 

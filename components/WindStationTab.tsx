@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
+import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
@@ -84,12 +85,11 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
           />
         }
       >
-        <View style={styles.header}>
-          <View>
-            <ThemedText type="title">{config.name}</ThemedText>
-            <ThemedText style={styles.subtitle}>{config.subtitle}</ThemedText>
-          </View>
-        </View>
+        {/* Header Image */}
+        <HeaderImage 
+          title={config.name}
+          subtitle={config.subtitle}
+        />
 
         {error && (
           <View style={styles.errorContainer}>
@@ -354,19 +354,6 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    marginTop: 4,
   },
   errorContainer: {
     margin: 16,

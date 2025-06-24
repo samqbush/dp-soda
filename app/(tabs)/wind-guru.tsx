@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useAppSettings } from '@/contexts/SettingsContext';
@@ -433,10 +434,14 @@ export default function WindGuruScreen() {
           />
         }
       >
-        {/* Header Section */}
+        {/* Header Image */}
+        <HeaderImage 
+          title="Wind Guru - Morrison, CO"
+          subtitle="Katabatic Wind Prediction"
+        />
+
+        {/* Update Info Section */}
         <ThemedView style={[styles.headerCard, { backgroundColor: cardColor }]}>
-          <ThemedText style={styles.locationTitle}>Wind Guru - Morrison, CO</ThemedText>
-          <ThemedText style={styles.subtitle}>Katabatic Wind Prediction</ThemedText>
           <ThemedView style={styles.updateInfo}>
             <ThemedText style={[styles.lastUpdated, { color: textColor, opacity: 0.7 }]}>
               Last updated: {formatLastUpdated()}

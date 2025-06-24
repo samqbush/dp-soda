@@ -2,52 +2,19 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ThresholdSlider } from '@/components/ThresholdSlider';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useSimpleAlarm } from '@/hooks/useSimpleAlarm';
 import { useAppSettings } from '@/contexts/SettingsContext';
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, Platform, Switch, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { Alert, ScrollView, StyleSheet, View, Platform, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const { settings, updateSetting } = useAppSettings();
-  const { testAlarm, testNotifications, checkWindConditions, isLoading } = useSimpleAlarm();
-  const [testResults, setTestResults] = useState<string>('');
   const insets = useSafeAreaInsets();
 
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({}, 'card');
-
-  const handleTestAlarm = async () => {
-    try {
-      setTestResults('Testing alarm...');
-      const result = await testAlarm();
-      setTestResults(`✅ Alarm Test Complete:\n• Wind Speed: ${result.windSpeed} mph\n• Triggered: ${result.shouldTrigger ? 'Yes' : 'No'}\n• Reason: ${result.reason}`);
-    } catch (error) {
-      setTestResults(`❌ Test failed: ${error}`);
-    }
-  };
-
-  const handleTestNotifications = async () => {
-    try {
-      setTestResults('Testing notifications...');
-      const result = await testNotifications();
-      setTestResults(`📱 Notification Test:\n• Has Permission: ${result.hasPermission ? 'Yes' : 'No'}\n• Can Schedule: ${result.canSchedule ? 'Yes' : 'No'}${result.error ? `\n• Error: ${result.error}` : ''}`);
-    } catch (error) {
-      setTestResults(`❌ Notification test failed: ${error}`);
-    }
-  };
-
-  const handleTestWindCheck = async () => {
-    try {
-      setTestResults('Checking wind conditions...');
-      const result = await checkWindConditions();
-      setTestResults(`🌬️ Wind Check Complete:\n• Current Speed: ${result.windSpeed} mph\n• Would Trigger: ${result.shouldTrigger ? 'Yes' : 'No'}\n• Status: ${result.reason}`);
-    } catch (error) {
-      setTestResults(`❌ Wind check failed: ${error}`);
-    }
-  };
 
   return (
     <ScrollView 
@@ -60,71 +27,21 @@ export default function SettingsScreen() {
       ]}
     >
       <ThemedView style={styles.content}>
-        <ThemedText type="title" style={styles.title}>Dawn Patrol Settings</ThemedText>
+        <ThemedText type="title" style={styles.title}>Settings</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Configure your alarm and app preferences
+          Configure your app preferences
         </ThemedText>
 
-        {/* Alarm Configuration Section */}
+        {/* Wind Threshold Section */}
         <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Alarm Configuration</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Wind Display</ThemedText>
           
           <View style={[styles.settingCard, { backgroundColor: cardColor }]}>
             <ThemedText style={styles.cardTitle}>Wind Speed Threshold</ThemedText>
             <ThemedText style={styles.cardDescription}>
-              Set the minimum wind speed required to trigger your dawn patrol alarm. Use the main Dawn Patrol tab to enable/disable the alarm and set the time.
+              Set the wind speed threshold for the yellow reference line displayed on the wind charts. This helps you quickly identify when conditions meet your preferred wind speed.
             </ThemedText>
             <ThresholdSlider />
-          </View>
-        </View>
-
-        {/* Testing Section */}
-        <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Testing & Diagnostics</ThemedText>
-          
-          <View style={[styles.settingCard, { backgroundColor: cardColor }]}>
-            <ThemedText style={styles.cardTitle}>Test Alarm System</ThemedText>
-            <ThemedText style={styles.cardDescription}>
-              Test different parts of the alarm system to make sure everything is working properly
-            </ThemedText>
-            
-            <View style={styles.testButtons}>
-              <TouchableOpacity
-                style={[styles.testButton, { backgroundColor: tintColor }]}
-                onPress={handleTestAlarm}
-                disabled={isLoading}
-              >
-                <ThemedText style={styles.testButtonText}>
-                  {isLoading ? 'Testing...' : '🚨 Test Full Alarm'}
-                </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.testButton, { backgroundColor: '#FF9500' }]}
-                onPress={handleTestNotifications}
-                disabled={isLoading}
-              >
-                <ThemedText style={styles.testButtonText}>
-                  {isLoading ? 'Testing...' : '📱 Test Notifications'}
-                </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.testButton, { backgroundColor: '#34C759' }]}
-                onPress={handleTestWindCheck}
-                disabled={isLoading}
-              >
-                <ThemedText style={styles.testButtonText}>
-                  {isLoading ? 'Testing...' : '🌬️ Check Wind Now'}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            {testResults && (
-              <View style={styles.testResultContainer}>
-                <ThemedText style={styles.testResultText}>{testResults}</ThemedText>
-              </View>
-            )}
           </View>
         </View>
 
@@ -238,36 +155,6 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 14,
     opacity: 0.7,
-  },
-  testButtons: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  testButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  testButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  testResultContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 8,
-    padding: 12,
-  },
-  testResultText: {
-    fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    lineHeight: 18,
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-    opacity: 0.8,
   },
   warningBox: {
     backgroundColor: 'rgba(255, 149, 0, 0.1)',

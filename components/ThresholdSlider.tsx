@@ -132,9 +132,6 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
         {getThresholdDescription(localValue)}
       </ThemedText>
 
-      <ThemedText style={[styles.helpText, { color: textColor }]}>
-        The alarm will trigger when current wind speed meets or exceeds this threshold
-      </ThemedText>
     </ThemedView>
   );
 }
