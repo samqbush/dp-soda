@@ -38,13 +38,13 @@ export function getWindChartTimeWindow(): TimeWindow {
     return result;
   }
   
-  // If it's between 4am and 9pm, show from 4am to current hour
+  // If it's between 4am and 9pm, show from 4am up to current time
   if (currentHour >= 4 && currentHour <= 21) {
     const result = {
       startHour: 4,
-      endHour: currentHour
+      endHour: 23 // Show all available data for the day up to current time
     };
-    console.log('☀️ Daytime detected - using current day window:', result);
+    console.log('☀️ Daytime detected - using current day window through current time:', result);
     return result;
   }
   
@@ -99,9 +99,12 @@ export function filterWindDataByTimeWindow<T extends { time: string | Date }>(
     } else {
       // For same-day scenarios, check if point is from today and within time window
       const isFromToday = pointDate.toDateString() === now.toDateString();
-      const isInTimeWindow = pointHour >= timeWindow.startHour && pointHour <= timeWindow.endHour;
       
-      return isFromToday && isInTimeWindow;
+      // Check if point is after start time and before/at current time
+      const isAfterStartTime = pointHour >= timeWindow.startHour;
+      const isBeforeCurrentTime = pointDate <= now;
+      
+      return isFromToday && isAfterStartTime && isBeforeCurrentTime;
     }
   });
   

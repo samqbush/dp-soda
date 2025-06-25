@@ -91,7 +91,7 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
       };
       
       // Perform main analysis first
-      const prediction = katabaticAnalyzer.analyzePrediction(weatherData, criteria);
+      const prediction = await katabaticAnalyzer.analyzePrediction(weatherData, criteria);
       
       // Enhance with free historical data if conditions warrant it
       try {
@@ -325,7 +325,7 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
       const criteria = { ...currentState.settings, ...customCriteria };
       
       // Perform analysis
-      const prediction = katabaticAnalyzer.analyzePrediction(weatherData, criteria);
+      const prediction = await katabaticAnalyzer.analyzePrediction(weatherData, criteria);
       
       // Add analysis mode context to the prediction
       const enhancedPrediction = {

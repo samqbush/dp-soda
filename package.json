@@ -9,12 +9,11 @@
     "web": "expo start --web",
     "lint": "expo lint && npx tsc --noEmit && npx yaml-lint .github/workflows/",
     "debug-devices": "node scripts/debug-ecowitt-devices.mjs",
-    "debug-weather": "node scripts/debug-openweather-api.mjs",
-    "debug-noaa": "node scripts/debug-noaa-api.mjs",
     "verify-noaa": "node scripts/verify-noaa-data.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
     "increment-version": "node scripts/increment-version.mjs",
     "debug-stations": "node scripts/debug-dp-stations.mjs",
+    "debug-transmission": "node scripts/DEBUG-transmission-quality-analysis.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -51,7 +50,7 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-svg": "15.11.2",
+    "react-native-svg": "^15.11.2",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5"
   },

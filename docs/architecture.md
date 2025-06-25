@@ -12,6 +12,7 @@ Complete technical architecture overview of the Dawn Patrol Alarm application.
 6. [API Integration](#api-integration)
 7. [Android Optimizations](#android-optimizations)
 8. [Performance Considerations](#performance-considerations)
+9. [Transmission Quality Monitoring](#transmission-quality-monitoring)
 
 ## System Architecture
 
@@ -364,7 +365,7 @@ const weatherConfig = {
 ### Rendering Optimization
 
 1. **Component Memoization**: Prevent unnecessary re-renders
-2. **State Colococation**: Keep state close to where it's used
+2. **State Colocational**: Keep state close to where it's used
 3. **Virtualization**: Efficient list rendering for large datasets (future consideration)
 
 ### Bundle Size Management
@@ -443,4 +444,139 @@ MKI Integration & Enhancement Calculation
 - **No User Tracking**: No personal data collection
 - **Minimal Permissions**: Request only necessary device permissions
 
-This architecture provides a solid foundation for reliable, maintainable, and performant mobile application development while addressing the unique challenges of cross-platform React Native development.
+## Transmission Quality Monitoring
+
+### Overview
+
+The app includes comprehensive transmission quality monitoring to detect and handle antenna issues that cause incomplete data transmission from weather stations.
+
+### Implementation
+
+#### Core Components
+
+1. **TransmissionQualityInfo Interface**
+   - `isFullTransmission`: Boolean indicating complete sensor data
+   - `hasOutdoorSensors`: Boolean for outdoor temperature/humidity availability
+   - `hasWindData`: Boolean for wind sensor availability
+   - `transmissionGaps`: Array of detected gaps with timing and type
+   - `currentTransmissionStatus`: Current status (good/partial/indoor-only/offline)
+
+2. **Data Point Analysis**
+   - `analyzeDataPointTransmissionQuality()`: Analyzes individual readings
+   - Detects missing outdoor sensors vs. indoor-only transmissions
+   - Identifies antenna issues when only indoor data is transmitted
+
+3. **Temporal Analysis**
+   - `analyzeOverallTransmissionQuality()`: Analyzes patterns over time
+   - Detects gaps and their duration
+   - Categorizes gap types (antenna, offline, partial)
+
+#### Integration Points
+
+1. **Data Fetching**
+   - Modified API calls to request wind + outdoor + indoor data
+   - Enhanced response parsing to detect missing fields
+   - Quality metadata attached to each data point
+
+2. **Hook Updates**
+   - `useSodaLakeWind` and `useStandleyLakeWind` now include transmission quality
+   - Automatic analysis on data refresh
+   - State management for quality information
+
+3. **UI Components**
+   - Transmission status indicators in current conditions
+   - Detailed alerts for antenna issues
+   - Chart context explanations for data gaps
+   - Color-coded status messages
+
+#### Data Flow
+
+```
+API Response → Data Point Analysis → Quality Metadata → Hook State → UI Alerts
+     ↓                                      ↓                          ↓
+Enhanced Parsing → Individual Assessment → Overall Analysis → User Warnings
+```
+
+### Benefits
+
+1. **User Understanding**: Clear distinction between technical issues and weather conditions
+2. **Data Transparency**: Users know when gaps are due to transmission problems
+3. **Reliability**: Better interpretation of incomplete data
+4. **Troubleshooting**: Helps identify station hardware issues
+
+## Wind Prediction System Architecture
+
+### Hybrid 5-Factor Implementation Summary
+
+Successfully updated the Wind Guru prediction system from a theoretical 6-factor system to a practical 5-factor hybrid system combining NOAA and OpenWeather APIs with real meteorological data.
+
+#### 1. Hybrid Weather Service (`hybridWeatherService.ts`)
+- **Primary NOAA Integration**: Rain probability, sky cover, temperature grids, transport winds
+- **Secondary OpenWeather Integration**: Pressure trends and backup data
+- **Smart Fallback Logic**: NOAA → OpenWeather → Cache → Mock data progression
+- **Data Source Tracking**: Real-time monitoring of which API provides each factor
+
+#### 2. Updated 5-Factor Katabatic Analyzer (`katabaticAnalyzer.ts`)
+**Current Factors:**
+- **Factor #1 - Rain Probability (25% weight)**: NOAA precipitation forecasts
+- **Factor #2 - Clear Sky Conditions (25% weight)**: NOAA sky cover analysis  
+- **Factor #3 - Pressure Change (20% weight)**: OpenWeather pressure trends
+- **Factor #4 - Temperature Differential (15% weight)**: NOAA temperature grid data
+- **Factor #5 - Wave Pattern Analysis (10% weight)**: NOAA transport winds + mixing height data
+
+**Algorithm Enhancements:**
+- Rebalanced factor weights for 5-factor system (25%/25%/20%/15%/10%)
+- Enhanced bonus system for multiple favorable factors
+- Improved confidence calculation accounting for hybrid data sources
+
+#### Factor Weighting System
+```
+precipitation: 25%        (replaces atmospheric stability)
+skyConditions: 25%        (same) 
+pressureChange: 20%       (same)
+temperatureDifferential: 15%  (same)
+wavePattern: 10%          (updated: uses transportWindAnalysis)
+```
+
+#### Confidence Calculation
+- **High Confidence**: 4+ factors met with hybrid data reliability
+- **Medium Confidence**: 3-4 factors met with some data uncertainty
+- **Low Confidence**: <3 factors met or significant data gaps
+
+#### Bonus System (Updated for 5-factor)
+- **4+ factors met**: 20% bonus
+- **5 factors met**: Additional 25% bonus (45% total)
+- **Positive wave enhancement**: Additional 10% bonus when confidence >70%
+
+### Wind Guru Enhancement Plan: MKI Integration
+
+#### Current System Strengths
+- 5-factor analysis system (Precipitation, Sky Conditions, Pressure, Temperature, Wave Pattern) 
+- Confidence calculation with factor weighting
+- Real-time verification and learning
+- User-friendly presentation with probability and recommendations
+
+#### Future Enhancement Phases
+
+**Phase 1: Enhanced Data Collection**
+- Synoptic Wind Data: Upper-level wind speed and direction (2-4km altitude)
+- Atmospheric Stability: Calculate Brunt-Väisälä frequency and stability profile
+- Froude Number: Compute Fr = U/NH for mountain wave assessment
+- Multi-level Temperature: Temperature profiles for stability analysis
+- Enhanced Pressure Data: Higher temporal resolution pressure measurements
+
+**Phase 2: MKI Factor Integration**
+- Wave Pattern Factor: Calculate Froude number from synoptic conditions
+- Atmospheric Stability Factor: Multi-layer stability optimization
+- Expand factor weighting system to 6 factors
+- Update recommendation logic for MKI scenarios
+
+**Phase 3: Advanced Prediction Logic**
+- Multi-scale Variability Modeling (mesoscale/microscale)
+- Enhanced Pressure Analysis with wave-induced modifications
+- Coupling Efficiency Calculation for wave energy transmission
+
+**Phase 4: Advanced UI/UX**
+- Enhanced factor display with MKI-specific explanations
+- Advanced prediction windows based on wave evolution
+- Activity-specific MKI guidance and safety considerations

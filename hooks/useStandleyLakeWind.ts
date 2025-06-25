@@ -1,14 +1,14 @@
 import {
-    clearEnhancedDeviceCache,
+    analyzeOverallTransmissionQuality,
+    clearDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
+    fetchEcowittCombinedWindDataForDevice,
     fetchEcowittRealTimeWindData,
-    fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
-    getEnhancedCachedData,
-    smartRefreshEcowittData,
     type EcowittCurrentWindConditions,
-    type EcowittWindDataPoint
+    type EcowittWindDataPoint,
+    type TransmissionQualityInfo
 } from '@/services/ecowittService';
 import { analyzeRecentWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ export interface UseStandleyLakeWindReturn {
   chartData: WindDataPoint[]; // Converted for chart compatibility
   currentConditions: EcowittCurrentWindConditions | null; // Real-time current conditions
   analysis: WindAnalysis | null;
+  transmissionQuality: TransmissionQualityInfo | null; // Transmission quality analysis
   
   // Loading and error states
   isLoading: boolean;
@@ -41,6 +42,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   const [windData, setWindData] = useState<EcowittWindDataPoint[]>([]);
   const [currentConditions, setCurrentConditions] = useState<EcowittCurrentWindConditions | null>(null);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
+  const [transmissionQuality, setTransmissionQuality] = useState<TransmissionQualityInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCurrent, setIsLoadingCurrent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,43 +74,14 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   const loadCachedData = useCallback(async (): Promise<boolean> => {
     try {
       console.log('📱 Loading cached Standley Lake wind data...');
-      const cachedData = await getEnhancedCachedData('DP Standley West');
-      
-      if (cachedData && cachedData.data.length > 0) {
-        setWindData(cachedData.data);
-        setLastUpdated(new Date(cachedData.metadata.lastUpdated));
-        
-        // Analyze the cached data
-        const converted = convertToWindDataPoint(cachedData.data);
-        if (converted.length > 0) {
-          // Use Standley Lake specific criteria with user-configured minimum speed
-          const defaultCriteria: AlarmCriteria = {
-            minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
-            directionConsistencyThreshold: 70,
-            minimumConsecutivePoints: 4,
-            directionDeviationThreshold: 45,
-            preferredDirection: 270, // West wind for Standley Lake
-            preferredDirectionRange: 45,
-            useWindDirection: true,
-            alarmEnabled: false,
-            alarmTime: "06:00" // Later start time for Standley Lake
-          };
-          
-          const windAnalysis = analyzeRecentWindData(converted, defaultCriteria);
-          setAnalysis(windAnalysis);
-        }
-        
-        console.log('✅ Loaded cached Standley Lake data:', cachedData.data.length, 'points');
-        return true;
-      }
-      
+      // For now, just return false as we're using combined data approach
+      console.log('⚠️ No cached data available - using combined real-time + historical data');
       return false;
     } catch (error) {
       console.error('❌ Error loading cached Standley Lake data:', error);
-      setError('Failed to load cached data');
       return false;
     }
-  }, [userMinimumSpeed]);
+  }, []);
 
   /**
    * Refresh current conditions (real-time data)
@@ -118,7 +91,8 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
       setIsLoadingCurrent(true);
       console.log('🏔️ Refreshing Standley Lake current conditions...');
       
-      const freshConditions = await fetchEcowittRealTimeWindData('DP Standley West');
+      const realTimeResult = await fetchEcowittRealTimeWindData('DP Standley West');
+      const freshConditions = realTimeResult.conditions;
       setCurrentConditions(freshConditions);
       setCurrentConditionsUpdated(new Date());
       
@@ -151,17 +125,30 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
         return;
       }
 
-      // Use smart refresh (incremental or full based on cache state)
-      const freshData = await smartRefreshEcowittData('DP Standley West');
+      // Use combined data (historical + real-time) for complete coverage
+      const freshData = await fetchEcowittCombinedWindDataForDevice('DP Standley West');
       
       setWindData(freshData);
       setLastUpdated(new Date());
+      
+      // Analyze transmission quality
+      const qualityAnalysis = analyzeOverallTransmissionQuality(freshData);
+      setTransmissionQuality(qualityAnalysis);
       
       // Handle empty data response
       if (freshData.length === 0) {
         console.warn('⚠️ No wind data received from DP Standley West station');
         setError('No data available from Standley Lake station. Station may be offline or not reporting data.');
         setAnalysis(null);
+        setTransmissionQuality({
+          isFullTransmission: false,
+          hasOutdoorSensors: false,
+          hasWindData: false,
+          hasCompleteSensorData: false,
+          transmissionGaps: [],
+          lastGoodTransmissionTime: null,
+          currentTransmissionStatus: 'offline'
+        });
         
         // Try to load cached data as fallback
         await loadCachedData();
@@ -208,7 +195,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
    */
   const clearCache = useCallback(async (): Promise<void> => {
     try {
-      await clearEnhancedDeviceCache('DP Standley West');
+      await clearDeviceCache('DP Standley West');
       setWindData([]);
       setAnalysis(null);
       setLastUpdated(null);
@@ -255,6 +242,7 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
     chartData,
     analysis,
     currentConditions,
+    transmissionQuality,
     
     // Loading and error states
     isLoading,

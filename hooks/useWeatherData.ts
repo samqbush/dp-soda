@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { WeatherServiceData, WeatherDataPoint } from '@/services/weatherService';
-import { hybridWeatherService } from '@/services/hybridWeatherService';
+import { WeatherServiceData, WeatherDataPoint } from '@/services/openMeteoWeatherService';
+import { openMeteoWeatherService } from '@/services/openMeteoWeatherService';
 import { useKatabaticAnalyzer } from '@/hooks/useKatabaticAnalyzer';
 import { katabaticAnalyzer } from '@/services/katabaticAnalyzer';
 import { predictionTrackingService } from '@/services/predictionTrackingService';
 
 /**
  * Custom hook for managing weather data state and operations
- * Follows the same patterns as useWindData.ts
- * Updated June 14, 2025: Added prediction tracking for continuous improvement
+ * Updated June 21, 2025: Switched to Open-Meteo API (free, unlimited) with aggressive caching
+ * Previous: Used hybrid OpenWeather/NOAA service (rate limited, paid)
  */
 export const useWeatherData = () => {
   const [weatherData, setWeatherData] = useState<WeatherServiceData | null>(null);
@@ -20,14 +20,14 @@ export const useWeatherData = () => {
   const katabaticAnalysis = useKatabaticAnalyzer(weatherData);
 
   /**
-   * Fetch weather data from the hybrid weather service
+   * Fetch weather data from the Open-Meteo weather service
    */
   const fetchWeatherData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const data = await hybridWeatherService.fetchHybridWeatherData();
+      const data = await openMeteoWeatherService.getWeatherData();
       
       setWeatherData(data);
       setLastUpdated(new Date(data.lastFetch));
@@ -49,7 +49,7 @@ export const useWeatherData = () => {
    * Refresh weather data (force fetch)
    */
   const refreshData = useCallback(async () => {
-    await hybridWeatherService.clearCache();
+    await openMeteoWeatherService.clearCache();
     await fetchWeatherData();
   }, [fetchWeatherData]);
 
@@ -58,7 +58,7 @@ export const useWeatherData = () => {
    */
   const clearCache = useCallback(async () => {
     try {
-      await hybridWeatherService.clearCache();
+      await openMeteoWeatherService.clearCache();
       setWeatherData(null);
       setLastUpdated(null);
       setError(null);
@@ -131,12 +131,12 @@ export const useWeatherData = () => {
    * Enhanced temperature differential calculation using thermal cycles
    * Uses the KatabaticAnalyzer to avoid code duplication
    */
-  const getKatabaticTemperatureDifferential = useCallback(() => {
+  const getKatabaticTemperatureDifferential = useCallback(async () => {
     if (!weatherData) return null;
     
     try {
       // Use the existing katabatic analyzer to get temperature differential analysis
-      const analysis = katabaticAnalyzer.analyzePrediction(weatherData);
+      const analysis = await katabaticAnalyzer.analyzePrediction(weatherData);
       const tempFactor = analysis.factors.temperatureDifferential;
       
       if (tempFactor.analysisType === 'unavailable') {
@@ -241,7 +241,7 @@ export const useWeatherData = () => {
    * Get preliminary katabatic prediction for tomorrow
    * Note: This is a preliminary prediction based on current forecast models
    */
-  const getTomorrowPrediction = useCallback(() => {
+  const getTomorrowPrediction = useCallback(async () => {
     if (!weatherData) return null;
     
     try {
@@ -280,7 +280,7 @@ export const useWeatherData = () => {
       }
       
       // Run katabatic analysis on tomorrow's data
-      const prediction = katabaticAnalyzer.analyzePrediction(tomorrowWeatherData);
+      const prediction = await katabaticAnalyzer.analyzePrediction(tomorrowWeatherData);
       
       return {
         prediction,
@@ -300,7 +300,7 @@ export const useWeatherData = () => {
   /**
    * Get katabatic prediction for a specific day (0 = today, 1 = tomorrow, etc.)
    */
-  const getDayPrediction = useCallback((dayOffset: number) => {
+  const getDayPrediction = useCallback(async (dayOffset: number) => {
     if (!weatherData) return null;
     
     try {
@@ -356,7 +356,7 @@ export const useWeatherData = () => {
       }
       
       // Run katabatic analysis on the day's data
-      const prediction = katabaticAnalyzer.analyzePrediction(dayWeatherData);
+      const prediction = await katabaticAnalyzer.analyzePrediction(dayWeatherData);
       
       // Determine data quality and preliminary status
       const dataQuality = dayWeatherData.morrison.hourlyForecast.length >= 18 ? 'good' : 'limited';
@@ -386,14 +386,14 @@ export const useWeatherData = () => {
   /**
    * Get predictions for the next 5 days (maximum available from free API)
    */
-  const getWeeklyPredictions = useCallback(() => {
+  const getWeeklyPredictions = useCallback(async () => {
     if (!weatherData) return [];
     
     const predictions = [];
     
     // Get predictions for today through day 4 (5 days total)
     for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
-      const prediction = getDayPrediction(dayOffset);
+      const prediction = await getDayPrediction(dayOffset);
       if (prediction) {
         predictions.push(prediction);
       }
@@ -430,17 +430,17 @@ export const useWeatherData = () => {
   }, [weatherData]);
 
   /**
-   * Set OpenWeatherMap API key manually
+   * Set API key manually (Not needed for Open-Meteo - kept for compatibility)
    */
   const setApiKey = useCallback((apiKey: string) => {
-    hybridWeatherService.setApiKey(apiKey);
+    console.log('ℹ️ API key not required for Open-Meteo service');
   }, []);
 
   /**
-   * Check if API key is configured
+   * Check if API key is configured (Always true for Open-Meteo)
    */
   const isApiKeyConfigured = useCallback(() => {
-    return hybridWeatherService.isApiKeyConfigured();
+    return true; // Open-Meteo doesn't require API keys
   }, []);
 
   /**
@@ -914,6 +914,13 @@ export const useWeatherData = () => {
     }
   }, []);
 
+  /**
+   * Get cache status for debugging (Open-Meteo aggressive caching)
+   */
+  const getCacheStatus = useCallback(async () => {
+    return await openMeteoWeatherService.getCacheStatus();
+  }, []);
+
   // Initialize data on mount
   useEffect(() => {
     fetchWeatherData();
@@ -964,5 +971,6 @@ export const useWeatherData = () => {
     logCurrentPrediction,
     validatePastPredictions,
     getPredictionAccuracy,
+    getCacheStatus,
   };
 };

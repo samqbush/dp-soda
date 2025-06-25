@@ -127,16 +127,6 @@ class AlarmNotificationServiceImpl implements AlarmNotificationService {
         return null;
       }
 
-      // WORKAROUND: If scheduling for more than 12 hours in the future, there's a known bug
-      // where notifications fire immediately. Skip notification scheduling in this case.
-      if (hoursUntilTrigger > 12) {
-        AlarmLogger.warning(`🚫 SKIPPING NOTIFICATION: Known Expo bug causes notifications > 12 hours to fire immediately. Using foreground timer only.`, {
-          hoursUntilTrigger: hoursUntilTrigger.toFixed(2),
-          scheduledTime: triggerDate.toISOString()
-        });
-        return null;
-      }
-
       // Cancel any existing notification
       if (this.scheduledNotificationId) {
         await this.cancelAlarmNotification(this.scheduledNotificationId);

@@ -1,14 +1,14 @@
 import {
-    clearEnhancedDeviceCache,
+    analyzeOverallTransmissionQuality,
+    clearDeviceCache,
     convertToWindDataPoint,
     debugDeviceListAPI,
+    fetchEcowittCombinedWindDataForDevice,
     fetchEcowittRealTimeWindData,
-    fetchEcowittWindDataForDevice,
     getAutoEcowittConfigForDevice,
-    getEnhancedCachedData,
-    smartRefreshEcowittData,
     type EcowittCurrentWindConditions,
-    type EcowittWindDataPoint
+    type EcowittWindDataPoint,
+    type TransmissionQualityInfo
 } from '@/services/ecowittService';
 import { analyzeRecentWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ export interface UseSodaLakeWindReturn {
   chartData: WindDataPoint[]; // Converted for chart compatibility
   currentConditions: EcowittCurrentWindConditions | null; // Real-time current conditions
   analysis: WindAnalysis | null;
+  transmissionQuality: TransmissionQualityInfo | null; // Transmission quality analysis
   
   // Loading and error states
   isLoading: boolean;
@@ -41,6 +42,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   const [windData, setWindData] = useState<EcowittWindDataPoint[]>([]);
   const [currentConditions, setCurrentConditions] = useState<EcowittCurrentWindConditions | null>(null);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
+  const [transmissionQuality, setTransmissionQuality] = useState<TransmissionQualityInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCurrent, setIsLoadingCurrent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,43 +74,14 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   const loadCachedData = useCallback(async (): Promise<boolean> => {
     try {
       console.log('📱 Loading cached Soda Lake wind data...');
-      const cachedData = await getEnhancedCachedData('DP Soda Lakes');
-      
-      if (cachedData && cachedData.data.length > 0) {
-        setWindData(cachedData.data);
-        setLastUpdated(new Date(cachedData.metadata.lastUpdated));
-        
-        // Analyze the cached data
-        const converted = convertToWindDataPoint(cachedData.data);
-        if (converted.length > 0) {
-          // Use Soda Lake specific criteria for analysis with user-configured minimum speed
-          const defaultCriteria: AlarmCriteria = {
-            minimumAverageSpeed: userMinimumSpeed, // Use user-configured minimum speed
-            directionConsistencyThreshold: 70,
-            minimumConsecutivePoints: 4,
-            directionDeviationThreshold: 45,
-            preferredDirection: 315, // Northwest wind for Soda Lake (matching original WindAlert setup)
-            preferredDirectionRange: 45,
-            useWindDirection: true,
-            alarmEnabled: false,
-            alarmTime: "05:00" // Earlier start time for Soda Lake dawn patrol
-          };
-          
-          const windAnalysis = analyzeRecentWindData(converted, defaultCriteria);
-          setAnalysis(windAnalysis);
-        }
-        
-        console.log('✅ Loaded cached Soda Lake data:', cachedData.data.length, 'points');
-        return true;
-      }
-      
+      // For now, just return false as we're using combined data approach
+      console.log('⚠️ No cached data available - using combined real-time + historical data');
       return false;
     } catch (error) {
       console.error('❌ Error loading cached Soda Lake data:', error);
-      setError('Failed to load cached data');
       return false;
     }
-  }, [userMinimumSpeed]);
+  }, []);
 
   /**
    * Refresh current conditions using real-time API
@@ -119,7 +92,8 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     try {
       console.log('⚡ Refreshing current conditions for Soda Lake...');
       
-      const realTimeData = await fetchEcowittRealTimeWindData('DP Soda Lakes');
+      const realTimeResult = await fetchEcowittRealTimeWindData('DP Soda Lakes');
+      const realTimeData = realTimeResult.conditions;
       
       if (realTimeData) {
         setCurrentConditions(realTimeData);
@@ -158,17 +132,30 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
         return;
       }
 
-      // Use smart refresh (incremental or full based on cache state)
-      const freshData = await smartRefreshEcowittData('DP Soda Lakes');
+      // Use combined data (historical + real-time) for complete coverage
+      const freshData = await fetchEcowittCombinedWindDataForDevice('DP Soda Lakes');
       
       setWindData(freshData);
       setLastUpdated(new Date());
+      
+      // Analyze transmission quality
+      const qualityAnalysis = analyzeOverallTransmissionQuality(freshData);
+      setTransmissionQuality(qualityAnalysis);
       
       // Handle empty data response
       if (freshData.length === 0) {
         console.warn('⚠️ No wind data received from DP Soda Lakes station');
         setError('No data available from Soda Lake station. Station may be offline or not reporting data.');
         setAnalysis(null);
+        setTransmissionQuality({
+          isFullTransmission: false,
+          hasOutdoorSensors: false,
+          hasWindData: false,
+          hasCompleteSensorData: false,
+          transmissionGaps: [],
+          lastGoodTransmissionTime: null,
+          currentTransmissionStatus: 'offline'
+        });
         
         // Try to load cached data as fallback
         await loadCachedData();
@@ -215,7 +202,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
    */
   const clearCache = useCallback(async (): Promise<void> => {
     try {
-      await clearEnhancedDeviceCache('DP Soda Lakes');
+      await clearDeviceCache('DP Soda Lakes');
       setWindData([]);
       setAnalysis(null);
       setLastUpdated(null);
@@ -262,6 +249,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     chartData,
     currentConditions,
     analysis,
+    transmissionQuality,
     
     // Loading and error states
     isLoading,
