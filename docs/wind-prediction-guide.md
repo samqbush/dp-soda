@@ -11,6 +11,7 @@ Technical guide to understanding the katabatic wind prediction system used in Da
 5. [Verification & Accuracy](#verification--accuracy)
 6. [Advanced Understanding](#advanced-understanding)
 7. [Time-Based Operation System](#time-based-operation-system)
+8. [Wind Prediction Improvement Plan](#wind-prediction-improvement-plan)
 
 ## Katabatic Wind Theory
 
@@ -564,3 +565,80 @@ The Wind Guru feature operates differently based on the time of day to provide t
 - **Progressive enhancement**: Analysis becomes more accurate as more data becomes available
 
 This time-based system ensures users get the most relevant and accurate information for their dawn patrol planning while the system continues to learn and improve from each day's results.
+
+## Wind Prediction Improvement Plan
+
+### Implementation History - June 14, 2025 Prediction Failure Analysis
+
+#### Incident Summary
+- **Prediction**: 100% probability, 82% confidence for katabatic winds 6-8 AM
+- **Reality**: Soda Lake winds <15 mph during predicted window
+- **Issue**: Significant overconfidence in prediction system
+
+#### Root Causes Identified & Fixed
+1. ✅ **Temperature Differential Underweighted**: Now 30% instead of 15%
+2. ✅ **Overconfident Scoring**: Capped at 65% with stricter requirements  
+3. ✅ **No Ground Truth Validation**: Full tracking system implemented
+4. ✅ **Factor Imbalance**: Stricter bonus requirements and critical factor checks
+
+#### Phase 1: Immediate Conservative Mode (COMPLETED)
+**Status**: ✅ **DEPLOYED**
+
+**Changes Made**:
+- ✅ **Factor Weight Rebalancing**: Temperature differential increased from 15% → 30% (most critical factor)
+- ✅ **Conservative Confidence Cap**: Maximum 65% confidence until validation system proves accuracy  
+- ✅ **Stricter Requirements**: Require ALL 5 factors favorable for >90% probability
+- ✅ **Critical Factor Check**: Temperature differential required for high confidence predictions
+- ✅ **Learning Mode Disclaimer**: Added to UI to set user expectations
+
+**Files Modified**:
+- `services/katabaticAnalyzer.ts` - Updated factor weights and confidence scoring
+- `app/(tabs)/wind-guru.tsx` - Added learning mode disclaimer
+
+#### Phase 2: Prediction Tracking (COMPLETED)
+**Status**: ✅ **DEPLOYED**
+
+**Features Implemented**:
+- ✅ **Prediction Tracking Service**: Complete logging and validation system
+- ✅ **Auto-validation**: Automatically compares predictions vs actual Soda Lake wind data
+- ✅ **Accuracy Metrics**: Real-time calculation of prediction success rates
+- ✅ **Trend Analysis**: Historical tracking of prediction performance
+- ✅ **UI Integration**: Prediction accuracy card in Wind Guru tab
+
+**Files Created**:
+- `services/predictionTrackingService.ts` - Complete tracking and validation system
+- `scripts/test-conservative-mode.mjs` - Testing and validation script
+- `scripts/prediction-analysis-summary.mjs` - Analysis of root causes
+
+**Files Modified**:
+- `hooks/useWeatherData.ts` - Added prediction logging and validation functions
+- `app/(tabs)/soda-lake.tsx` - Auto-validation integration
+- `app/(tabs)/wind-guru.tsx` - Accuracy metrics display
+
+#### Phase 3: Ready for Adaptive Learning
+**Status**: 🟡 **INFRASTRUCTURE READY**
+
+**Next Steps** (when we have accuracy data):
+- Dynamic factor weight adjustment based on success patterns
+- Confidence calibration improvements
+- Seasonal/weather-pattern specific thresholds
+
+#### Success Metrics & Results
+
+**Immediate Improvements**:
+- ✅ **Conservative Mode Active**: Confidence capped at 65% maximum
+- ✅ **Better Factor Balance**: Temperature differential now properly weighted
+- ✅ **Stricter Thresholds**: Require more evidence for high-confidence predictions
+- ✅ **User Transparency**: Learning mode disclaimer sets proper expectations
+
+**Validation System Ready**:
+- ✅ **Auto-logging**: Every prediction automatically tracked for analysis
+- ✅ **Auto-validation**: Wind data automatically compared to predictions
+- ✅ **Accuracy Tracking**: Real-time success rate calculation
+- ✅ **Learning Infrastructure**: Ready to adapt based on outcomes
+
+**Expected Behavior Changes**:
+- **Before**: 100% probability, 82% confidence → Wrong prediction
+- **After**: ~60-70% probability, ~45-55% confidence → More realistic
+- **UI**: "Learning Mode" disclaimer + accuracy metrics visible
+- **Learning**: Each outcome improves future predictions

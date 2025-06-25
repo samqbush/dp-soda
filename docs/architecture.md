@@ -503,3 +503,80 @@ Enhanced Parsing → Individual Assessment → Overall Analysis → User Warning
 2. **Data Transparency**: Users know when gaps are due to transmission problems
 3. **Reliability**: Better interpretation of incomplete data
 4. **Troubleshooting**: Helps identify station hardware issues
+
+## Wind Prediction System Architecture
+
+### Hybrid 5-Factor Implementation Summary
+
+Successfully updated the Wind Guru prediction system from a theoretical 6-factor system to a practical 5-factor hybrid system combining NOAA and OpenWeather APIs with real meteorological data.
+
+#### 1. Hybrid Weather Service (`hybridWeatherService.ts`)
+- **Primary NOAA Integration**: Rain probability, sky cover, temperature grids, transport winds
+- **Secondary OpenWeather Integration**: Pressure trends and backup data
+- **Smart Fallback Logic**: NOAA → OpenWeather → Cache → Mock data progression
+- **Data Source Tracking**: Real-time monitoring of which API provides each factor
+
+#### 2. Updated 5-Factor Katabatic Analyzer (`katabaticAnalyzer.ts`)
+**Current Factors:**
+- **Factor #1 - Rain Probability (25% weight)**: NOAA precipitation forecasts
+- **Factor #2 - Clear Sky Conditions (25% weight)**: NOAA sky cover analysis  
+- **Factor #3 - Pressure Change (20% weight)**: OpenWeather pressure trends
+- **Factor #4 - Temperature Differential (15% weight)**: NOAA temperature grid data
+- **Factor #5 - Wave Pattern Analysis (10% weight)**: NOAA transport winds + mixing height data
+
+**Algorithm Enhancements:**
+- Rebalanced factor weights for 5-factor system (25%/25%/20%/15%/10%)
+- Enhanced bonus system for multiple favorable factors
+- Improved confidence calculation accounting for hybrid data sources
+
+#### Factor Weighting System
+```
+precipitation: 25%        (replaces atmospheric stability)
+skyConditions: 25%        (same) 
+pressureChange: 20%       (same)
+temperatureDifferential: 15%  (same)
+wavePattern: 10%          (updated: uses transportWindAnalysis)
+```
+
+#### Confidence Calculation
+- **High Confidence**: 4+ factors met with hybrid data reliability
+- **Medium Confidence**: 3-4 factors met with some data uncertainty
+- **Low Confidence**: <3 factors met or significant data gaps
+
+#### Bonus System (Updated for 5-factor)
+- **4+ factors met**: 20% bonus
+- **5 factors met**: Additional 25% bonus (45% total)
+- **Positive wave enhancement**: Additional 10% bonus when confidence >70%
+
+### Wind Guru Enhancement Plan: MKI Integration
+
+#### Current System Strengths
+- 5-factor analysis system (Precipitation, Sky Conditions, Pressure, Temperature, Wave Pattern) 
+- Confidence calculation with factor weighting
+- Real-time verification and learning
+- User-friendly presentation with probability and recommendations
+
+#### Future Enhancement Phases
+
+**Phase 1: Enhanced Data Collection**
+- Synoptic Wind Data: Upper-level wind speed and direction (2-4km altitude)
+- Atmospheric Stability: Calculate Brunt-Väisälä frequency and stability profile
+- Froude Number: Compute Fr = U/NH for mountain wave assessment
+- Multi-level Temperature: Temperature profiles for stability analysis
+- Enhanced Pressure Data: Higher temporal resolution pressure measurements
+
+**Phase 2: MKI Factor Integration**
+- Wave Pattern Factor: Calculate Froude number from synoptic conditions
+- Atmospheric Stability Factor: Multi-layer stability optimization
+- Expand factor weighting system to 6 factors
+- Update recommendation logic for MKI scenarios
+
+**Phase 3: Advanced Prediction Logic**
+- Multi-scale Variability Modeling (mesoscale/microscale)
+- Enhanced Pressure Analysis with wave-induced modifications
+- Coupling Efficiency Calculation for wave energy transmission
+
+**Phase 4: Advanced UI/UX**
+- Enhanced factor display with MKI-specific explanations
+- Advanced prediction windows based on wave evolution
+- Activity-specific MKI guidance and safety considerations

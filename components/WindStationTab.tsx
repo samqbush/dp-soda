@@ -315,17 +315,11 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
                 </ThemedText>
                 
                 {/* Show gap details */}
-                {transmissionQuality.transmissionGaps.slice(0, 3).map((gap, index) => (
+                {transmissionQuality.transmissionGaps.map((gap, index) => (
                   <ThemedText key={index} style={styles.gapDetailText}>
                     • {gap.type} gap: {gap.durationMinutes} min ({new Date(gap.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - {new Date(gap.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })})
                   </ThemedText>
                 ))}
-                
-                {transmissionQuality.transmissionGaps.length > 3 && (
-                  <ThemedText style={styles.gapDetailText}>
-                    • ... and {transmissionQuality.transmissionGaps.length - 3} more gap{transmissionQuality.transmissionGaps.length - 3 !== 1 ? 's' : ''}
-                  </ThemedText>
-                )}
               </>
             )}
           </View>

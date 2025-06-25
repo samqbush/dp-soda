@@ -634,3 +634,63 @@ npm run verify-noaa
 - Frequency: 915MHz (US), 868MHz (EU), 433MHz (Asia)
 - Range: 100+ meters in open areas
 - Protocol: Proprietary Ecowitt wireless
+
+## API Migration History
+
+### Phase 1: Open-Meteo Migration (Completed June 21, 2025)
+
+Successfully migrated from OpenWeatherMap to Open-Meteo API to eliminate API blocking issues and costs.
+
+#### Objectives Achieved
+1. **Primary Weather API Switch**
+   - **From**: OpenWeatherMap (rate-limited, paid, blocked)
+   - **To**: Open-Meteo (unlimited, free, high-quality)
+   - **Result**: ✅ Eliminated API blocking issues
+
+2. **Aggressive Caching Implementation**
+   - **From**: 30-minute cache duration
+   - **To**: 6-hour cache duration (12x improvement)
+   - **Benefits**: 
+     - 🚀 Reduced API dependency
+     - ⚡ Faster app performance  
+     - 📶 Better offline capability
+     - 💰 Zero API costs
+
+#### Technical Implementation
+- **New Files Created**:
+  - `services/openMeteoWeatherService.ts` - Complete Open-Meteo integration
+  - `scripts/test-open-meteo-integration.mjs` - API validation script
+
+- **Files Modified**:
+  - `hooks/useWeatherData.ts` - Switched to Open-Meteo service
+  - `app/(tabs)/wind-guru.tsx` - Updated UI to show new data source
+  - `package.json` - Added test script
+
+#### Key Features
+- **No API Keys Required** - Open-Meteo is completely free
+- **Comprehensive Data** - Current weather + 7-day hourly forecasts
+- **High Quality Sources** - European reanalysis data (ERA5, ECMWF IFS)
+- **Smart Caching** - 6-hour cache with stale data fallback
+- **Error Recovery** - Graceful degradation with mock data
+
+#### Performance Results
+```
+✅ Morrison API Response: 200
+   Current Temp: 33.2°C
+   Pressure: 985.4 hPa
+   Wind: 2.51 m/s
+   Forecast Hours: 168
+
+✅ Evergreen API Response: 200
+   Current Temp: 30.5°C
+   Pressure: 985.8 hPa
+
+🌡️ Temperature Differential: 2.7°C
+⚡ API Performance: ~159ms average
+```
+
+#### Benefits Achieved
+- **Cost Elimination**: $0 API costs with Open-Meteo
+- **Reliability Improvement**: No limits, no blocks, unlimited requests
+- **Performance Enhancement**: 6-hour cache, 12x fewer API calls
+- **Development Velocity**: Zero configuration, works immediately
