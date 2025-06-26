@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { AlarmLogger } from './alarmDebugLogger';
+import { AppLogger } from './appLogger';
 
 /**
  * General Notification Service
@@ -33,27 +33,27 @@ class GeneralNotificationService {
    */
   async requestPermissions(): Promise<boolean> {
     try {
-      AlarmLogger.info('🔔 Checking notification permissions...');
+      AppLogger.info('🔔 Checking notification permissions...');
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      AlarmLogger.info(`📋 Current permission status: ${existingStatus}`);
+      AppLogger.info(`📋 Current permission status: ${existingStatus}`);
       let finalStatus = existingStatus;
 
       // Only ask for permissions if we don't already have them
       if (existingStatus !== 'granted') {
-        AlarmLogger.info('📱 Requesting notification permissions from user...');
+        AppLogger.info('📱 Requesting notification permissions from user...');
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
-        AlarmLogger.info(`📋 Permission request result: ${status}`);
+        AppLogger.info(`📋 Permission request result: ${status}`);
       } else {
-        AlarmLogger.info('✅ Notification permissions already granted');
+        AppLogger.info('✅ Notification permissions already granted');
       }
 
       const hasPermission = finalStatus === 'granted';
-      AlarmLogger.info(`🔔 Final permission status: ${hasPermission ? 'GRANTED' : 'DENIED'}`);
+      AppLogger.info(`🔔 Final permission status: ${hasPermission ? 'GRANTED' : 'DENIED'}`);
       return hasPermission;
     } catch (error) {
-      AlarmLogger.error('❌ Error requesting notification permissions:', error);
+      AppLogger.error('❌ Error requesting notification permissions:', error);
       return false;
     }
   }
@@ -69,10 +69,10 @@ class GeneralNotificationService {
     data?: any
   ): Promise<string | null> {
     try {
-      AlarmLogger.info(`📅 Scheduling notification: "${title}" for ${triggerDate.toLocaleString()}`);
+      AppLogger.info(`📅 Scheduling notification: "${title}" for ${triggerDate.toLocaleString()}`);
 
       if (!this.isNotificationSupported()) {
-        AlarmLogger.error('❌ Notifications not supported on this platform');
+        AppLogger.error('❌ Notifications not supported on this platform');
         return null;
       }
 
@@ -80,12 +80,12 @@ class GeneralNotificationService {
       const msUntilTrigger = triggerDate.getTime() - now.getTime();
       
       if (msUntilTrigger <= 0) {
-        AlarmLogger.warning(`⚠️ Cannot schedule notification for past date: ${triggerDate.toLocaleString()}`);
+        AppLogger.warning(`⚠️ Cannot schedule notification for past date: ${triggerDate.toLocaleString()}`);
         return null;
       }
 
       const secondsUntilTrigger = Math.ceil(msUntilTrigger / 1000);
-      AlarmLogger.info(`⏰ Scheduling notification for ${secondsUntilTrigger} seconds from now`);
+      AppLogger.info(`⏰ Scheduling notification for ${secondsUntilTrigger} seconds from now`);
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
@@ -104,10 +104,10 @@ class GeneralNotificationService {
         },
       });
 
-      AlarmLogger.success(`✅ General notification scheduled successfully with ID: ${identifier}`);
+      AppLogger.success(`✅ General notification scheduled successfully with ID: ${identifier}`);
       return identifier;
     } catch (error) {
-      AlarmLogger.error('❌ Failed to schedule general notification:', error);
+      AppLogger.error('❌ Failed to schedule general notification:', error);
       return null;
     }
   }
@@ -118,9 +118,9 @@ class GeneralNotificationService {
   async cancelNotification(identifier: string): Promise<void> {
     try {
       await Notifications.cancelScheduledNotificationAsync(identifier);
-      AlarmLogger.info(`Cancelled notification: ${identifier}`);
+      AppLogger.info(`Cancelled notification: ${identifier}`);
     } catch (error) {
-      AlarmLogger.error('Error cancelling notification:', error);
+      AppLogger.error('Error cancelling notification:', error);
     }
   }
 
@@ -148,9 +148,9 @@ class GeneralNotificationService {
           showBadge: false,
         });
         
-        AlarmLogger.info('General notification channels created');
+        AppLogger.info('General notification channels created');
       } catch (error) {
-        AlarmLogger.error('Error setting up general notification channels:', error);
+        AppLogger.error('Error setting up general notification channels:', error);
       }
     }
   }
@@ -160,7 +160,7 @@ class GeneralNotificationService {
    */
   async initialize(): Promise<void> {
     try {
-      AlarmLogger.info('Initializing general notification service...');
+      AppLogger.info('Initializing general notification service...');
       
       // Set up notification channels
       await this.setupNotificationChannels();
@@ -169,12 +169,12 @@ class GeneralNotificationService {
       const hasPermissions = await this.requestPermissions();
       
       if (!hasPermissions) {
-        AlarmLogger.warning('Notification permissions not granted - some background features may not work');
+        AppLogger.warning('Notification permissions not granted - some background features may not work');
       }
       
-      AlarmLogger.success('General notification service initialized');
+      AppLogger.success('General notification service initialized');
     } catch (error) {
-      AlarmLogger.error('Error initializing general notification service:', error);
+      AppLogger.error('Error initializing general notification service:', error);
     }
   }
 }

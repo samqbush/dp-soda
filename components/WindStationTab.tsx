@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
 import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useSimpleAlarm } from '@/hooks/useSimpleAlarm';
+import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import {
@@ -51,7 +51,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   const cardColor = useThemeColor({}, 'card');
 
   // Get wind threshold for the chart's yellow line
-  const { windThreshold } = useSimpleAlarm();
+  const { windThreshold } = useWindThreshold();
 
   // Track if we've loaded data initially
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
