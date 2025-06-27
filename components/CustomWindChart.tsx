@@ -121,6 +121,14 @@ export function CustomWindChart({
   });
 
   console.log('🧭 Wind directions sample:', directions.slice(0, 5).map(d => d?.toFixed(0) + '°').join(', '));
+  
+  // Debug wind direction calculations for first few points
+  directions.slice(0, 3).forEach((dir, idx) => {
+    if (dir !== null) {
+      const windGoesDirection = (dir + 180) % 360;
+      console.log(`🧭 Point ${idx}: Wind from ${dir.toFixed(0)}° → Wind goes to ${windGoesDirection.toFixed(0)}°`);
+    }
+  });
 
   // Calculate scale
   const maxValue = Math.max(...speeds, ...gusts, idealWindSpeed);
@@ -203,24 +211,27 @@ export function CustomWindChart({
 
   // Helper function to create wind direction arrow path
   const createArrowPath = (centerX: number, centerY: number, direction: number, size = 8): string => {
-    // Convert meteorological direction (where wind comes from) to mathematical angle
-    // Meteorological: 0° = North (wind from north), 90° = East (wind from east)
-    // Mathematical: 0° = East, 90° = North
-    // We need to rotate 90° and flip because arrows point TO direction wind goes
-    const angleRad = ((direction + 180) * Math.PI) / 180; // +180 to show where wind goes, not where it comes from
+    // Convert meteorological direction (where wind comes from) to screen coordinates
+    // Meteorological: 0° = North (wind from north), 90° = East (wind from east), 180° = South, 270° = West
+    // Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
+    // Arrow should point TO where wind is going (opposite of where it comes from)
     
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
+    // Convert: meteorological direction → direction wind goes → screen angle
+    const windGoesDirection = (direction + 180) % 360; // Where wind goes (opposite of where it comes from)
+    const screenAngle = (90 - windGoesDirection) * Math.PI / 180; // Convert to screen coordinates (90° - angle because screen Y is inverted)
+    
+    const cos = Math.cos(screenAngle);
+    const sin = Math.sin(screenAngle);
     
     // Arrow points: tip, left wing, right wing
     const tipX = centerX + cos * size;
-    const tipY = centerY + sin * size;
+    const tipY = centerY - sin * size; // Negative sin because screen Y is inverted
     
-    const leftX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
-    const leftY = centerY + sin * (-size * 0.6) - cos * (-size * 0.4);
+    const leftX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
+    const leftY = centerY - sin * (-size * 0.6) + cos * (size * 0.4);
     
-    const rightX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
-    const rightY = centerY + sin * (-size * 0.6) - cos * (size * 0.4);
+    const rightX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
+    const rightY = centerY - sin * (-size * 0.6) + cos * (-size * 0.4);
     
     return `M ${tipX} ${tipY} L ${leftX} ${leftY} M ${tipX} ${tipY} L ${rightX} ${rightY}`;
   };
