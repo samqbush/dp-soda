@@ -1,5 +1,23 @@
-# Dawn Patrol Alarm - Release Notes
-**Version 1.0.7 - Major Architecture Simplification & Reliability Update**
+# Dawn Patrol Alarm - Changelog
+
+## **Version 1.0.8 - Wind Prediction Enhancement & UI Polish Update**
+
+**Branch:** patch/remove-alarm → main  
+**Date:** June 28, 2025  
+**Files Changed:** 7 files modified, 1 new documentation file  
+**Commits:** 3 feature commits focusing on prediction management and UI improvements
+
+### 🎯 **Key Highlights**
+- **🔒 Smart Prediction Locking System** - Automatic prediction freeze at 11 PM with visual lock indicators
+- **📊 Enhanced Wind Direction Analysis** - Improved calculations and chart rendering
+- **⚙️ Simplified Threshold Management** - Streamlined wind speed preference handling
+- **🛠️ Major Code Cleanup** - Removed 3,862 lines of complex alarm code for better stability
+
+*See RELEASE_NOTES_v1.0.8.md for complete details*
+
+---
+
+## **Version 1.0.7 - Major Architecture Simplification & Reliability Update**
 
 **Branch:** patch/timestamps → main  
 **Date:** June 24, 2025  
