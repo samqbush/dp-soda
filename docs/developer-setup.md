@@ -500,6 +500,8 @@ The service automatically initializes when the app starts and requires notificat
 
 The app implements a robust prediction lifecycle management system to ensure wind predictions are locked at appropriate times and maintain consistency throughout the prediction window.
 
+> **📋 For complete workflow details, see [Wind Guru Prediction Workflow](./wind-guru-prediction-workflow.md)**
+
 ### Purpose
 The prediction lifecycle management solves timing issues where predictions would dramatically change after midnight due to forecast data transitions. It implements a structured approach to prediction reliability:
 

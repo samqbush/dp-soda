@@ -169,8 +169,11 @@ export class KatabaticAnalyzer {
       message: stateInfo.message
     });
 
-    // Use locked prediction if available and appropriate
-    if (shouldUseLocked && lockedPrediction) {
+    // Check if we're in refreshable window for locked predictions
+    if (shouldUseLocked && lockedPrediction && stateInfo.state === 'preview') {
+      console.log(`🔄 In refreshable window - can update locked prediction`);
+      // Continue with new analysis to update the lock
+    } else if (shouldUseLocked && lockedPrediction) {
       console.log(`🔒 Using locked prediction from ${lockedPrediction.lockTime}`);
       return {
         ...lockedPrediction.prediction,
@@ -179,7 +182,7 @@ export class KatabaticAnalyzer {
         lockInfo: {
           lockedAt: lockedPrediction.lockTime,
           lockType: lockedPrediction.lockType,
-          state: lockedPrediction.state
+          state: 'locked'
         }
       } as KatabaticPrediction;
     }
@@ -211,16 +214,26 @@ export class KatabaticAnalyzer {
       }
     };
 
-    // Auto-lock prediction if it's time
+    // Auto-lock prediction if it's time AND we don't have a lock yet
     if (stateInfo.shouldLock && stateInfo.lockType) {
-      console.log(`🔒 Auto-locking ${stateInfo.lockType} prediction for ${this.formatDate(predictionDate)}`);
-      await predictionStateManager.lockPrediction(predictionDate, prediction, stateInfo.lockType);
-      prediction.isLocked = true;
-      prediction.lockInfo = {
-        lockedAt: new Date().toISOString(),
-        lockType: stateInfo.lockType,
-        state: 'locked'
-      };
+      const existingLock = await predictionStateManager.getLockedPrediction(predictionDate);
+      
+      // Only lock if:
+      // 1. No existing lock, OR
+      // 2. We're upgrading from evening to final lock
+      const shouldCreateLock = !existingLock || 
+        (stateInfo.lockType === 'final' && existingLock.lockType === 'evening');
+        
+      if (shouldCreateLock) {
+        console.log(`🔒 Auto-locking ${stateInfo.lockType} prediction for ${this.formatDate(predictionDate)}`);
+        await predictionStateManager.lockPrediction(predictionDate, prediction, stateInfo.lockType);
+        prediction.isLocked = true;
+        prediction.lockInfo = {
+          lockedAt: new Date().toISOString(),
+          lockType: stateInfo.lockType,
+          state: 'locked'
+        };
+      }
     }
 
     return prediction;

@@ -499,6 +499,8 @@ The consecutive good points metric helps identify **sustained favorable conditio
 
 The Wind Guru feature operates differently based on the time of day to provide the most accurate and relevant information for dawn patrol planning.
 
+> **📋 For complete workflow details, see [Wind Guru Prediction Workflow](./wind-guru-prediction-workflow.md)**
+
 ### Daily Timeline and Behavior
 
 #### 🌙 Before 6 AM - Prediction Mode Only
