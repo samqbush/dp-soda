@@ -52,9 +52,9 @@ export function getWindDirectionIndicator(status: WindDirectionStatus | null): s
 export function getWindDirectionStatusText(status: WindDirectionStatus | null): string {
   switch (status) {
     case 'perfect':
-      return 'Perfect conditions!';
+      return 'Perfect direction!';
     case 'good':
-      return 'Good conditions';
+      return 'Good direction';
     default:
       return '';
   }
