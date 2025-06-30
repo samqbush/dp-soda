@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
 import { filterWindDataByTimeWindow, type TimeWindow } from '@/utils/timeWindowUtils';
+import { assessWindDirection } from '@/utils/windDirectionUtils';
 
 interface CustomWindChartProps {
   data: WindDataPoint[];
@@ -15,6 +16,11 @@ interface CustomWindChartProps {
   timeWindow?: TimeWindow;
   idealWindSpeed?: number;
   showIdealLine?: boolean;
+  idealWindDirection?: {
+    range: { min: number; max: number };
+    perfect: number;
+    perfectTolerance?: number;
+  };
 }
 
 export function CustomWindChart({ 
@@ -24,7 +30,8 @@ export function CustomWindChart({
   criteria, 
   timeWindow, 
   idealWindSpeed = 15, 
-  showIdealLine = true 
+  showIdealLine = true,
+  idealWindDirection
 }: CustomWindChartProps) {
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
@@ -432,17 +439,34 @@ export function CustomWindChart({
               ))}
 
               {/* Wind direction arrows */}
-              {windArrows.map((arrow, index) => (
-                <Path
-                  key={`arrow-${index}`}
-                  d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
-                  stroke={textColor}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  fill="none"
-                  opacity={0.7}
-                />
-              ))}
+              {windArrows.map((arrow, index) => {
+                // Determine arrow color based on ideal wind direction
+                let arrowColor = textColor;
+                let opacity = 0.7;
+                
+                if (idealWindDirection && arrow) {
+                  const windStatus = assessWindDirection(arrow.direction, idealWindDirection);
+                  if (windStatus === 'perfect') {
+                    arrowColor = '#FFD700'; // Gold for perfect
+                    opacity = 0.9;
+                  } else if (windStatus === 'good') {
+                    arrowColor = '#4CAF50'; // Green for good
+                    opacity = 0.8;
+                  }
+                }
+                
+                return (
+                  <Path
+                    key={`arrow-${index}`}
+                    d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
+                    stroke={arrowColor}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={opacity}
+                  />
+                );
+              })}
 
               {/* X-axis labels */}
               {labelData.map((label, index) => (
@@ -505,6 +529,40 @@ export function CustomWindChart({
           </View>
           <ThemedText style={styles.legendText}>Wind Direction</ThemedText>
         </View>
+        {idealWindDirection && (
+          <>
+            <View style={styles.legendItem}>
+              <View style={styles.legendArrow}>
+                <Svg width={16} height={12}>
+                  <Path
+                    d="M 12 6 L 6 3 M 12 6 L 6 9"
+                    stroke="#FFD700"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.9}
+                  />
+                </Svg>
+              </View>
+              <ThemedText style={styles.legendText}>🎯 Perfect Direction</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={styles.legendArrow}>
+                <Svg width={16} height={12}>
+                  <Path
+                    d="M 12 6 L 6 3 M 12 6 L 6 9"
+                    stroke="#4CAF50"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.8}
+                  />
+                </Svg>
+              </View>
+              <ThemedText style={styles.legendText}>✅ Good Direction</ThemedText>
+            </View>
+          </>
+        )}
         {showIdealLine && (
           <View style={styles.legendItem}>
             <View style={[styles.legendDashed, { borderColor: '#FF9500' }]} />

@@ -15,6 +15,14 @@ export default function SodaLakeScreen() {
         description: 'For more detailed wind analysis and historical data, visit the Ecowitt weather station page:',
         buttonText: '📊 View Detailed Weather Data'
       }
+    },
+    idealWindDirection: {
+      range: {
+        min: 270,
+        max: 330
+      },
+      perfect: 297,
+      perfectTolerance: 10
     }
   };
 
