@@ -38,4 +38,12 @@ export interface WindStationConfig {
       buttonText: string;
     };
   };
+  idealWindDirection?: {
+    range: {
+      min: number;
+      max: number;
+    };
+    perfect: number;
+    perfectTolerance?: number; // degrees ± perfect for "near perfect" indication
+  };
 }

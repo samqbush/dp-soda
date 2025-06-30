@@ -218,6 +218,48 @@ export default function WindGuruScreen() {
     }
   };
 
+  // Helper function to get prediction lock status
+  const getPredictionLockStatus = () => {
+    if (!katabaticAnalysis.prediction) return null;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (katabaticAnalysis.prediction.isLocked) {
+      return {
+        status: 'locked',
+        icon: '🔒',
+        message: `Locked at ${new Date(katabaticAnalysis.prediction.lockInfo?.lockedAt || '').toLocaleTimeString()}`,
+        canRefresh: false
+      };
+    }
+    
+    if (currentHour >= 18 && currentHour < 23) {
+      return {
+        status: 'refreshable',
+        icon: '🔄',
+        message: 'Lock window active - refresh to update prediction',
+        canRefresh: true
+      };
+    }
+    
+    if (currentHour >= 23 || currentHour < 6) {
+      return {
+        status: 'auto-locked',
+        icon: '⏰',
+        message: 'Auto-locked - no changes until after dawn patrol',
+        canRefresh: false
+      };
+    }
+    
+    return {
+      status: 'preview',
+      icon: '🔮',
+      message: 'Preview mode - locks at 6 PM',
+      canRefresh: true
+    };
+  };
+
   // Helper function to calculate overnight temperature changes (evening to dawn)
   // This matches the same thermal cycle timeframe as pressure analysis
   const getOvernightTemperatureAnalysis = () => {
@@ -890,6 +932,28 @@ export default function WindGuruScreen() {
                 </ThemedText>
               </ThemedView>
             )}
+            
+            {/* Lock Status Indicator */}
+            {(() => {
+              const lockStatus = getPredictionLockStatus();
+              if (!lockStatus) return null;
+              
+              return (
+                <ThemedView style={[styles.lockStatusCard, { 
+                  backgroundColor: lockStatus.canRefresh ? 'rgba(33, 150, 243, 0.1)' : 'rgba(128, 128, 128, 0.1)',
+                  borderColor: lockStatus.canRefresh ? 'rgba(33, 150, 243, 0.3)' : 'rgba(128, 128, 128, 0.3)'
+                }]}>
+                  <ThemedText style={[styles.lockStatusText, { color: textColor }]}>
+                    {lockStatus.icon} {lockStatus.message}
+                  </ThemedText>
+                  {lockStatus.status === 'refreshable' && (
+                    <ThemedText style={[styles.lockStatusHint, { color: tintColor, fontSize: 11 }]}>
+                      💡 Pull down to refresh and update your locked prediction
+                    </ThemedText>
+                  )}
+                </ThemedView>
+              );
+            })()}
           </ThemedView>
 
           {/* Today's Conditions Analysis - positioned directly under today's prediction */}
@@ -1971,5 +2035,22 @@ const styles = StyleSheet.create({
   cacheDebugInfo: {
     fontSize: 10,
     marginTop: 2,
+  },
+  // Lock status indicator styles
+  lockStatusCard: {
+    padding: 12,
+    marginTop: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  lockStatusText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  lockStatusHint: {
+    marginTop: 4,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

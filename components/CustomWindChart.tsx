@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import type { AlarmCriteria, WindDataPoint } from '@/services/windService';
 import { filterWindDataByTimeWindow, type TimeWindow } from '@/utils/timeWindowUtils';
+import { assessWindDirection } from '@/utils/windDirectionUtils';
 
 interface CustomWindChartProps {
   data: WindDataPoint[];
@@ -15,6 +16,11 @@ interface CustomWindChartProps {
   timeWindow?: TimeWindow;
   idealWindSpeed?: number;
   showIdealLine?: boolean;
+  idealWindDirection?: {
+    range: { min: number; max: number };
+    perfect: number;
+    perfectTolerance?: number;
+  };
 }
 
 export function CustomWindChart({ 
@@ -24,7 +30,8 @@ export function CustomWindChart({
   criteria, 
   timeWindow, 
   idealWindSpeed = 15, 
-  showIdealLine = true 
+  showIdealLine = true,
+  idealWindDirection
 }: CustomWindChartProps) {
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
@@ -121,6 +128,14 @@ export function CustomWindChart({
   });
 
   console.log('🧭 Wind directions sample:', directions.slice(0, 5).map(d => d?.toFixed(0) + '°').join(', '));
+  
+  // Debug wind direction calculations for first few points
+  directions.slice(0, 3).forEach((dir, idx) => {
+    if (dir !== null) {
+      const windGoesDirection = (dir + 180) % 360;
+      console.log(`🧭 Point ${idx}: Wind from ${dir.toFixed(0)}° → Wind goes to ${windGoesDirection.toFixed(0)}°`);
+    }
+  });
 
   // Calculate scale
   const maxValue = Math.max(...speeds, ...gusts, idealWindSpeed);
@@ -203,24 +218,27 @@ export function CustomWindChart({
 
   // Helper function to create wind direction arrow path
   const createArrowPath = (centerX: number, centerY: number, direction: number, size = 8): string => {
-    // Convert meteorological direction (where wind comes from) to mathematical angle
-    // Meteorological: 0° = North (wind from north), 90° = East (wind from east)
-    // Mathematical: 0° = East, 90° = North
-    // We need to rotate 90° and flip because arrows point TO direction wind goes
-    const angleRad = ((direction + 180) * Math.PI) / 180; // +180 to show where wind goes, not where it comes from
+    // Convert meteorological direction (where wind comes from) to screen coordinates
+    // Meteorological: 0° = North (wind from north), 90° = East (wind from east), 180° = South, 270° = West
+    // Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
+    // Arrow should point TO where wind is going (opposite of where it comes from)
     
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
+    // Convert: meteorological direction → direction wind goes → screen angle
+    const windGoesDirection = (direction + 180) % 360; // Where wind goes (opposite of where it comes from)
+    const screenAngle = (90 - windGoesDirection) * Math.PI / 180; // Convert to screen coordinates (90° - angle because screen Y is inverted)
+    
+    const cos = Math.cos(screenAngle);
+    const sin = Math.sin(screenAngle);
     
     // Arrow points: tip, left wing, right wing
     const tipX = centerX + cos * size;
-    const tipY = centerY + sin * size;
+    const tipY = centerY - sin * size; // Negative sin because screen Y is inverted
     
-    const leftX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
-    const leftY = centerY + sin * (-size * 0.6) - cos * (-size * 0.4);
+    const leftX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
+    const leftY = centerY - sin * (-size * 0.6) + cos * (size * 0.4);
     
-    const rightX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
-    const rightY = centerY + sin * (-size * 0.6) - cos * (size * 0.4);
+    const rightX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
+    const rightY = centerY - sin * (-size * 0.6) + cos * (-size * 0.4);
     
     return `M ${tipX} ${tipY} L ${leftX} ${leftY} M ${tipX} ${tipY} L ${rightX} ${rightY}`;
   };
@@ -421,17 +439,34 @@ export function CustomWindChart({
               ))}
 
               {/* Wind direction arrows */}
-              {windArrows.map((arrow, index) => (
-                <Path
-                  key={`arrow-${index}`}
-                  d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
-                  stroke={textColor}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  fill="none"
-                  opacity={0.7}
-                />
-              ))}
+              {windArrows.map((arrow, index) => {
+                // Determine arrow color based on ideal wind direction
+                let arrowColor = textColor;
+                let opacity = 0.7;
+                
+                if (idealWindDirection && arrow) {
+                  const windStatus = assessWindDirection(arrow.direction, idealWindDirection);
+                  if (windStatus === 'perfect') {
+                    arrowColor = '#FFD700'; // Gold for perfect
+                    opacity = 0.9;
+                  } else if (windStatus === 'good') {
+                    arrowColor = '#4CAF50'; // Green for good
+                    opacity = 0.8;
+                  }
+                }
+                
+                return (
+                  <Path
+                    key={`arrow-${index}`}
+                    d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
+                    stroke={arrowColor}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={opacity}
+                  />
+                );
+              })}
 
               {/* X-axis labels */}
               {labelData.map((label, index) => (
@@ -494,6 +529,40 @@ export function CustomWindChart({
           </View>
           <ThemedText style={styles.legendText}>Wind Direction</ThemedText>
         </View>
+        {idealWindDirection && (
+          <>
+            <View style={styles.legendItem}>
+              <View style={styles.legendArrow}>
+                <Svg width={16} height={12}>
+                  <Path
+                    d="M 12 6 L 6 3 M 12 6 L 6 9"
+                    stroke="#FFD700"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.9}
+                  />
+                </Svg>
+              </View>
+              <ThemedText style={styles.legendText}>🎯 Perfect Direction</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={styles.legendArrow}>
+                <Svg width={16} height={12}>
+                  <Path
+                    d="M 12 6 L 6 3 M 12 6 L 6 9"
+                    stroke="#4CAF50"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.8}
+                  />
+                </Svg>
+              </View>
+              <ThemedText style={styles.legendText}>✅ Good Direction</ThemedText>
+            </View>
+          </>
+        )}
         {showIdealLine && (
           <View style={styles.legendItem}>
             <View style={[styles.legendDashed, { borderColor: '#FF9500' }]} />

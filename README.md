@@ -1,14 +1,13 @@
-# Dawn Patrol Alarm - Soda Lake
+# Dawn Patrol - Soda Lake Wind Monitor
 
-An app that monitors wind conditions at Soda Lake (Soda Lake Dam 1) in Colorado and tells you whether it's worth waking up early for "dawn patrol". Get reliable predictions based on early morning wind patterns!
+A wind monitoring app for Soda Lake (Soda Lake Dam 1) in Colorado that helps you decide whether it's worth heading out for water sports based on real-time wind conditions and advanced meteorological analysis.
 
 ## Features
 
-- **Morning Wind Alarm**: Wake up or sleep in based on actual wind conditions
-- **Smart Analysis**: Uses 3am-5am window to analyze if conditions will be favorable
-- **Verification System**: Confirms predictions using 6am-8am window data
-- **Fully Configurable**: Customize all wind criteria to match your preferences
-- **Standley Lake Monitor**: Monitor real-time wind conditions at Standley Lake (via Ecowitt weather stations)
+- **Real-time Wind Monitoring**: Live wind conditions at Soda Lake and Standley Lake
+- **Smart Analysis**: Advanced wind pattern analysis with multiple data sources
+- **Configurable Thresholds**: Customize wind speed preferences for visual indicators
+- **Standley Lake Monitor**: Real-time wind conditions via Ecowitt weather stations
 - **🎯 NEW: Mountain Wave-Katabatic Interaction (MKI)**: Revolutionary 6-factor atmospheric analysis (Phase 4 Complete!)
 - **🆓 FREE Historical Enhancement**: Uses actual observed weather data for improved thermal cycle analysis (no additional API costs)
 
@@ -71,14 +70,14 @@ Why: Strong basic conditions + positive wave enhancement
 
 ## How It Works
 
-The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing early morning wind patterns at Soda Lake.
+The Dawn Patrol app helps you decide when to head to the beach by analyzing wind patterns at Soda Lake using multiple data sources and advanced meteorological models.
 
-### Smart Wake-Up Decisions
+### Wind Monitoring
 
-1. **Morning Analysis**: The app checks wind conditions during the crucial 3am-5am window
-2. **Decision Making**: Based on speed, consistency, and direction, it determines if conditions are favorable
-3. **Clear Results**: Get a simple "Wake Up! 🌊" or "Sleep In 😴" recommendation with alarm
-4. **Verification**: The app also checks the 6am-8am window to validate its predictions
+1. **Real-time Data**: The app continuously monitors wind conditions from multiple sources
+2. **Pattern Analysis**: Uses historical patterns and current conditions to assess quality
+3. **Visual Indicators**: Wind charts show your configurable threshold as a reference line
+4. **Multiple Sources**: Combines government weather data with local weather stations
 
 ### Default Settings (All Customizable)
 
@@ -91,13 +90,13 @@ The Dawn Patrol Alarm helps you decide when to head to the beach by analyzing ea
 
 ### Main Screen
 
-- **Current Status**: Large "Wake Up! 🌊" or "Sleep In 😴" indicator
-- **Wind Statistics**: View current speed, direction consistency, and quality metrics
-- **Trend Chart**: See wind patterns over the last 12 hours
+- **Current Conditions**: Real-time wind speed, direction, and quality metrics
+- **Wind Charts**: Interactive charts showing recent wind patterns
+- **Threshold Indicator**: Visual reference line based on your configured wind speed preference
 - **Manual Refresh**: Pull down to update wind data
 - **Last Updated**: Time of most recent data fetch
 
-### Alarm Tester
+### Settings Screen
 
 - **Test Different Scenarios**: Try different wind conditions to see how the alarm responds
 - **Customize Parameters**: Adjust minimum wind speed, direction consistency, and other criteria

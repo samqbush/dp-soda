@@ -278,11 +278,13 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     const currentHour = now.getHours();
     
     if (currentHour >= 0 && currentHour < 6) {
-      return 'prediction'; // Pre-dawn: Focus on today's prediction
+      return 'prediction-locked'; // Changed from 'prediction'
     } else if (currentHour >= 6 && currentHour <= 8) {
       return 'verification'; // Dawn patrol: Real-time verification mode
-    } else {
+    } else if (currentHour > 8 && currentHour < 18) {
       return 'post-dawn'; // After 8am: Freeze today's analysis, focus on tomorrow
+    } else {
+      return 'evening-lock'; // Changed from generic case
     }
   }, []);
 
@@ -305,26 +307,31 @@ export function useKatabaticAnalyzer(weatherData: WeatherServiceData | null) {
     // Use ref to access current state without creating dependency
     const currentState = stateRef.current;
     
-    // For post-dawn mode, check if we already have a prediction from today
+    // Check if we should skip analysis based on time and existing state
+    if (analysisMode === 'prediction-locked') {
+      // For locked predictions, only use cached prediction
+      if (currentState.prediction && currentState.prediction.isLocked) {
+        console.log('🔒 Using cached locked prediction, skipping analysis');
+        return;
+      }
+    }
+    
     if (analysisMode === 'post-dawn' && currentState.prediction && currentState.lastAnalysisTime) {
       const lastAnalysisDate = currentState.lastAnalysisTime;
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
       
-      // If we have a prediction from today and it's after 8am, don't re-analyze
       if (lastAnalysisDate >= todayStart) {
-        console.log('🔒 Post-dawn mode: Using frozen today\'s prediction, analysis mode:', analysisMode);
+        console.log('🔒 Post-dawn mode: Using frozen prediction');
         return;
       }
     }
 
+    // Continue with analysis...
     setState(prev => ({ ...prev, isAnalyzing: true, error: null }));
 
     try {
-      // Merge settings with any custom criteria using ref
       const criteria = { ...currentState.settings, ...customCriteria };
-      
-      // Perform analysis
       const prediction = await katabaticAnalyzer.analyzePrediction(weatherData, criteria);
       
       // Add analysis mode context to the prediction

@@ -136,7 +136,7 @@ export class PredictionStateManager {
 
     // Tomorrow's prediction logic
     if (this.isTomorrow(target)) {
-      // 11 PM - Final lock time
+      // 11 PM - Final lock time (23:00 - 23:59)
       if (currentHour >= 23) {
         return {
           state: 'locked',
@@ -146,13 +146,15 @@ export class PredictionStateManager {
         };
       }
 
-      // 6 PM - Evening lock time
+      // 6 PM - 10:59 PM - Refreshable lock window
       if (currentHour >= 18) {
         return {
-          state: existingPrediction?.lockType === 'final' ? 'locked' : 'preview',
-          shouldLock: !existingPrediction || existingPrediction.lockType === undefined,
-          lockType: 'evening',
-          message: 'Evening preview lock (6 PM) - preliminary prediction set'
+          state: 'preview', // Always allow refreshes in this window
+          shouldLock: true,  // Always should lock when refreshed
+          lockType: existingPrediction?.lockType === 'final' ? 'final' : 'evening',
+          message: existingPrediction?.lockType === 'final' ? 
+            'Final lock active - no more changes' : 
+            'Evening lock window - refresh to update prediction'
         };
       }
 
@@ -313,6 +315,23 @@ export class PredictionStateManager {
       console.log(`🧹 Cleaned up ${cleaned} old predictions`);
       await this.persistPredictions();
     }
+  }
+
+  /**
+   * Check if we're in the refreshable lock window (6 PM - 10:59 PM)
+   */
+  public isInRefreshableWindow(): boolean {
+    const now = new Date();
+    const currentHour = now.getHours();
+    return currentHour >= 18 && currentHour < 23;
+  }
+
+  /**
+   * Check if prediction can be updated
+   */
+  public async canUpdatePrediction(targetDate?: Date): Promise<boolean> {
+    const state = await this.getCurrentPredictionState(targetDate);
+    return state.state === 'preview' || this.isInRefreshableWindow();
   }
 
   // Helper methods

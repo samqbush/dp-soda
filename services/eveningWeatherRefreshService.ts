@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AlarmLogger } from './alarmDebugLogger';
+import { AppLogger } from './appLogger';
 import { hybridWeatherService } from './hybridWeatherService';
 import { generalNotificationService } from './generalNotificationService';
 
@@ -32,38 +32,38 @@ class EveningWeatherRefreshService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      AlarmLogger.info('🔄 Evening Weather Refresh Service already initialized - skipping');
+      AppLogger.info('🔄 Evening Weather Refresh Service already initialized - skipping');
       return;
     }
 
     try {
-      AlarmLogger.info('🌅 Starting Evening Weather Refresh Service initialization...');
+      AppLogger.info('🌅 Starting Evening Weather Refresh Service initialization...');
 
       // Initialize the general notification service first
-      AlarmLogger.info('🔔 Initializing general notification service...');
+      AppLogger.info('🔔 Initializing general notification service...');
       await generalNotificationService.initialize();
-      AlarmLogger.info('✅ General notification service initialized');
+      AppLogger.info('✅ General notification service initialized');
 
       // Restore any previously scheduled notification ID from storage
-      AlarmLogger.info('💾 Restoring scheduled notification ID from storage...');
+      AppLogger.info('💾 Restoring scheduled notification ID from storage...');
       await this.restoreScheduledNotificationId();
 
       // Verify if the restored notification is still valid and scheduled
-      AlarmLogger.info('🔍 Verifying and rescheduling if needed...');
+      AppLogger.info('🔍 Verifying and rescheduling if needed...');
       await this.verifyAndRescheduleIfNeeded();
 
       // Set up notification response listener for weather refresh notifications
-      AlarmLogger.info('👂 Setting up notification response listeners...');
+      AppLogger.info('👂 Setting up notification response listeners...');
       this.setupNotificationResponseListener();
 
       this.isInitialized = true;
-      AlarmLogger.success('✅ Evening Weather Refresh Service fully initialized and ready!');
+      AppLogger.success('✅ Evening Weather Refresh Service fully initialized and ready!');
       
       // Log current status for debugging
       const status = this.getRefreshStatus();
-      AlarmLogger.info(`📊 Current refresh status: {isScheduled: ${status.isScheduled}, nextRefresh: ${status.nextRefreshTime?.toLocaleString() || 'N/A'}}`);
+      AppLogger.info(`📊 Current refresh status: {isScheduled: ${status.isScheduled}, nextRefresh: ${status.nextRefreshTime?.toLocaleString() || 'N/A'}}`);
     } catch (error) {
-      AlarmLogger.error('❌ Critical error initializing Evening Weather Refresh Service:', error);
+      AppLogger.error('❌ Critical error initializing Evening Weather Refresh Service:', error);
       // Mark as failed initialization
       this.isInitialized = false;
     }
@@ -74,11 +74,11 @@ class EveningWeatherRefreshService {
    */
   async scheduleEveningRefresh(): Promise<boolean> {
     try {
-      AlarmLogger.info('🗓️ Starting evening refresh scheduling...');
+      AppLogger.info('🗓️ Starting evening refresh scheduling...');
 
       // Clear any existing scheduled refresh
       if (this.scheduledRefreshId) {
-        AlarmLogger.info(`🗑️ Clearing existing scheduled refresh: ${this.scheduledRefreshId}`);
+        AppLogger.info(`🗑️ Clearing existing scheduled refresh: ${this.scheduledRefreshId}`);
         await this.cancelEveningRefresh();
       }
 
@@ -90,16 +90,16 @@ class EveningWeatherRefreshService {
       // If it's already past 6 PM today, schedule for tomorrow
       if (now.getTime() >= targetTime.getTime()) {
         targetTime.setDate(targetTime.getDate() + 1);
-        AlarmLogger.info('⏭️ Past 6 PM today, scheduling for tomorrow');
+        AppLogger.info('⏭️ Past 6 PM today, scheduling for tomorrow');
       } else {
-        AlarmLogger.info('⏰ Before 6 PM today, scheduling for today');
+        AppLogger.info('⏰ Before 6 PM today, scheduling for today');
       }
 
-      AlarmLogger.info(`🎯 Target time: ${targetTime.toLocaleString()}`);
-      AlarmLogger.info(`⏳ Hours until refresh: ${((targetTime.getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(2)}`);
+      AppLogger.info(`🎯 Target time: ${targetTime.toLocaleString()}`);
+      AppLogger.info(`⏳ Hours until refresh: ${((targetTime.getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(2)}`);
 
       // Use the general notification service to schedule the refresh
-      AlarmLogger.info('📱 Requesting notification scheduling from general service...');
+      AppLogger.info('📱 Requesting notification scheduling from general service...');
       const identifier = await generalNotificationService.scheduleNotification(
         targetTime,
         'Weather Data Update',
@@ -114,20 +114,20 @@ class EveningWeatherRefreshService {
 
       if (identifier) {
         this.scheduledRefreshId = identifier;
-        AlarmLogger.info(`📝 Received notification identifier: ${identifier}`);
+        AppLogger.info(`📝 Received notification identifier: ${identifier}`);
         
         // Store the identifier in AsyncStorage for persistence across app restarts
-        AlarmLogger.info('💾 Storing notification ID in AsyncStorage...');
+        AppLogger.info('💾 Storing notification ID in AsyncStorage...');
         await this.storeScheduledNotificationId(identifier);
         
-        AlarmLogger.success(`✅ Evening weather refresh successfully scheduled with ID: ${identifier}`);
+        AppLogger.success(`✅ Evening weather refresh successfully scheduled with ID: ${identifier}`);
         return true;
       } else {
-        AlarmLogger.error('❌ General notification service returned null identifier - scheduling failed');
+        AppLogger.error('❌ General notification service returned null identifier - scheduling failed');
         return false;
       }
     } catch (error) {
-      AlarmLogger.error('❌ Critical error during evening refresh scheduling:', error);
+      AppLogger.error('❌ Critical error during evening refresh scheduling:', error);
       return false;
     }
   }
@@ -137,11 +137,11 @@ class EveningWeatherRefreshService {
    */
   private async storeScheduledNotificationId(id: string): Promise<void> {
     try {
-      AlarmLogger.info(`💾 Storing notification ID "${id}" with key "${this.STORAGE_KEY}"`);
+      AppLogger.info(`💾 Storing notification ID "${id}" with key "${this.STORAGE_KEY}"`);
       await AsyncStorage.setItem(this.STORAGE_KEY, id);
-      AlarmLogger.success(`✅ Successfully stored evening refresh notification ID: ${id}`);
+      AppLogger.success(`✅ Successfully stored evening refresh notification ID: ${id}`);
     } catch (error) {
-      AlarmLogger.error('❌ Failed to store notification ID in AsyncStorage:', error);
+      AppLogger.error('❌ Failed to store notification ID in AsyncStorage:', error);
     }
   }
 
@@ -150,16 +150,16 @@ class EveningWeatherRefreshService {
    */
   private async restoreScheduledNotificationId(): Promise<void> {
     try {
-      AlarmLogger.info(`💾 Attempting to restore notification ID from key "${this.STORAGE_KEY}"`);
+      AppLogger.info(`💾 Attempting to restore notification ID from key "${this.STORAGE_KEY}"`);
       const storedId = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (storedId) {
         this.scheduledRefreshId = storedId;
-        AlarmLogger.success(`✅ Restored evening refresh notification ID: ${storedId}`);
+        AppLogger.success(`✅ Restored evening refresh notification ID: ${storedId}`);
       } else {
-        AlarmLogger.info('ℹ️ No stored evening refresh notification ID found (fresh install or first run)');
+        AppLogger.info('ℹ️ No stored evening refresh notification ID found (fresh install or first run)');
       }
     } catch (error) {
-      AlarmLogger.error('❌ Failed to restore notification ID from AsyncStorage:', error);
+      AppLogger.error('❌ Failed to restore notification ID from AsyncStorage:', error);
     }
   }
 
@@ -169,7 +169,7 @@ class EveningWeatherRefreshService {
   private async verifyAndRescheduleIfNeeded(): Promise<void> {
     try {
       if (!this.scheduledRefreshId) {
-        AlarmLogger.info('No stored notification ID - scheduling new evening refresh');
+        AppLogger.info('No stored notification ID - scheduling new evening refresh');
         await this.scheduleEveningRefresh();
         return;
       }
@@ -179,7 +179,7 @@ class EveningWeatherRefreshService {
       const ourNotification = scheduledNotifications.find(n => n.identifier === this.scheduledRefreshId);
 
       if (!ourNotification) {
-        AlarmLogger.info(`Stored notification ${this.scheduledRefreshId} no longer exists - rescheduling`);
+        AppLogger.info(`Stored notification ${this.scheduledRefreshId} no longer exists - rescheduling`);
         this.scheduledRefreshId = null;
         await AsyncStorage.removeItem(this.STORAGE_KEY);
         await this.scheduleEveningRefresh();
@@ -192,15 +192,15 @@ class EveningWeatherRefreshService {
         const now = new Date();
         
         if (!scheduledTime || scheduledTime.getTime() <= now.getTime()) {
-          AlarmLogger.info(`Stored notification is for past time - rescheduling`);
+          AppLogger.info(`Stored notification is for past time - rescheduling`);
           await this.cancelEveningRefresh();
           await this.scheduleEveningRefresh();
         } else {
-          AlarmLogger.success(`Existing evening refresh notification verified: ${scheduledTime.toLocaleString()}`);
+          AppLogger.success(`Existing evening refresh notification verified: ${scheduledTime.toLocaleString()}`);
         }
       }
     } catch (error) {
-      AlarmLogger.error('Error verifying scheduled notification:', error);
+      AppLogger.error('Error verifying scheduled notification:', error);
       // If verification fails, just reschedule to be safe
       await this.scheduleEveningRefresh();
     }
@@ -213,12 +213,12 @@ class EveningWeatherRefreshService {
     if (this.scheduledRefreshId) {
       try {
         await generalNotificationService.cancelNotification(this.scheduledRefreshId);
-        AlarmLogger.info(`Cancelled evening weather refresh: ${this.scheduledRefreshId}`);
+        AppLogger.info(`Cancelled evening weather refresh: ${this.scheduledRefreshId}`);
         this.scheduledRefreshId = null;
         // Remove from storage
         await AsyncStorage.removeItem(this.STORAGE_KEY);
       } catch (error) {
-        AlarmLogger.error('Error cancelling evening weather refresh:', error);
+        AppLogger.error('Error cancelling evening weather refresh:', error);
       }
     }
   }
@@ -228,15 +228,15 @@ class EveningWeatherRefreshService {
    */
   async triggerEveningRefresh(): Promise<boolean> {
     try {
-      AlarmLogger.info('Manually triggering evening weather refresh...');
+      AppLogger.info('Manually triggering evening weather refresh...');
       
       // Clear cache and fetch fresh weather data
       await hybridWeatherService.clearCache();
       const refreshedData = await hybridWeatherService.fetchHybridWeatherData();
       
       if (refreshedData) {
-        AlarmLogger.success('Evening weather refresh completed successfully');
-        AlarmLogger.info('Refreshed weather data:', {
+        AppLogger.success('Evening weather refresh completed successfully');
+        AppLogger.info('Refreshed weather data:', {
           morrisonDataPoints: refreshedData.morrison.hourlyForecast.length,
           mountainDataPoints: refreshedData.mountain.hourlyForecast.length,
           lastUpdated: new Date().toISOString()
@@ -247,11 +247,11 @@ class EveningWeatherRefreshService {
         
         return true;
       } else {
-        AlarmLogger.error('Evening weather refresh failed: No data returned');
+        AppLogger.error('Evening weather refresh failed: No data returned');
         return false;
       }
     } catch (error) {
-      AlarmLogger.error('Error during evening weather refresh:', error);
+      AppLogger.error('Error during evening weather refresh:', error);
       return false;
     }
   }
@@ -265,7 +265,7 @@ class EveningWeatherRefreshService {
       const data = notification.request.content.data;
       
       if (data?.type === 'evening_weather_refresh') {
-        AlarmLogger.info('Evening weather refresh notification received');
+        AppLogger.info('Evening weather refresh notification received');
         
         // Trigger the refresh in the background
         setTimeout(async () => {
@@ -279,12 +279,12 @@ class EveningWeatherRefreshService {
       const data = response.notification.request.content.data;
       
       if (data?.type === 'evening_weather_refresh') {
-        AlarmLogger.info('User interacted with evening weather refresh notification');
+        AppLogger.info('User interacted with evening weather refresh notification');
         await this.triggerEveningRefresh();
       }
     });
 
-    AlarmLogger.info('Evening weather refresh notification listeners set up');
+    AppLogger.info('Evening weather refresh notification listeners set up');
   }
 
   /**

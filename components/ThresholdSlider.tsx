@@ -4,14 +4,14 @@ import Slider from '@react-native-community/slider';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useSimpleAlarm } from '@/hooks/useSimpleAlarm';
+import { useWindThreshold } from '@/hooks/useWindThreshold';
 
 interface ThresholdSliderProps {
   disabled?: boolean;
 }
 
 export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
-  const { windThreshold, setWindThreshold, isLoading } = useSimpleAlarm();
+  const { windThreshold, setWindThreshold, isLoading } = useWindThreshold();
   const [localValue, setLocalValue] = useState(windThreshold);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
