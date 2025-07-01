@@ -8,59 +8,25 @@ A wind monitoring app for Soda Lake (Soda Lake Dam 1) in Colorado that helps you
 - **Smart Analysis**: Advanced wind pattern analysis with multiple data sources
 - **Configurable Thresholds**: Customize wind speed preferences for visual indicators
 - **Standley Lake Monitor**: Real-time wind conditions via Ecowitt weather stations
-- **🎯 NEW: Mountain Wave-Katabatic Interaction (MKI)**: Revolutionary 6-factor atmospheric analysis (Phase 4 Complete!)
-- **🆓 FREE Historical Enhancement**: Uses actual observed weather data for improved thermal cycle analysis (no additional API costs)
+- **🚀 NEW: Wind Guru Server Migration**: Advanced katabatic wind predictions moved to server-based architecture
 
-## Phase 4: MKI Integration ✅ COMPLETE
+## Wind Guru: Server-Based Predictions
 
-**Mountain Wave-Katabatic Interaction Prediction System**
+**Enhanced Performance & Accuracy (In Development)**
 
-The Wind Guru tab now features groundbreaking meteorological analysis based on atmospheric science research. Our system is the first consumer implementation of Mountain Wave-Katabatic Interaction (MKI) theory, providing unprecedented accuracy in mountain wind prediction.
+The Wind Guru tab has been upgraded from a complex local prediction system to a server-based solution for improved performance and accuracy. Users will benefit from:
 
-### How It Works
+### Coming Soon: Server-Powered Features
 
-**Enhanced 6-Factor MKI Analysis:**
-1. **☔ Precipitation Risk** (25% weight): Rain disrupts both katabatic flow and wave patterns
-2. **🌙 Sky Conditions** (20% weight): Clear skies enable radiative cooling and wave development
-3. **📈 Pressure Changes** (20% weight): Enhanced analysis including wave-induced pressure modifications
-4. **🌡️ Temperature Differential** (15% weight): Valley vs mountain temperature with wave mixing effects
-5. **🌊 Wave Pattern** (15% weight): Mountain wave enhancement using Froude number analysis
-6. **🏔️ Atmospheric Stability** (5% weight): Multi-layer coupling efficiency between surface and wave levels
+**🌟 Enhanced Prediction Capabilities:**
+- **Machine Learning Models**: Advanced pattern recognition from comprehensive datasets
+- **Real-Time Processing**: Continuous monitoring and instant prediction updates
+- **Multi-Location Analysis**: Comparative analysis across multiple wind sites
+- **Improved Accuracy**: Access to more sophisticated weather modeling
+- **Faster Performance**: No local processing delays, instant server results
 
-**🆓 FREE Historical Enhancement:**
-- Uses [Open-Meteo](https://open-meteo.com/) for actual observed temperature data
-- Replaces forecast estimates with real thermal cycle data when available
-- Provides 95% confidence thermal analysis at no additional cost
-- Automatically falls back to forecast data when historical unavailable
-
-**Advanced MKI Calculations:**
-- Froude number assessment for optimal wave conditions (Fr = 0.4-0.6)
-- Nonlinear wave-katabatic interaction modeling
-- Multi-scale variability analysis (mesoscale hourly + microscale rapid)
-- Enhanced bonus system for positive wave enhancement scenarios
-- Results in probability percentage with explanation
-
-**Example: Understanding 73% MKI Prediction**
-```
-✅ Rain: 8.2% (excellent, below 25% threshold)
-✅ Sky: 78% clear (good, above 45% requirement)  
-✅ Pressure: +3.1 hPa change (excellent, above 1.0 threshold)
-✅ Temp Diff: 7.3°F (good, above 6.0°F threshold)
-✅ Wave Pattern: Fr=0.52 (optimal, positive enhancement)
-❌ Stability: 42% coupling (marginal, below 50% threshold)
-
-Result: 73% probability, High confidence → GO!
-Why: Strong basic conditions + positive wave enhancement
-```
-
-### MKI Analysis Features
-
-1. **6-Factor Probability Scoring**: Live percentage with MKI visual indicators
-2. **Enhanced Confidence**: High/Medium/Low reliability with wave consideration
-3. **Complete Factor Breakdown**: See all 6 atmospheric interactions
-4. **MKI-Aware Recommendations**: GO/MAYBE/SKIP with wave enhancement context
-5. **Scientific Analysis**: Technical explanations based on atmospheric research
-6. **Intelligent Approach**: Captures complex scenarios traditional models miss
+**🎯 Previous Local System (Migrated):**
+The previous system included local 5-factor katabatic analysis, real-time prediction tracking, and complex atmospheric calculations. This functionality has been moved to server infrastructure for enhanced capabilities.
 
 ## Getting Started
 

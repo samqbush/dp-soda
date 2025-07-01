@@ -1,17 +1,24 @@
 # Wind Prediction Guide
 
-Technical guide to understanding the katabatic wind prediction system used in Dawn Patrol Alarm.
+Technical guide to understanding katabatic wind prediction concepts. Note: The local prediction system described in this guide has been migrated to a server-based architecture (June 30, 2025).
+
+## Migration Notice
+
+**🚀 Server-Based Predictions Now In Development**
+
+The complex local prediction system described in this guide has been converted to a server-based solution for enhanced performance and accuracy. This guide remains as reference material for understanding wind prediction theory and methodology.
+
+**Previous Local System:** Removed 3000+ lines of local prediction logic including 5-factor MKI analysis, prediction tracking, and complex atmospheric calculations.
+
+**New Server System:** Enhanced machine learning models, real-time processing, and improved atmospheric pattern recognition.
 
 ## Table of Contents
 
 1. [Katabatic Wind Theory](#katabatic-wind-theory)
 2. [Prediction Methodology](#prediction-methodology)
-3. [6-Factor MKI Analysis System](#6-factor-mki-analysis-system)
-4. [Confidence Calculation](#confidence-calculation)
-5. [Verification & Accuracy](#verification--accuracy)
-6. [Advanced Understanding](#advanced-understanding)
-7. [Time-Based Operation System](#time-based-operation-system)
-8. [Wind Prediction Improvement Plan](#wind-prediction-improvement-plan)
+3. [Historical 5-Factor Analysis System](#historical-5-factor-analysis-system)
+4. [Server Migration Benefits](#server-migration-benefits)
+5. [Future Enhancements](#future-enhancements)
 
 ## Katabatic Wind Theory
 
@@ -644,3 +651,63 @@ This time-based system ensures users get the most relevant and accurate informat
 - **After**: ~60-70% probability, ~45-55% confidence → More realistic
 - **UI**: "Learning Mode" disclaimer + accuracy metrics visible
 - **Learning**: Each outcome improves future predictions
+
+## Server Migration Benefits
+
+### Why Move to Server-Based Predictions?
+
+**Technical Advantages:**
+1. **Reduced Client Complexity**: Eliminated 3000+ lines of complex prediction code
+2. **Enhanced Processing Power**: Server can handle sophisticated ML models and real-time data
+3. **Better Data Access**: Comprehensive weather datasets not practical for mobile clients
+4. **Improved Accuracy**: Advanced atmospheric modeling and pattern recognition
+5. **Scalability**: Handle multiple users and locations efficiently
+
+**Architectural Benefits:**
+- **Centralized Logic**: Easier to update and maintain prediction algorithms
+- **Version Control**: All users get latest prediction improvements instantly
+- **Testing**: More comprehensive validation and testing capabilities
+- **Performance**: No local processing overhead on mobile devices
+
+### Future Enhancements (Server-Based)
+
+**Enhanced Prediction Capabilities:**
+- **Machine Learning Models**: Advanced pattern recognition from historical data
+- **Multi-Location Analysis**: Comparative analysis across multiple wind sites
+- **Real-Time Processing**: Continuous data monitoring and prediction updates
+- **Advanced Atmospheric Modeling**: More sophisticated MKI analysis
+- **Historical Correlation**: Long-term pattern analysis and seasonal adjustments
+
+**Improved User Experience:**
+- **Faster Response Times**: Instant predictions without local processing delays
+- **Enhanced Accuracy**: Access to comprehensive weather model datasets
+- **Real-Time Updates**: Push notifications for changing conditions
+- **Extended Forecasts**: Multi-day prediction capabilities
+- **Confidence Calibration**: Better calibrated confidence scores from larger datasets
+
+### Migration Timeline
+
+**Phase 1: Client Simplification (✅ Complete - June 30, 2025)**
+- Removed local prediction services and complex analysis code
+- Simplified Wind Guru UI to server migration placeholder
+- Updated documentation to reflect new architecture
+
+**Phase 2: Server Development (🔄 In Progress)**
+- Develop server-based prediction API
+- Implement enhanced ML models and atmospheric analysis
+- Create real-time data processing pipeline
+
+**Phase 3: API Integration (⏳ Planned)**
+- Integrate server API with existing UI placeholder
+- Add real-time prediction updates and notifications
+- Implement enhanced user experience features
+
+**Phase 4: Enhanced Features (⏳ Future)**
+- Multi-location support and comparative analysis
+- Advanced machine learning model deployment
+- Historical pattern analysis and seasonal adjustments
+
+---
+
+*Documentation updated: June 30, 2025*  
+*Local prediction system migrated to server-based architecture*

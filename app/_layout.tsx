@@ -21,7 +21,7 @@ import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androi
 import { globalCrashHandler } from '@/services/globalCrashHandler';
 import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
-import { eveningWeatherRefreshService } from '@/services/eveningWeatherRefreshService';
+
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
 // Ignore specific warnings in production builds
@@ -93,17 +93,6 @@ export default function RootLayout() {
           setInitError('Storage initialization failed');
         } else {
           console.log('✅ Storage initialization successful');
-          
-          // Initialize evening weather refresh service
-          console.log('🌅 Initializing evening weather refresh service...');
-          await eveningWeatherRefreshService.initialize();
-          console.log('✅ Evening weather refresh service initialized');
-          
-          // Initialize prediction state manager
-          console.log('🔮 Initializing prediction state manager...');
-          const { predictionStateManager } = await import('@/services/predictionStateManager');
-          await predictionStateManager.initialize();
-          console.log('✅ Prediction state manager initialized');
         }
         
       } catch (e) {
