@@ -1,10 +1,10 @@
 # Dawn Patrol Alarm - Release Notes
-**Version 1.0.8 - Wind Prediction Enhancement & UI Polish Update**
+**Version 1.0.8 - Major Architecture Simplification & Performance Update**
 
 **Branch:** patch/remove-alarm → main  
-**Date:** June 28, 2025  
-**Files Changed:** 7 files modified, 1 new documentation file  
-**Commits:** 3 feature commits focusing on prediction management and UI improvements
+**Date:** July 4, 2025  
+**Files Changed:** 40 files modified, 8 deleted services, 4 deleted hooks, massive code cleanup  
+**Commits:** 8 major refactoring commits focusing on simplification and performance
 
 ---
 

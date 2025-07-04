@@ -1,6 +1,23 @@
 # Dawn Patrol Alarm - Changelog
 
-## **Version 1.0.8 - Wind Prediction Enhancement & UI Polish Update**
+## **Version 1.0.8 - Major Architecture Simplification & Performance Update**
+
+**Branch:** patch/remove-alarm → main  
+**Date:** July 4, 2025  
+**Files Changed:** 40 files modified, 8 deleted services, 4 deleted hooks, massive code cleanup  
+**Commits:** 8 major refactoring commits focusing on simplification and performance
+
+### 🎯 **Key Highlights**
+- **⚡ Dramatically Faster Performance** - Removed 9,856 lines of complex code for instant app startup
+- **🎛️ Clean Wind Threshold Control** - Streamlined, persistent wind speed preference management
+- **📊 Enhanced Wind Analysis Display** - Better time intervals and wind direction indicators
+- **�️ Major Code Cleanup** - Eliminated complex alarm infrastructure and simplified architecture
+
+*See RELEASE_NOTES_v1.0.8.md for complete details*
+
+---
+
+## **Version 1.0.7 - Major Architecture Simplification & Reliability Update**
 
 **Branch:** patch/remove-alarm → main  
 **Date:** June 28, 2025  
