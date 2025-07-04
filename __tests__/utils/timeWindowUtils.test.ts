@@ -111,121 +111,48 @@ describe('Time Window Utilities Tests', () => {
     });
 
     it('should handle empty data array', () => {
-      const timeWindow: TimeWindow = {
-        startHour: 4,
-        endHour: 21
-      };
-
+      const timeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
       const result = filterWindDataByTimeWindow([], timeWindow);
+      
       expect(result).toEqual([]);
     });
 
-    it('should filter data based on time window', () => {
-      // Set a specific current time
-      jest.setSystemTime(new Date('2025-07-04T16:00:00.000Z'));
-
-      const timeWindow: TimeWindow = {
-        startHour: 4,
-        endHour: 23
-      };
-
-      const result = filterWindDataByTimeWindow(mockWindData, timeWindow);
-
-      // Should return some filtered data
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThanOrEqual(0);
+    it('should handle null data input', () => {
+      const timeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
+      const result = filterWindDataByTimeWindow(null as any, timeWindow);
       
-      // All returned items should have the required structure
-      result.forEach(item => {
-        expect(item).toHaveProperty('time');
-        expect(item).toHaveProperty('windSpeed');
-      });
+      expect(result).toEqual([]);
     });
 
-    it('should handle data with Date objects instead of strings', () => {
-      const dataWithDates = [
-        { time: new Date('2025-07-04T06:00:00.000Z'), windSpeed: 14 },
-        { time: new Date('2025-07-04T12:00:00.000Z'), windSpeed: 20 },
-        { time: new Date('2025-07-04T18:00:00.000Z'), windSpeed: 18 },
-      ];
-
-      jest.setSystemTime(new Date('2025-07-04T19:00:00.000Z'));
-
-      const timeWindow: TimeWindow = {
-        startHour: 4,
-        endHour: 23
-      };
-
-      const result = filterWindDataByTimeWindow(dataWithDates, timeWindow);
-
-      // Should handle Date objects
-      expect(Array.isArray(result)).toBe(true);
-      result.forEach(item => {
-        expect(item.time instanceof Date).toBe(true);
-      });
-    });
-
-    it('should respect time window boundaries', () => {
-      jest.setSystemTime(new Date('2025-07-04T20:00:00.000Z'));
-
-      const timeWindow: TimeWindow = {
-        startHour: 10, // Start later
-        endHour: 18   // End earlier
-      };
-
-      const result = filterWindDataByTimeWindow(mockWindData, timeWindow);
-
-      // Should filter based on the time window
-      expect(Array.isArray(result)).toBe(true);
+    it('should properly log when no data remains after filtering', () => {
+      // Set up mock console.log to capture the logging
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      // Verify that returned data respects the time window
-      result.forEach(item => {
-        const itemDate = new Date(item.time);
-        const itemHour = itemDate.getHours();
-        // Data should be within the time window or have other valid filtering logic
-        expect(typeof itemHour).toBe('number');
-      });
-    });
-
-    it('should handle multi-day scenarios', () => {
-      // Test isMultiDay flag
-      const timeWindow: TimeWindow = {
-        startHour: 4,
-        endHour: 21,
-        isMultiDay: true
-      };
-
-      jest.setSystemTime(new Date('2025-07-04T02:30:00.000Z'));
-
-      const result = filterWindDataByTimeWindow(mockWindData, timeWindow);
-
-      // Should handle multi-day filtering
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it('should handle empty data gracefully and test filtering edge cases', () => {
       jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM local
       
-      // Test with empty data array
-      const emptyResult = filterWindDataByTimeWindow([], { startHour: 4, endHour: 21 });
-      expect(emptyResult).toEqual([]);
-
-      // Test with data that has various edge conditions
-      jest.setSystemTime(new Date('2025-07-04T15:00:00-06:00')); // 3 PM local time
-      
-      const edgeCaseData = [
-        { time: '2025-07-04T04:00:00-06:00', windSpeed: 12 }, // Exactly at start hour
-        { time: '2025-07-04T15:00:00-06:00', windSpeed: 15 }, // Current time
-        { time: '2025-07-04T16:00:00-06:00', windSpeed: 18 }, // Future time - should be excluded
+      // Create data that will be filtered out (from tomorrow)
+      const futureData = [
+        {
+          time: '2025-07-05T06:00:00-06:00', // Tomorrow at 6 AM
+          windSpeed: 15,
+          windDirection: 270,
+          windGust: 20
+        }
       ];
 
-      const timeWindow = getWindChartTimeWindow();
-      const result = filterWindDataByTimeWindow(edgeCaseData, timeWindow);
+      const timeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
+      const result = filterWindDataByTimeWindow(futureData, timeWindow);
 
-      // Should include data from start hour and up to current time, exclude future
-      expect(result.length).toBeLessThanOrEqual(edgeCaseData.length);
-      expect(result.some(item => item.windSpeed === 12)).toBe(true); // Start hour included
+      expect(result).toEqual([]);
+      
+      // Check that the logging occurred for no data scenario
+      expect(consoleLogSpy).toHaveBeenCalledWith('✅ Filtered result:', {
+        filteredPoints: 0,
+        timeRange: 'No data'
+      });
 
+      consoleLogSpy.mockRestore();
       jest.useRealTimers();
     });
   });

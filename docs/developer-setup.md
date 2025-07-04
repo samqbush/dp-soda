@@ -136,8 +136,7 @@ dp-react/
 │   └── ...                # Component files
 ├── hooks/                  # Custom React hooks
 │   ├── useWindData.ts     # Wind data fetching
-│   ├── useWeatherData.ts  # Simplified weather data (server-based predictions)
-│   └── ...                # Hook files
+│   └── ...                # Hook files (useWeatherData.ts removed)
 ├── services/               # Business logic and API services
 │   ├── weatherService.ts  # Weather API integration
 │   ├── alarmAudioService.ts # Audio/notification handling
@@ -193,7 +192,7 @@ The Wind Guru prediction system has been converted from a complex local predicti
 
 **Simplified Files:**
 - `app/(tabs)/wind-guru.tsx` - From 2057 lines to ~400 lines (80% reduction)
-- `hooks/useWeatherData.ts` - From 977 lines to 152 lines (85% reduction)
+- `hooks/useWeatherData.ts` - **REMOVED** (was simplified from 977 to 152 lines, then removed entirely)
 - `app/_layout.tsx` - Removed wind prediction service initialization
 
 **Previous System (Removed):**

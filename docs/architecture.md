@@ -80,9 +80,9 @@ interface WeatherService {
 4. Fall back to cached data if API fails
 5. Fall back to mock data if all else fails
 
-### Weather Data Hook (`hooks/useWeatherData.ts`)
+### Weather Data Functionality (Removed)
 
-**Purpose**: Simplified weather data management for server-based predictions
+**Note**: The `useWeatherData.ts` hook has been **removed** as weather prediction functionality has been migrated to server-side processing.
 
 **Previous Features (Removed in Server Migration)**:
 - ~~Advanced wind prediction using 6-factor MKI meteorological analysis~~
@@ -154,7 +154,7 @@ interface MountainWaveAnalysis {
 ```
 User Interface
       ↓
-Custom Hooks (useWindData, useWeatherData)
+Custom Hooks (useWindData)
       ↓
 Weather Service
       ↓

@@ -390,6 +390,24 @@ describe('Wind Station Utilities Tests', () => {
       expect(result?.status).toBe('ideal'); // Should be in range after normalization
     });
 
+    it('should handle wind directions greater than 360 degrees', () => {
+      // This tests the normalizeWindDirection function with values >= 360
+      // which should trigger the second while loop (line 133)
+      const configWithLargeIdeal = {
+        name: 'Test Station',
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: 450, // This will be normalized to 90
+          range: { min: 440, max: 480 }, // This will be normalized to 80-120
+          perfectTolerance: 3 // Small tolerance to avoid perfect match
+        }
+      };
+      
+      const result = assessWindDirection(100, configWithLargeIdeal); // Should be in ideal range but not perfect
+      expect(result).not.toBe(null);
+      expect(result?.status).toBe('ideal'); // Should be in range after normalization
+    });
+
     it('should handle wrap-around wind direction ranges', () => {
       // This tests the wrap-around logic in isDirectionInRange (line 158)
       const configWithWrapAround = {
