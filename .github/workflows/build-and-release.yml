@@ -46,9 +46,17 @@ jobs:
       - name: 🔍 Fix package versions
         run: npx expo install --fix
 
-      - name: 🧪 Run checks
+      - name: 🧪 Run checks and tests
         run: |
           npm run lint
+          npm run test:coverage
+
+      - name: 📊 Upload iOS Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-coverage-report
+          path: coverage/
+          retention-days: 7
 
       # Extract app version and bundle identifier from app.config.js
       - name: 🏷️ Extract app version and bundle ID from app.config.js
@@ -239,9 +247,17 @@ jobs:
       - name: 🔍 Fix package versions
         run: npx expo install --fix
 
-      - name: 🧪 Run checks
+      - name: 🧪 Run checks and tests
         run: |
           npm run lint
+          npm run test:coverage
+
+      - name: 📊 Upload Android Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coverage-report
+          path: coverage/
+          retention-days: 7
           
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
@@ -557,6 +573,10 @@ jobs:
           echo "- **Android AAB**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.aab\` (for Google Play Store)" >> $GITHUB_STEP_SUMMARY
           echo "- **Android APK**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.apk\` (for direct installation)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Test Coverage:" >> $GITHUB_STEP_SUMMARY
+          echo "- **iOS Coverage Report**: Available in artifacts (ios-coverage-report)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android Coverage Report**: Available in artifacts (android-coverage-report)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Next Steps:" >> $GITHUB_STEP_SUMMARY
           echo "1. Review the draft release in the [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
           echo "2. Test the builds on your devices if needed" >> $GITHUB_STEP_SUMMARY
@@ -609,6 +629,7 @@ jobs:
           echo "- **iOS IPA**: Ready for TestFlight and App Store" >> $GITHUB_STEP_SUMMARY
           echo "- **Android AAB**: Ready for Google Play Store" >> $GITHUB_STEP_SUMMARY
           echo "- **Android APK**: Ready for direct installation" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage Reports**: iOS and Android coverage reports available in separate artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Manual Upload Steps:" >> $GITHUB_STEP_SUMMARY
           echo "1. Download the combined artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
