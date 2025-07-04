@@ -13,6 +13,7 @@
     "test:coverage": "npx jest --coverage",
     "test:wind": "npx jest __tests__/services/windAnalysis.test.ts",
     "test:data": "npx jest __tests__/services/dataTransformation.test.ts",
+    "test:utils": "npx jest __tests__/utils/",
     "debug-devices": "node scripts/debug-ecowitt-devices.mjs",
     "verify-noaa": "node scripts/verify-noaa-data.mjs",
     "test-version": "node scripts/test-version-increment.mjs",
