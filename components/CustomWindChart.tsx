@@ -149,21 +149,13 @@ export function CustomWindChart({
     const minute = time.getMinutes();
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    
-    if (timeSpanHours <= 1) {
-      // 1 hour or less: show every 15 minutes
-      if (minute % 15 === 0) {
-        return minute === 0 ? `${displayHour}${ampm}` : `${displayHour}:${minute.toString().padStart(2, '0')}`;
-      }
-    } else if (timeSpanHours <= 3) {
-      // 1-3 hours: show every 30 minutes
-      if (minute === 0 || minute === 30) {
-        return minute === 0 ? `${displayHour}${ampm}` : `${displayHour}:30`;
-      }
-    } else {
-      // 3+ hours: show every hour
+
+    // Always show every 30 minutes
+    if (minute === 0 || minute === 30) {
       if (minute === 0) {
         return `${displayHour}${ampm}`;
+      } else {
+        return `${displayHour}:30`;
       }
     }
     return '';
