@@ -370,4 +370,105 @@ describe('Wind Station Utilities Tests', () => {
       expect(result).toBe(null);
     });
   });
+
+  describe('Edge Cases and Internal Function Coverage', () => {
+    it('should handle negative wind directions in normalization', () => {
+      // This tests the normalizeWindDirection function with negative values
+      // which should trigger the while loop (lines 132-133)
+      const configWithNegativeIdeal = {
+        name: 'Test Station',
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: -30, // This will be normalized to 330
+          range: { min: -50, max: -10 }, // This will be normalized to 310-350
+          perfectTolerance: 5 // Small tolerance to get 'ideal' not 'perfect'
+        }
+      };
+      
+      const result = assessWindDirection(315, configWithNegativeIdeal); // Should be in ideal range
+      expect(result).not.toBe(null);
+      expect(result?.status).toBe('ideal'); // Should be in range after normalization
+    });
+
+    it('should handle wrap-around wind direction ranges', () => {
+      // This tests the wrap-around logic in isDirectionInRange (line 158)
+      const configWithWrapAround = {
+        name: 'Test Station',
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: 10,
+          perfectTolerance: 5, // Small tolerance to avoid perfect match
+          range: { min: 350, max: 30 } // Wrap-around range: 350-360 and 0-30
+        }
+      };
+      
+      // Test direction in the wrap-around range
+      const result1 = assessWindDirection(355, configWithWrapAround); // Should be in range
+      expect(result1?.status).toBe('ideal');
+      
+      const result2 = assessWindDirection(25, configWithWrapAround); // Should be in range, far from perfect
+      expect(result2?.status).toBe('ideal');
+      
+      const result3 = assessWindDirection(180, configWithWrapAround); // Should NOT be in range
+      expect(result3?.status).toBe('suboptimal');
+    });
+
+    it('should handle large angular differences in direction distance calculation', () => {
+      // This tests the diff > 180 case in getDirectionDistance (line 171)
+      const configForLargeDistance = {
+        name: 'Test Station',
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: 10, // Perfect direction at 10°
+          perfectTolerance: 5, // Small tolerance
+          range: { min: 350, max: 30 }
+        }
+      };
+      
+      // Test with direction that's >180° away, should calculate shorter distance
+      const result = assessWindDirection(200, configForLargeDistance); // 200° is far from 10°
+      expect(result?.status).toBe('suboptimal');
+      expect(result?.description).toContain('150°'); // Should calculate shorter distance to range
+    });
+
+    it('should handle directions outside ideal range', () => {
+      // This tests the fallback case in assessWindDirection (line 209+)
+      const config = {
+        name: 'Test Station', 
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: 270,
+          perfectTolerance: 5,
+          range: { min: 240, max: 300 }
+        }
+      };
+      
+      // Test direction far outside the ideal range
+      const result = assessWindDirection(90, config); // 90° is far from 240-300 range
+      expect(result?.status).toBe('suboptimal');
+      expect(result?.indicator).toBe('📍'); // This is the actual indicator used
+      expect(result?.description).toContain('from ideal range');
+    });
+
+    it('should handle edge case with exact boundary directions', () => {
+      const config = {
+        name: 'Test Station',
+        subtitle: 'Test Location',
+        idealWindDirection: {
+          perfect: 270,
+          range: { min: 240, max: 300 }
+        }
+      };
+      
+      // Test exact boundary cases
+      const result1 = assessWindDirection(240, config); // Exact min boundary
+      expect(result1?.status).toBe('ideal');
+      
+      const result2 = assessWindDirection(300, config); // Exact max boundary  
+      expect(result2?.status).toBe('ideal');
+      
+      const result3 = assessWindDirection(270, config); // Exact perfect direction
+      expect(result3?.status).toBe('perfect');
+    });
+  });
 });

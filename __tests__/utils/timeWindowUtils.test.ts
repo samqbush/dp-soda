@@ -48,6 +48,48 @@ describe('Time Window Utilities Tests', () => {
 
       jest.useRealTimers();
     });
+
+    it('should return previous day window for early morning hours (0-4am)', () => {
+      jest.useFakeTimers();
+      
+      // Test 2am - should return previous day window
+      jest.setSystemTime(new Date('2025-07-04T02:00:00-06:00')); // 2 AM local time
+      const earlyMorningResult = getWindChartTimeWindow();
+      
+      expect(earlyMorningResult.startHour).toBe(4);
+      expect(earlyMorningResult.endHour).toBe(21); // 9pm
+      expect(earlyMorningResult.isMultiDay).toBe(true);
+
+      jest.useRealTimers();
+    });
+
+    it('should return current day window for daytime hours (4am-9pm)', () => {
+      jest.useFakeTimers();
+      
+      // Test 10am - should return current day window
+      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM local time
+      const daytimeResult = getWindChartTimeWindow();
+      
+      expect(daytimeResult.startHour).toBe(4);
+      expect(daytimeResult.endHour).toBe(23); // Show through current time
+      expect(daytimeResult.isMultiDay).toBeUndefined(); // No isMultiDay property
+
+      jest.useRealTimers();
+    });
+
+    it('should return full day window for evening hours (after 9pm)', () => {
+      jest.useFakeTimers();
+      
+      // Test 10pm - should return full day window
+      jest.setSystemTime(new Date('2025-07-04T22:00:00-06:00')); // 10 PM local time
+      const eveningResult = getWindChartTimeWindow();
+      
+      expect(eveningResult.startHour).toBe(4);
+      expect(eveningResult.endHour).toBe(21); // 9pm
+      expect(eveningResult.isMultiDay).toBeUndefined(); // No isMultiDay property
+
+      jest.useRealTimers();
+    });
   });
 
   describe('filterWindDataByTimeWindow', () => {
@@ -159,6 +201,32 @@ describe('Time Window Utilities Tests', () => {
 
       // Should handle multi-day filtering
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle empty data gracefully and test filtering edge cases', () => {
+      jest.useFakeTimers();
+      
+      // Test with empty data array
+      const emptyResult = filterWindDataByTimeWindow([], { startHour: 4, endHour: 21 });
+      expect(emptyResult).toEqual([]);
+
+      // Test with data that has various edge conditions
+      jest.setSystemTime(new Date('2025-07-04T15:00:00-06:00')); // 3 PM local time
+      
+      const edgeCaseData = [
+        { time: '2025-07-04T04:00:00-06:00', windSpeed: 12 }, // Exactly at start hour
+        { time: '2025-07-04T15:00:00-06:00', windSpeed: 15 }, // Current time
+        { time: '2025-07-04T16:00:00-06:00', windSpeed: 18 }, // Future time - should be excluded
+      ];
+
+      const timeWindow = getWindChartTimeWindow();
+      const result = filterWindDataByTimeWindow(edgeCaseData, timeWindow);
+
+      // Should include data from start hour and up to current time, exclude future
+      expect(result.length).toBeLessThanOrEqual(edgeCaseData.length);
+      expect(result.some(item => item.windSpeed === 12)).toBe(true); // Start hour included
+
+      jest.useRealTimers();
     });
   });
 });

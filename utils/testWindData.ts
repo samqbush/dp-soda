@@ -131,10 +131,8 @@ export function generateInconsistentDirectionData(): WindDataPoint[] {
       // Highly variable direction between NW and NE
       if (hour === 3) {
         windDirection = 315 + (Math.random() * 20 - 10); // NW
-      } else if (hour === 4) {
+      } else { // hour === 4
         windDirection = 45 + (Math.random() * 20 - 10); // NE
-      } else {
-        windDirection = Math.random() * 360;
       }
     } 
     // 6am-8am: Still variable direction

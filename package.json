@@ -77,6 +77,7 @@
     "husky": "^9.1.7",
     "jest-environment-node": "^30.0.4",
     "jest-fetch-mock": "^3.0.3",
+    "react-test-renderer": "^19.0.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.2",
     "typescript": "~5.8.3",
