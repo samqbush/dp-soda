@@ -143,20 +143,17 @@ export function CustomWindChart({
   const yScale = plotHeight / yMax;
   const xScale = plotWidth / (recentData.length - 1);
 
-  // Format time labels with better control
+  // Format time labels - Two-tier system: only show hour labels
   const formatTimeLabel = (time: Date, index: number) => {
     const hour = time.getHours();
     const minute = time.getMinutes();
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
 
-    // Always show every 30 minutes
-    if (minute === 0 || minute === 30) {
-      if (minute === 0) {
-        return `${displayHour}${ampm}`;
-      } else {
-        return `${displayHour}:30`;
-      }
+    // Only show hour labels (minute = 0) for cleaner display
+    // The 30-minute marks will be shown as small tick marks below
+    if (minute === 0) {
+      return `${displayHour}${ampm}`;
     }
     return '';
   };
@@ -460,19 +457,81 @@ export function CustomWindChart({
                 );
               })}
 
-              {/* X-axis labels */}
+              {/* X-axis labels - Major labels (hours only) */}
               {labelData.map((label, index) => (
                 <Text
                   key={`x-label-${index}`}
                   x={label!.x}
                   y={label!.y}
-                  fontSize={11}
+                  fontSize={12}
                   fill={textColor}
                   textAnchor="middle"
+                  fontWeight="bold"
                 >
                   {label!.label}
                 </Text>
               ))}
+
+              {/* Hierarchical tick marks - Tape measure style 
+                  📏 Major ticks (16px): Hour marks (0 min) - with labels
+                  📐 Medium ticks (12px): Half-hour marks (30 min)
+                  📌 Minor ticks (8px): Quarter-hour marks (15, 45 min) */}
+              {recentData.map((point, index) => {
+                const time = new Date(point.time);
+                const minute = time.getMinutes();
+                const x = padding.left + index * xScale;
+                const baseY = chartHeight - padding.bottom;
+                
+                // Major ticks: Hour marks (biggest) - 16px tall
+                if (minute === 0) {
+                  return (
+                    <Line
+                      key={`major-tick-${index}`}
+                      x1={x}
+                      y1={baseY}
+                      x2={x}
+                      y2={baseY + 16}
+                      stroke={textColor}
+                      strokeWidth={2}
+                      opacity={0.8}
+                    />
+                  );
+                }
+                
+                // Medium ticks: 30-minute marks - 12px tall  
+                if (minute === 30) {
+                  return (
+                    <Line
+                      key={`medium-tick-${index}`}
+                      x1={x}
+                      y1={baseY}
+                      x2={x}
+                      y2={baseY + 12}
+                      stroke={textColor}
+                      strokeWidth={1.5}
+                      opacity={0.6}
+                    />
+                  );
+                }
+                
+                // Minor ticks: 15 and 45-minute marks - 8px tall
+                if (minute === 15 || minute === 45) {
+                  return (
+                    <Line
+                      key={`minor-tick-${index}`}
+                      x1={x}
+                      y1={baseY}
+                      x2={x}
+                      y2={baseY + 8}
+                      stroke={textColor}
+                      strokeWidth={1}
+                      opacity={0.4}
+                    />
+                  );
+                }
+                
+                return null;
+              }).filter(Boolean)}
 
               {/* Axes */}
               <Line
