@@ -40,7 +40,8 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Early morning time - should trigger multi-day scenario
-      jest.setSystemTime(new Date('2025-07-04T02:30:00-06:00')); // 2:30 AM local time
+      // Use local time constructor to ensure consistent behavior across environments
+      jest.setSystemTime(new Date(2025, 6, 4, 2, 30, 0)); // July 4, 2025, 2:30 AM local time
       const earlyMorningResult = getWindChartTimeWindow();
       
       expect(earlyMorningResult.startHour).toBe(4);
@@ -54,7 +55,7 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Exactly midnight
-      jest.setSystemTime(new Date('2025-07-04T00:00:00-06:00')); // Midnight local time
+      jest.setSystemTime(new Date(2025, 6, 4, 0, 0, 0)); // July 4, 2025, midnight local time
       const midnightResult = getWindChartTimeWindow();
       
       expect(midnightResult.startHour).toBe(4);
@@ -67,7 +68,7 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Exactly 4 AM - should switch from multi-day to same-day
-      jest.setSystemTime(new Date('2025-07-04T04:00:00-06:00')); // 4 AM local time
+      jest.setSystemTime(new Date(2025, 6, 4, 4, 0, 0)); // July 4, 2025, 4 AM local time
       const boundaryResult = getWindChartTimeWindow();
       
       expect(boundaryResult.startHour).toBe(4);
@@ -80,7 +81,7 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Test 2am - should return previous day window
-      jest.setSystemTime(new Date('2025-07-04T02:00:00-06:00')); // 2 AM local time
+      jest.setSystemTime(new Date(2025, 6, 4, 2, 0, 0)); // July 4, 2025, 2 AM local time
       const earlyMorningResult = getWindChartTimeWindow();
       
       expect(earlyMorningResult.startHour).toBe(4);
@@ -94,7 +95,7 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Test 10am - should return current day window
-      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM local time
+      jest.setSystemTime(new Date(2025, 6, 4, 10, 0, 0)); // July 4, 2025, 10 AM local time
       const daytimeResult = getWindChartTimeWindow();
       
       expect(daytimeResult.startHour).toBe(4);
@@ -108,7 +109,7 @@ describe('Time Window Utilities Tests', () => {
       jest.useFakeTimers();
       
       // Test 10pm - should return full day window
-      jest.setSystemTime(new Date('2025-07-04T22:00:00-06:00')); // 10 PM local time
+      jest.setSystemTime(new Date(2025, 6, 4, 22, 0, 0)); // July 4, 2025, 10 PM local time
       const eveningResult = getWindChartTimeWindow();
       
       expect(eveningResult.startHour).toBe(4);
@@ -121,12 +122,12 @@ describe('Time Window Utilities Tests', () => {
 
   describe('filterWindDataByTimeWindow', () => {
     const mockWindData = [
-      { time: '2025-07-03T06:00:00.000Z', windSpeed: 12 }, // Yesterday 6am UTC
-      { time: '2025-07-03T12:00:00.000Z', windSpeed: 15 }, // Yesterday noon UTC
-      { time: '2025-07-03T18:00:00.000Z', windSpeed: 18 }, // Yesterday 6pm UTC
-      { time: '2025-07-04T06:00:00.000Z', windSpeed: 14 }, // Today 6am UTC
-      { time: '2025-07-04T12:00:00.000Z', windSpeed: 20 }, // Today noon UTC
-      { time: '2025-07-04T15:00:00.000Z', windSpeed: 22 }, // Today 3pm UTC
+      { time: new Date(2025, 6, 3, 6, 0, 0).toISOString(), windSpeed: 12 }, // July 3, 2025, 6am local
+      { time: new Date(2025, 6, 3, 12, 0, 0).toISOString(), windSpeed: 15 }, // July 3, 2025, noon local
+      { time: new Date(2025, 6, 3, 18, 0, 0).toISOString(), windSpeed: 18 }, // July 3, 2025, 6pm local
+      { time: new Date(2025, 6, 4, 6, 0, 0).toISOString(), windSpeed: 14 }, // July 4, 2025, 6am local
+      { time: new Date(2025, 6, 4, 12, 0, 0).toISOString(), windSpeed: 20 }, // July 4, 2025, noon local
+      { time: new Date(2025, 6, 4, 15, 0, 0).toISOString(), windSpeed: 22 }, // July 4, 2025, 3pm local
     ];
 
     beforeEach(() => {
@@ -139,14 +140,14 @@ describe('Time Window Utilities Tests', () => {
 
     it('should handle multi-day filtering correctly', () => {
       jest.useFakeTimers();
-      jest.setSystemTime(new Date('2025-07-04T02:00:00-06:00')); // 2 AM on July 4th
+      jest.setSystemTime(new Date(2025, 6, 4, 2, 0, 0)); // July 4, 2025, 2 AM local time
       
       const multiDayTimeWindow = { startHour: 4, endHour: 21, isMultiDay: true };
       
       // Create test data spanning yesterday and today
-      const yesterday = new Date('2025-07-03T18:00:00-06:00'); // 6 PM yesterday (within window)
-      const yesterdayEarly = new Date('2025-07-03T02:00:00-06:00'); // 2 AM yesterday (outside window)
-      const todayEarly = new Date('2025-07-04T01:00:00-06:00'); // 1 AM today (current day)
+      const yesterday = new Date(2025, 6, 3, 18, 0, 0); // July 3, 2025, 6 PM local time (within window)
+      const yesterdayEarly = new Date(2025, 6, 3, 2, 0, 0); // July 3, 2025, 2 AM local time (outside window)
+      const todayEarly = new Date(2025, 6, 4, 1, 0, 0); // July 4, 2025, 1 AM local time (current day)
       
       const testData = [
         { time: yesterday.toISOString(), windSpeed: 5, windDirection: 180 },
@@ -165,14 +166,14 @@ describe('Time Window Utilities Tests', () => {
 
     it('should handle same-day filtering with before current time check', () => {
       jest.useFakeTimers();
-      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM
+      jest.setSystemTime(new Date(2025, 6, 4, 10, 0, 0)); // July 4, 2025, 10 AM local time
       
       const sameDayTimeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
       
       // Create test data
-      const earlyMorning = new Date('2025-07-04T06:00:00-06:00'); // 6 AM today (within window, before current)
-      const futureTime = new Date('2025-07-04T12:00:00-06:00'); // 12 PM today (after current time)
-      const beforeWindow = new Date('2025-07-04T02:00:00-06:00'); // 2 AM today (before window)
+      const earlyMorning = new Date(2025, 6, 4, 6, 0, 0); // July 4, 2025, 6 AM local time (within window, before current)
+      const futureTime = new Date(2025, 6, 4, 12, 0, 0); // July 4, 2025, 12 PM local time (after current time)
+      const beforeWindow = new Date(2025, 6, 4, 2, 0, 0); // July 4, 2025, 2 AM local time (before window)
       
       const testData = [
         { time: earlyMorning.toISOString(), windSpeed: 5, windDirection: 180 },
@@ -194,12 +195,12 @@ describe('Time Window Utilities Tests', () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       
       jest.useFakeTimers();
-      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM local
+      jest.setSystemTime(new Date(2025, 6, 4, 10, 0, 0)); // July 4, 2025, 10 AM local time
       
       // Create data that will be filtered out (from tomorrow)
       const futureData = [
         {
-          time: '2025-07-05T06:00:00-06:00', // Tomorrow at 6 AM
+          time: new Date(2025, 6, 5, 6, 0, 0).toISOString(), // July 5, 2025, 6 AM local time (tomorrow)
           windSpeed: 15,
           windDirection: 270,
           windGust: 20
