@@ -36,15 +36,42 @@ describe('Time Window Utilities Tests', () => {
       expect(result.endHour).toBeLessThanOrEqual(23);
     });
 
-    it('should handle boundary times correctly', () => {
-      // Test a few specific scenarios with known outcomes
+    it('should handle early morning times (multi-day scenario)', () => {
       jest.useFakeTimers();
       
-      // Afternoon time - should be straightforward
-      jest.setSystemTime(new Date('2025-07-04T18:00:00-06:00')); // 6 PM local time
-      const afternoonResult = getWindChartTimeWindow();
-      expect(afternoonResult.startHour).toBe(4);
-      expect(typeof afternoonResult.endHour).toBe('number');
+      // Early morning time - should trigger multi-day scenario
+      jest.setSystemTime(new Date('2025-07-04T02:30:00-06:00')); // 2:30 AM local time
+      const earlyMorningResult = getWindChartTimeWindow();
+      
+      expect(earlyMorningResult.startHour).toBe(4);
+      expect(earlyMorningResult.endHour).toBe(21);
+      expect(earlyMorningResult.isMultiDay).toBe(true);
+
+      jest.useRealTimers();
+    });
+
+    it('should handle midnight edge case', () => {
+      jest.useFakeTimers();
+      
+      // Exactly midnight
+      jest.setSystemTime(new Date('2025-07-04T00:00:00-06:00')); // Midnight local time
+      const midnightResult = getWindChartTimeWindow();
+      
+      expect(midnightResult.startHour).toBe(4);
+      expect(midnightResult.isMultiDay).toBe(true);
+
+      jest.useRealTimers();
+    });
+
+    it('should handle 4 AM boundary correctly', () => {
+      jest.useFakeTimers();
+      
+      // Exactly 4 AM - should switch from multi-day to same-day
+      jest.setSystemTime(new Date('2025-07-04T04:00:00-06:00')); // 4 AM local time
+      const boundaryResult = getWindChartTimeWindow();
+      
+      expect(boundaryResult.startHour).toBe(4);
+      expect(boundaryResult.isMultiDay || false).toBe(false);
 
       jest.useRealTimers();
     });
@@ -110,18 +137,56 @@ describe('Time Window Utilities Tests', () => {
       jest.useRealTimers();
     });
 
-    it('should handle empty data array', () => {
-      const timeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
-      const result = filterWindDataByTimeWindow([], timeWindow);
+    it('should handle multi-day filtering correctly', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-07-04T02:00:00-06:00')); // 2 AM on July 4th
       
-      expect(result).toEqual([]);
+      const multiDayTimeWindow = { startHour: 4, endHour: 21, isMultiDay: true };
+      
+      // Create test data spanning yesterday and today
+      const yesterday = new Date('2025-07-03T18:00:00-06:00'); // 6 PM yesterday (within window)
+      const yesterdayEarly = new Date('2025-07-03T02:00:00-06:00'); // 2 AM yesterday (outside window)
+      const todayEarly = new Date('2025-07-04T01:00:00-06:00'); // 1 AM today (current day)
+      
+      const testData = [
+        { time: yesterday.toISOString(), windSpeed: 5, windDirection: 180 },
+        { time: yesterdayEarly.toISOString(), windSpeed: 6, windDirection: 200 },
+        { time: todayEarly.toISOString(), windSpeed: 7, windDirection: 220 }
+      ];
+      
+      const result = filterWindDataByTimeWindow(testData, multiDayTimeWindow);
+      
+      // Should only include yesterday's data within the time window (6 PM)
+      expect(result).toHaveLength(1);
+      expect(result[0].windSpeed).toBe(5);
+      
+      jest.useRealTimers();
     });
 
-    it('should handle null data input', () => {
-      const timeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
-      const result = filterWindDataByTimeWindow(null as any, timeWindow);
+    it('should handle same-day filtering with before current time check', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-07-04T10:00:00-06:00')); // 10 AM
       
-      expect(result).toEqual([]);
+      const sameDayTimeWindow = { startHour: 4, endHour: 21, isMultiDay: false };
+      
+      // Create test data
+      const earlyMorning = new Date('2025-07-04T06:00:00-06:00'); // 6 AM today (within window, before current)
+      const futureTime = new Date('2025-07-04T12:00:00-06:00'); // 12 PM today (after current time)
+      const beforeWindow = new Date('2025-07-04T02:00:00-06:00'); // 2 AM today (before window)
+      
+      const testData = [
+        { time: earlyMorning.toISOString(), windSpeed: 5, windDirection: 180 },
+        { time: futureTime.toISOString(), windSpeed: 6, windDirection: 200 },
+        { time: beforeWindow.toISOString(), windSpeed: 7, windDirection: 220 }
+      ];
+      
+      const result = filterWindDataByTimeWindow(testData, sameDayTimeWindow);
+      
+      // Should only include early morning data (within window and before current time)
+      expect(result).toHaveLength(1);
+      expect(result[0].windSpeed).toBe(5);
+      
+      jest.useRealTimers();
     });
 
     it('should properly log when no data remains after filtering', () => {

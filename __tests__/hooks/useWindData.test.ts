@@ -815,5 +815,48 @@ describe('useWindData Hook Tests', () => {
         consoleErrorSpy.mockRestore();
       });
     });
+
+    describe('Fatal error handling', () => {
+      it('should handle errors and set appropriate error state', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        const fatalError = new Error('Fatal initialization error');
+        
+        // Mock all data sources to fail
+        mockWindService.getCachedWindData.mockRejectedValue(fatalError);
+        mockWindService.fetchWindData.mockRejectedValue(fatalError);
+        mockWindService.fetchRealWindData.mockRejectedValue(fatalError);
+        mockWindService.getAlarmCriteria.mockRejectedValue(fatalError);
+        
+        const { result } = renderHook(() => useWindData());
+        
+        await waitFor(() => {
+          expect(result.current.isLoading).toBe(false);
+        });
+        
+        // Should have some error set
+        expect(result.current.error).toBeTruthy();
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        
+        consoleErrorSpy.mockRestore();
+      });
+
+      it('should clear timeout when data loading encounters errors', async () => {
+        const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+        
+        // Mock some services to fail
+        mockWindService.getCachedWindData.mockRejectedValue(new Error('Cache error'));
+        
+        const { result } = renderHook(() => useWindData());
+        
+        await waitFor(() => {
+          expect(result.current.isLoading).toBe(false);
+        });
+        
+        // Timeout should be cleared when data loading completes
+        expect(clearTimeoutSpy).toHaveBeenCalled();
+        
+        clearTimeoutSpy.mockRestore();
+      });
+    });
   });
 });

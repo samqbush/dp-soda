@@ -90,6 +90,32 @@ describe('Wind Station Utilities Tests', () => {
       expect(typeof result).toBe('string');
       expect(result).not.toBe('Never');
     });
+
+    it('should handle very old historical data', () => {
+      // Create historical data that is 5 hours old
+      const fiveHoursAgo = new Date();
+      fiveHoursAgo.setHours(fiveHoursAgo.getHours() - 5);
+      
+      const oldHistoricalData = [{
+        time: fiveHoursAgo.toISOString(),
+        timestamp: fiveHoursAgo.getTime(),
+        windSpeed: 6.7,
+        windSpeedMph: 15.0,
+        windGust: 8.9,
+        windGustMph: 20.0,
+        windDirection: 300
+      }];
+
+      const result = formatLastUpdated(
+        null,
+        null,
+        oldHistoricalData
+      );
+
+      // Should return some meaningful string for old data
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
   });
 
   describe('getCurrentWindSpeed', () => {

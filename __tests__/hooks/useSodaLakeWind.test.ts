@@ -641,6 +641,33 @@ describe('useSodaLakeWind Hook Tests', () => {
 
         consoleErrorSpy.mockRestore();
       });
+
+      it('should handle cached data loading errors', async () => {
+        // Create a spy that will throw on the specific call we want to test
+        const consoleLogSpy = jest.spyOn(console, 'log');
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        
+        // Make console.log throw on second call (the cached data message)
+        consoleLogSpy.mockImplementationOnce(() => {}) // First call succeeds
+          .mockImplementationOnce(() => {
+            throw new Error('Cache read error');
+          });
+
+        const { result } = renderHook(() => useSodaLakeWind());
+
+        await act(async () => {
+          const loadResult = await result.current.loadCachedData();
+          expect(loadResult).toBe(false);
+        });
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '❌ Error loading cached Soda Lake data:',
+          expect.any(Error)
+        );
+
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+      });
     });
   });
 });

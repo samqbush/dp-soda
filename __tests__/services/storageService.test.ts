@@ -149,6 +149,19 @@ describe('StorageService Tests', () => {
         consoleWarnSpy.mockRestore();
       });
 
+      it('should handle fatal initialization errors', async () => {
+        // Mock setItem to throw an error at the very beginning
+        mockAsyncStorage.setItem.mockRejectedValue(new Error('Storage unavailable'));
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        const result = await initializeStorage();
+
+        expect(result).toBe(false);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('AsyncStorage test failed with error:', expect.any(Error));
+        
+        consoleErrorSpy.mockRestore();
+      });
+
       it('should handle Android timeout', async () => {
         mockPlatform.OS = 'android';
         mockAsyncStorage.getItem.mockImplementation(() => 
