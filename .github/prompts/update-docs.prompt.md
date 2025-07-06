@@ -1,6 +1,6 @@
 ---
 mode: 'agent'
-tools: ['file_search', 'semantic_search', 'read_file', 'list_dir', 'grep_search']
+tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runNotebooks', 'runTasks', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI']
 description: 'Update documentation for Dawn Patrol Alarm repository'
 ---
 

@@ -136,8 +136,7 @@ dp-react/
 │   └── ...                # Component files
 ├── hooks/                  # Custom React hooks
 │   ├── useWindData.ts     # Wind data fetching
-│   ├── useKatabaticAnalyzer.ts # Prediction logic
-│   └── ...                # Hook files
+│   └── ...                # Hook files (useWeatherData.ts removed)
 ├── services/               # Business logic and API services
 │   ├── weatherService.ts  # Weather API integration
 │   ├── alarmAudioService.ts # Audio/notification handling
@@ -170,25 +169,54 @@ dp-react/
 - API integrations (OpenWeatherMap, Ecowitt)
 - Data processing and analysis
 - Audio and notification services
-- Evening weather refresh service (automatic 6 PM data updates)
+- **Note**: Wind prediction services moved to server-based architecture
 
 ## Recent Major Updates
 
-### Mountain Wave-Katabatic Interaction (MKI) Integration (Phase 4)
-The prediction system has been enhanced with sophisticated atmospheric science based on research from "Interaction of Katabatic Flow and Mountain Waves":
+### Wind Guru Server Migration (June 30, 2025)
+The Wind Guru prediction system has been converted from a complex local prediction system to a server-based solution:
 
-- **Enhanced 6-Factor Analysis**: Upgraded from 4-factor to 6-factor prediction system
-- **New Services**: Added `mountainWaveAnalyzer.ts` for advanced atmospheric modeling
-- **Improved Accuracy**: 15-25% improvement target through MKI consideration
-- **Scientific Foundation**: First consumer implementation of MKI atmospheric research
+**Migration Overview:**
+- **Removed Local Prediction Logic**: Eliminated 3000+ lines of complex katabatic analysis code
+- **Simplified Client**: Wind Guru tab now shows server migration status and coming features
+- **Enhanced Performance**: Server-based predictions will provide faster and more accurate results
+- **Code Reduction**: 87% reduction in Wind Guru related code (from ~3000+ lines to ~400 lines)
 
-**Key Files:**
-- `services/mountainWaveAnalyzer.ts` - New MKI analysis engine
-- `services/katabaticAnalyzer.ts` - Enhanced with 6-factor system
-- `services/generalNotificationService.ts` - General purpose notification system
-- `services/eveningWeatherRefreshService.ts` - Automatic 6 PM weather data refresh
-- `docs/wind-prediction-guide.md` - Updated with comprehensive MKI theory and 6-factor system
-- `docs/architecture.md` - Updated with MKI service architecture details
+**Removed Services:**
+- `services/katabaticAnalyzer.ts` (1165 lines) - Main prediction algorithm
+- `services/predictionStateManager.ts` (~400 lines) - Locked prediction state management
+- `services/predictionTrackingService.ts` (~500 lines) - Accuracy tracking and outcomes
+- `services/eveningWeatherRefreshService.ts` (~300 lines) - Auto 6PM data refresh
+- `services/freeHistoricalWeatherService.ts` (~275 lines) - Historical weather enhancement
+- `hooks/useKatabaticAnalyzer.ts` (~200 lines) - React hook for prediction analysis
+
+**Simplified Files:**
+- `app/(tabs)/wind-guru.tsx` - From 2057 lines to ~400 lines (80% reduction)
+- `hooks/useWeatherData.ts` - **REMOVED** (was simplified from 977 to 152 lines, then removed entirely)
+- `app/_layout.tsx` - Removed wind prediction service initialization
+
+**Previous System (Removed):**
+- ~~Local 5-factor hybrid MKI analysis~~
+- ~~Real-time prediction state management~~
+- ~~Historical verification tracking~~
+- ~~Evening weather refresh automation~~
+- ~~Complex atmospheric stability calculations~~
+- ~~Thermal cycle temperature analysis~~
+- ~~Wave pattern enhancement detection~~
+
+**New System (In Development):**
+- Server-based katabatic wind analysis
+- Enhanced machine learning models
+- Improved atmospheric pattern recognition
+- Multi-location comparative analysis
+- Centralized prediction logic for better maintainability
+
+**Benefits of Server Migration:**
+1. **Reduced Client Complexity**: Massive code reduction and simplified architecture
+2. **Better Performance**: No local processing overhead, instant server results
+3. **Enhanced Accuracy**: Access to more comprehensive weather datasets and ML models
+4. **Improved Maintainability**: Centralized logic, easier updates and debugging
+5. **Scalability**: Server can handle complex calculations and real-time data processing
 
 ## Recent Improvements
 
@@ -499,6 +527,8 @@ The service automatically initializes when the app starts and requires notificat
 ## Prediction Lifecycle Management
 
 The app implements a robust prediction lifecycle management system to ensure wind predictions are locked at appropriate times and maintain consistency throughout the prediction window.
+
+> **📋 For complete workflow details, see [Wind Guru Prediction Workflow](./wind-guru-prediction-workflow.md)**
 
 ### Purpose
 The prediction lifecycle management solves timing issues where predictions would dramatically change after midnight due to forecast data transitions. It implements a structured approach to prediction reliability:

@@ -12,16 +12,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
-import { AppInitializer } from '@/components/AppInitializer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { GlobalCrashRecovery } from '@/components/GlobalCrashRecovery';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
-import { globalCrashHandler } from '@/services/globalCrashHandler';
-import { productionCrashDetector } from '@/services/productionCrashDetector';
 import { initializeStorage } from '@/services/storageService';
-import { eveningWeatherRefreshService } from '@/services/eveningWeatherRefreshService';
+
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
 // Ignore specific warnings in production builds
@@ -32,16 +28,6 @@ if (!__DEV__) {
     'AsyncStorage has been extracted from react-native',
   ]);
 }
-
-// Initialize global crash detection as early as possible
-globalCrashHandler.initialize().catch(error => 
-  console.error('Failed to initialize global crash handler:', error)
-);
-
-// Initialize production crash detector for APK debugging
-productionCrashDetector.initialize().catch(error =>
-  console.error('Failed to initialize production crash detector:', error)
-);
 
 // Keep the splash screen visible while we fetch resources
 // And set a safety timeout to ensure it doesn't get stuck
@@ -93,17 +79,6 @@ export default function RootLayout() {
           setInitError('Storage initialization failed');
         } else {
           console.log('✅ Storage initialization successful');
-          
-          // Initialize evening weather refresh service
-          console.log('🌅 Initializing evening weather refresh service...');
-          await eveningWeatherRefreshService.initialize();
-          console.log('✅ Evening weather refresh service initialized');
-          
-          // Initialize prediction state manager
-          console.log('🔮 Initializing prediction state manager...');
-          const { predictionStateManager } = await import('@/services/predictionStateManager');
-          await predictionStateManager.initialize();
-          console.log('✅ Prediction state manager initialized');
         }
         
       } catch (e) {
@@ -158,13 +133,6 @@ export default function RootLayout() {
     hideSplash();
   }, [loaded, isStorageInitialized]);
 
-  // Callback for when initialization completes (either normally or via timeout)
-  const handleInitialized = useCallback(() => {
-    if (!isStorageInitialized) {
-      setIsStorageInitialized(true);
-    }
-  }, [isStorageInitialized]);
-  
   // Minimum loading delay to ensure smooth transitions
   const [minimumLoadingComplete, setMinimumLoadingComplete] = useState(false);
   useEffect(() => {
@@ -177,12 +145,12 @@ export default function RootLayout() {
 
   // Normal initialization state - loading resources
   if ((!loaded || !isStorageInitialized || !minimumLoadingComplete) && !isStuck) {
-    // Use SafeAppLoader for Android, AppInitializer for iOS
+    // Use SafeAppLoader for Android, simple loading for iOS
     return Platform.OS === 'android' 
       ? <SafeAppLoader /> 
       : (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <AppInitializer onInitialized={handleInitialized} />
+          <Text>Loading...</Text>
         </View>
       );
   }
@@ -254,8 +222,6 @@ export default function RootLayout() {
             </ThemeProvider>
           </SettingsProvider>
         </ErrorBoundary>
-        {/* Global crash recovery overlay */}
-        <GlobalCrashRecovery />
       </AndroidSafeWrapper>
     </GestureHandlerRootView>
   );

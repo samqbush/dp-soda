@@ -80,23 +80,22 @@ interface WeatherService {
 4. Fall back to cached data if API fails
 5. Fall back to mock data if all else fails
 
-### Katabatic Analyzer (`hooks/useKatabaticAnalyzer.ts`)
+### Weather Data Functionality (Removed)
 
-**Purpose**: Advanced wind prediction using 6-factor MKI meteorological analysis
+**Note**: The `useWeatherData.ts` hook has been **removed** as weather prediction functionality has been migrated to server-side processing.
 
-**Analysis Factors**:
-1. **Precipitation Factor** (25%): Precipitation probability during dawn patrol
-2. **Sky Conditions Factor** (20%): Cloud cover during overnight cooling
-3. **Pressure Change Factor** (20%): Barometric pressure changes and wave-induced modifications
-4. **Temperature Differential Factor** (15%): Elevation-based temperature gradients
-5. **Wave Pattern Factor** (15%): Mountain wave enhancement using Froude number analysis
-6. **Atmospheric Stability Factor** (5%): Multi-layer stability for wave-katabatic coupling
+**Previous Features (Removed in Server Migration)**:
+- ~~Advanced wind prediction using 6-factor MKI meteorological analysis~~
+- ~~Local katabatic analysis factors (precipitation, sky conditions, pressure, temperature, wave patterns, atmospheric stability)~~
+- ~~MKI enhancement features and prediction tracking~~
 
-**MKI Enhancement Features**:
-- Enhanced bonus system for multiple favorable factors (4+ factors: 20%, 5+ factors: 45%, 6 factors: 55%)
-- Special MKI enhancement bonuses for positive wave conditions (+10% when confidence >70%)
-- Improved confidence calculation accounting for wave interactions
-- Nonlinear interaction modeling based on atmospheric research
+**Current Features**:
+- Basic weather data fetching from Open-Meteo API
+- Simple temperature differential calculations
+- Pressure trend analysis
+- Cache management and error handling
+
+**Server Migration**: Complex wind prediction logic moved to server infrastructure for enhanced performance and accuracy.
 
 **Calculation Process**:
 ```typescript
@@ -150,20 +149,20 @@ interface MountainWaveAnalysis {
 
 ## Data Flow
 
-### Primary Data Flow
+### Primary Data Flow (Simplified for Server-Based Predictions)
 
 ```
 User Interface
       ↓
-Custom Hooks (useWindData, useKatabaticAnalyzer)
+Custom Hooks (useWindData)
       ↓
 Weather Service
       ↓
 API/Cache/Mock Data
       ↓
-Data Processing & Analysis
+Basic Data Processing
       ↓
-State Updates (useReducer)
+State Updates
       ↓
 UI Re-render
 ```
@@ -173,9 +172,15 @@ UI Re-render
 1. **User opens app** → `useWindData` hook activates
 2. **Hook requests data** → `weatherService.getCurrentWeather()`
 3. **Service checks cache** → Valid? Return cached : Fetch new
-4. **Data processed** → `useKatabaticAnalyzer` calculates prediction
-5. **State updated** → `useWindAlarmReducer` manages state
+4. **Data processed** → Basic weather data formatting
+5. **State updated** → Simple state management
 6. **UI updates** → Components re-render with new data
+
+### Wind Guru Server Integration (Coming Soon)
+
+```
+Client Request → Server API → AI Analysis → Prediction Response → UI Update
+```
 
 ### Error Handling Flow
 

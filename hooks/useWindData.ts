@@ -206,13 +206,15 @@ export const useWindData = (): UseWindDataReturn => {
 
   // Load cached data and then refresh on mount
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     const initializeData = async () => {
       console.log('🚀 Initializing wind data...');
       let dataLoaded = false;
       
       try {
         // SAFETY: Ensure we never hang forever on initialization
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           if (!dataLoaded) {
             console.warn('⚠️ Wind data initialization timeout - setting error state');
             setError('Unable to load wind data. Please check your connection and try refreshing.');
@@ -241,16 +243,23 @@ export const useWindData = (): UseWindDataReturn => {
             setIsLoading(false);
           }
           dataLoaded = true;
+          if (timeoutId) clearTimeout(timeoutId); // Clear timeout when data is loaded
         }
       } catch (err) {
         console.error('💥 Fatal error during data initialization:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize wind data');
         setIsLoading(false);
         dataLoaded = true;
+        if (timeoutId) clearTimeout(timeoutId); // Clear timeout on error
       }
     };
     
     initializeData();
+    
+    // Cleanup function to clear timeout if component unmounts
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [loadCachedData, refreshData, criteria]);
 
   return {

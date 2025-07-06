@@ -1,4 +1,3 @@
-import { crashMonitor } from '@/services/crashMonitor';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { Component, ReactNode } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -55,7 +54,8 @@ export class DataCrashDetector extends Component<DataCrashDetectorProps, DataCra
     console.error('🚨 DataCrashDetector full error:', error, errorInfo);
     
     // Log to crash monitor
-    await crashMonitor.logCrash(this.props.componentName || 'Unknown', error);
+    // Log crash data to storage for debugging
+    console.error('💥 Data crash detected in', this.props.componentName || 'Unknown', error);
     
     const newCrashCount = this.state.crashCount + 1;
     const crashTime = new Date();

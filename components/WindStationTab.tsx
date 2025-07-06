@@ -14,9 +14,10 @@ import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
 import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useSimpleAlarm } from '@/hooks/useSimpleAlarm';
+import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
+import { assessWindDirection, getWindDirectionIndicator, getWindDirectionStatusText } from '@/utils/windDirectionUtils';
 import {
   formatLastUpdated,
   getCurrentWindSpeed,
@@ -51,7 +52,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   const cardColor = useThemeColor({}, 'card');
 
   // Get wind threshold for the chart's yellow line
-  const { windThreshold } = useSimpleAlarm();
+  const { windThreshold } = useWindThreshold();
 
   // Track if we've loaded data initially
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
@@ -147,9 +148,23 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
             </View>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Direction</ThemedText>
-              <ThemedText style={styles.conditionValue}>
-                {getWindDirectionText(currentWindDirection)} ({currentWindDirection?.toFixed(0) || '--'}°)
-              </ThemedText>
+              <View style={styles.windDirectionContainer}>
+                <ThemedText style={styles.conditionValue}>
+                  {getWindDirectionText(currentWindDirection)} ({currentWindDirection?.toFixed(0) || '--'}°)
+                </ThemedText>
+                {(() => {
+                  const windStatus = currentWindDirection !== null ? assessWindDirection(currentWindDirection, config.idealWindDirection) : null;
+                  const indicator = getWindDirectionIndicator(windStatus);
+                  const statusText = getWindDirectionStatusText(windStatus);
+                  
+                  return indicator ? (
+                    <View style={styles.windDirectionIndicator}>
+                      <ThemedText style={styles.windIndicatorEmoji}>{indicator}</ThemedText>
+                      <ThemedText style={styles.windIndicatorText}>{statusText}</ThemedText>
+                    </View>
+                  ) : null;
+                })()}
+              </View>
             </View>
             <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
@@ -182,6 +197,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
               timeWindow={getWindChartTimeWindow()}
               idealWindSpeed={windThreshold}
               showIdealLine={true}
+              idealWindDirection={config.idealWindDirection}
             />
           </View>
         ) : (
@@ -225,6 +241,46 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
                 <ThemedText style={styles.analysisLabel}>Good Points</ThemedText>
               </View>
             </View>
+            
+            {/* Wind Direction Status for Recent Analysis */}
+            {config.idealWindDirection && (() => {
+              // Calculate average direction from recent chart data (last hour)
+              const now = new Date();
+              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+              const recentPoints = chartData.filter(point => {
+                const pointTime = new Date(point.time);
+                return pointTime >= oneHourAgo;
+              });
+              
+              if (recentPoints.length > 0) {
+                // Calculate circular mean of wind directions
+                let sumSin = 0, sumCos = 0;
+                recentPoints.forEach(point => {
+                  const dir = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
+                  if (!isNaN(dir)) {
+                    const radians = (dir * Math.PI) / 180;
+                    sumSin += Math.sin(radians);
+                    sumCos += Math.cos(radians);
+                  }
+                });
+                
+                const avgDirection = Math.atan2(sumSin, sumCos) * 180 / Math.PI;
+                const normalizedDirection = avgDirection < 0 ? avgDirection + 360 : avgDirection;
+                const windStatus = assessWindDirection(normalizedDirection, config.idealWindDirection);
+                const indicator = getWindDirectionIndicator(windStatus);
+                const statusText = getWindDirectionStatusText(windStatus);
+                
+                return indicator ? (
+                  <View style={styles.analysisDirectionIndicator}>
+                    <ThemedText style={styles.analysisDirectionText}>
+                      Recent direction: {getWindDirectionText(normalizedDirection)} ({normalizedDirection.toFixed(0)}°) {indicator} {statusText}
+                    </ThemedText>
+                  </View>
+                ) : null;
+              }
+              return null;
+            })()}
+            
             <ThemedText style={styles.analysisDescription}>
               {analysis.analysis}
             </ThemedText>
@@ -425,6 +481,34 @@ const styles = StyleSheet.create({
   conditionValue: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  windDirectionContainer: {
+    flexDirection: 'column',
+  },
+  windDirectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  windIndicatorEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  windIndicatorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4CAF50',
+  },
+  analysisDirectionIndicator: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  analysisDirectionText: {
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.9,
   },
   freshnessMessage: {
     marginTop: 8,
