@@ -62,11 +62,10 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
     React.useCallback(() => {
       if (!hasInitiallyLoaded) {
         console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
-        refreshData();
-        refreshCurrentConditions();
+        refreshData(); // This calls refreshCurrentConditions() internally, no need for duplicate call
         setHasInitiallyLoaded(true);
       }
-    }, [hasInitiallyLoaded, refreshData, refreshCurrentConditions, config.name])
+    }, [hasInitiallyLoaded, refreshData, config.name])
   );
 
   const handleRefresh = async () => {
