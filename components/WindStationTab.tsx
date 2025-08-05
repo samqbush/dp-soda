@@ -9,7 +9,6 @@ import {
   View
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
@@ -17,7 +16,7 @@ import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
-import { getGlobalSessionId } from '@/utils/sessionUtils';
+import { getGlobalSessionId, hasBeenInitiallyLoaded, markAsInitiallyLoaded } from '@/utils/sessionUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import { assessWindDirection, getWindDirectionIndicator, getWindDirectionStatusText } from '@/utils/windDirectionUtils';
 import {
@@ -58,16 +57,14 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
 
   // Track if we've loaded data initially - persist across component remounts using global session
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
+  const [isCheckingInitialStatus, setIsCheckingInitialStatus] = React.useState(true);
 
-  // Check if data was already loaded in this global session
+  // Check if data was already loaded in this global session using dual persistence
   React.useEffect(() => {
     const checkInitialLoadStatus = async () => {
       try {
-        const globalSessionId = getGlobalSessionId();
-        const key = `initialLoad_${config.name}_${globalSessionId}`;
-        console.log(`🔍 Checking initial load status with key: ${key}`);
-        const hasLoaded = await AsyncStorage.getItem(key);
-        if (hasLoaded === 'true') {
+        const hasLoaded = await hasBeenInitiallyLoaded(config.name);
+        if (hasLoaded) {
           console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
           setHasInitiallyLoaded(true);
         } else {
@@ -75,21 +72,20 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
         }
       } catch (error) {
         console.warn('Failed to check initial load status:', error);
+      } finally {
+        setIsCheckingInitialStatus(false);
       }
     };
     checkInitialLoadStatus();
   }, [config.name]);
 
-  // Persist initial load status using global session
-  const markAsInitiallyLoaded = React.useCallback(async () => {
+  // Mark tab as initially loaded using dual persistence
+  const handleMarkAsInitiallyLoaded = React.useCallback(async () => {
     try {
-      const globalSessionId = getGlobalSessionId();
-      const key = `initialLoad_${config.name}_${globalSessionId}`;
-      console.log(`💾 Marking ${config.name} as initially loaded with key: ${key}`);
-      await AsyncStorage.setItem(key, 'true');
+      await markAsInitiallyLoaded(config.name);
       setHasInitiallyLoaded(true);
     } catch (error) {
-      console.warn('Failed to persist initial load status:', error);
+      console.warn('Failed to mark as initially loaded:', error);
       setHasInitiallyLoaded(true); // Fallback to in-memory state
     }
   }, [config.name]);
@@ -97,12 +93,13 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   // Only refresh data on first navigation to the tab
   useFocusEffect(
     React.useCallback(() => {
-      if (!hasInitiallyLoaded) {
+      // Wait for the initial status check to complete before making loading decisions
+      if (!isCheckingInitialStatus && !hasInitiallyLoaded) {
         console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
         refreshData(); // This calls refreshCurrentConditions() internally, no need for duplicate call
-        markAsInitiallyLoaded();
+        handleMarkAsInitiallyLoaded();
       }
-    }, [hasInitiallyLoaded, refreshData, config.name, markAsInitiallyLoaded])
+    }, [isCheckingInitialStatus, hasInitiallyLoaded, refreshData, config.name, handleMarkAsInitiallyLoaded])
   );
 
   const handleRefresh = async () => {

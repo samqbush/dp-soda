@@ -17,6 +17,7 @@ import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
 import { initializeStorage } from '@/services/storageService';
+import { getGlobalSessionId } from '@/utils/sessionUtils';
 
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
@@ -79,6 +80,9 @@ export default function RootLayout() {
           setInitError('Storage initialization failed');
         } else {
           console.log('✅ Storage initialization successful');
+          
+          // Initialize global session for component remount persistence
+          await getGlobalSessionId();
         }
         
       } catch (e) {
