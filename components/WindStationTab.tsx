@@ -9,6 +9,7 @@ import {
   View
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomWindChart } from '@/components/CustomWindChart';
@@ -54,8 +55,37 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   // Get wind threshold for the chart's yellow line
   const { windThreshold } = useWindThreshold();
 
-  // Track if we've loaded data initially
+  // Track if we've loaded data initially - persist across component remounts
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
+  const [sessionId] = React.useState(() => Date.now().toString());
+
+  // Check if data was already loaded in this session
+  React.useEffect(() => {
+    const checkInitialLoadStatus = async () => {
+      try {
+        const key = `initialLoad_${config.name}_${sessionId}`;
+        const hasLoaded = await AsyncStorage.getItem(key);
+        if (hasLoaded === 'true') {
+          setHasInitiallyLoaded(true);
+        }
+      } catch (error) {
+        console.warn('Failed to check initial load status:', error);
+      }
+    };
+    checkInitialLoadStatus();
+  }, [config.name, sessionId]);
+
+  // Persist initial load status
+  const markAsInitiallyLoaded = React.useCallback(async () => {
+    try {
+      const key = `initialLoad_${config.name}_${sessionId}`;
+      await AsyncStorage.setItem(key, 'true');
+      setHasInitiallyLoaded(true);
+    } catch (error) {
+      console.warn('Failed to persist initial load status:', error);
+      setHasInitiallyLoaded(true); // Fallback to in-memory state
+    }
+  }, [config.name, sessionId]);
 
   // Only refresh data on first navigation to the tab
   useFocusEffect(
@@ -63,9 +93,9 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
       if (!hasInitiallyLoaded) {
         console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
         refreshData(); // This calls refreshCurrentConditions() internally, no need for duplicate call
-        setHasInitiallyLoaded(true);
+        markAsInitiallyLoaded();
       }
-    }, [hasInitiallyLoaded, refreshData, config.name])
+    }, [hasInitiallyLoaded, refreshData, config.name, markAsInitiallyLoaded])
   );
 
   const handleRefresh = async () => {
