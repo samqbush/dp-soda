@@ -17,6 +17,7 @@ import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
+import { getGlobalSessionId } from '@/utils/sessionUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import { assessWindDirection, getWindDirectionIndicator, getWindDirectionStatusText } from '@/utils/windDirectionUtils';
 import {
@@ -55,37 +56,43 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   // Get wind threshold for the chart's yellow line
   const { windThreshold } = useWindThreshold();
 
-  // Track if we've loaded data initially - persist across component remounts
+  // Track if we've loaded data initially - persist across component remounts using global session
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
-  const [sessionId] = React.useState(() => Date.now().toString());
 
-  // Check if data was already loaded in this session
+  // Check if data was already loaded in this global session
   React.useEffect(() => {
     const checkInitialLoadStatus = async () => {
       try {
-        const key = `initialLoad_${config.name}_${sessionId}`;
+        const globalSessionId = getGlobalSessionId();
+        const key = `initialLoad_${config.name}_${globalSessionId}`;
+        console.log(`🔍 Checking initial load status with key: ${key}`);
         const hasLoaded = await AsyncStorage.getItem(key);
         if (hasLoaded === 'true') {
+          console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
           setHasInitiallyLoaded(true);
+        } else {
+          console.log(`🆕 No existing load status found for ${config.name} - will load on focus`);
         }
       } catch (error) {
         console.warn('Failed to check initial load status:', error);
       }
     };
     checkInitialLoadStatus();
-  }, [config.name, sessionId]);
+  }, [config.name]);
 
-  // Persist initial load status
+  // Persist initial load status using global session
   const markAsInitiallyLoaded = React.useCallback(async () => {
     try {
-      const key = `initialLoad_${config.name}_${sessionId}`;
+      const globalSessionId = getGlobalSessionId();
+      const key = `initialLoad_${config.name}_${globalSessionId}`;
+      console.log(`💾 Marking ${config.name} as initially loaded with key: ${key}`);
       await AsyncStorage.setItem(key, 'true');
       setHasInitiallyLoaded(true);
     } catch (error) {
       console.warn('Failed to persist initial load status:', error);
       setHasInitiallyLoaded(true); // Fallback to in-memory state
     }
-  }, [config.name, sessionId]);
+  }, [config.name]);
 
   // Only refresh data on first navigation to the tab
   useFocusEffect(
