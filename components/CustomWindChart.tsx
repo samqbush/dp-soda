@@ -158,50 +158,48 @@ export function CustomWindChart({
     return '';
   };
 
-  // Generate label positions
-  const labelData = recentData
+  // Generate label positions with smart spacing
+  const minLabelSpacing = 60; // Minimum pixels between labels to prevent crowding
+  const allPotentialLabels = recentData
     .map((point, index) => {
       const time = new Date(point.time);
       const label = formatTimeLabel(time, index);
-      if (label) {
-        return {
-          x: padding.left + index * xScale,
-          y: chartHeight - padding.bottom + 20,
-          label,
-          index
-        };
-      }
-      return null;
-    })
-    .filter(Boolean);
+      return {
+        x: padding.left + index * xScale,
+        y: chartHeight - padding.bottom + 20,
+        label: label || time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        index,
+        isHourMark: time.getMinutes() === 0 && label !== '' // Prioritize clean hour marks
+      };
+    });
 
-  // Always include first and last labels if not already included
-  if (labelData.length > 0) {
-    const firstTime = new Date(recentData[0].time);
-    const lastTime = new Date(recentData[recentData.length - 1].time);
-    
-    // Add first label if not present
-    if (labelData[0]?.index !== 0) {
-      const firstLabel = formatTimeLabel(firstTime, 0) || firstTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      labelData.unshift({
-        x: padding.left,
-        y: chartHeight - padding.bottom + 20,
-        label: firstLabel,
-        index: 0
-      });
+  // Smart label selection: prioritize hour marks and maintain spacing
+  const labelData: Array<{x: number, y: number, label: string, index: number}> = [];
+  
+  allPotentialLabels.forEach((potential, i) => {
+    // Always include the first label
+    if (i === 0) {
+      labelData.push(potential);
+      return;
     }
     
-    // Add last label if not present
-    if (labelData[labelData.length - 1]?.index !== recentData.length - 1) {
-      const lastLabel = formatTimeLabel(lastTime, recentData.length - 1) || lastTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      labelData.push({
-        x: padding.left + (recentData.length - 1) * xScale,
-        y: chartHeight - padding.bottom + 20,
-        label: lastLabel,
-        index: recentData.length - 1
-      });
+    // For hour marks, check if there's enough space from the last added label
+    if (potential.isHourMark) {
+      const lastLabel = labelData[labelData.length - 1];
+      if (potential.x - lastLabel.x >= minLabelSpacing) {
+        labelData.push(potential);
+        return;
+      }
     }
-  }
+    
+    // For the last label, only add if it's far enough from the previous label and not an hour mark
+    if (i === allPotentialLabels.length - 1) {
+      const lastLabel = labelData[labelData.length - 1];
+      if (potential.x - lastLabel.x >= minLabelSpacing && !potential.isHourMark) {
+        labelData.push(potential);
+      }
+    }
+  });
 
   console.log('📊 Chart labels:', labelData.map(l => l?.label).join(', '));
 
