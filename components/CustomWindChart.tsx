@@ -82,7 +82,7 @@ export function CustomWindChart({
 
   // Chart dimensions
   const screenWidth = Dimensions.get('window').width;
-  const chartHeight = 240;
+  const chartHeight = 360;
   const padding = { top: 20, bottom: 60, left: 50, right: 20 };
   
   // Calculate chart width based on time span for proper label spacing
@@ -463,7 +463,7 @@ export function CustomWindChart({
                   key={`x-label-${index}`}
                   x={label!.x}
                   y={label!.y}
-                  fontSize={12}
+                  fontSize={14}
                   fill={textColor}
                   textAnchor="middle"
                   fontWeight="bold"
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   yLabelText: {
-    fontSize: 12,
+    fontSize: 14,
     opacity: 0.8,
     textAlign: 'right',
   },
@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   legendText: {
-    fontSize: 12,
+    fontSize: 14,
     opacity: 0.8,
   },
 });
