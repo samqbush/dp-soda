@@ -81,6 +81,40 @@ npx expo start --tunnel
 
 ## Development Workflow
 
+### Android Development Setup
+
+**⚠️ Important: Always ensure Android emulator is running before starting development**
+
+#### Quick Android Setup Check
+```bash
+# Check your Android development environment
+npm run android-setup
+```
+
+#### Safe Android Development (Recommended)
+```bash
+# Automatically starts emulator if needed, then runs the app
+npm run android-safe
+```
+
+#### Manual Android Development
+```bash
+# 1. Start emulator manually (if not already running)
+emulator -avd YourEmulatorName
+
+# 2. Verify device is connected
+adb devices
+
+# 3. Run the app
+npm run android
+```
+
+**Common Android Issues & Solutions:**
+- **"No Android connected device found"** → Use `npm run android-safe` instead
+- **Emulator not detected** → Ensure `ANDROID_HOME` and `ANDROID_SDK_ROOT` are set
+- **ADB not found** → Add `$ANDROID_HOME/platform-tools` to PATH
+- **Emulator command not found** → Add `$ANDROID_HOME/emulator` to PATH
+
 ### Daily Development
 
 1. **Start the development server**
@@ -90,7 +124,7 @@ npx expo start --tunnel
 
 2. **Choose your development platform**
    - Press `i` for iOS Simulator
-   - Press `a` for Android Emulator  
+   - Press `a` for Android Emulator (ensure emulator is running first!)
    - Scan QR code with Expo Go app on physical device
 
 3. **Live reload** - Changes automatically refresh the app
