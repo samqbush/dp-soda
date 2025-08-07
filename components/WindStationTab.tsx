@@ -71,12 +71,24 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
           console.log(`🆕 No existing load status found for ${config.name} - will load on focus`);
         }
       } catch (error) {
-        console.warn('Failed to check initial load status:', error);
+        console.warn('Failed to check initial load status, will load data anyway:', error);
+        // On error, allow data loading to proceed normally
       } finally {
         setIsCheckingInitialStatus(false);
       }
     };
-    checkInitialLoadStatus();
+    
+    // Add timeout as safety net to prevent hanging
+    const timeoutId = setTimeout(() => {
+      console.warn(`⏰ Initial load status check timeout for ${config.name}, proceeding with data load`);
+      setIsCheckingInitialStatus(false);
+    }, 2000); // 2 second timeout
+    
+    checkInitialLoadStatus().finally(() => {
+      clearTimeout(timeoutId);
+    });
+    
+    return () => clearTimeout(timeoutId);
   }, [config.name]);
 
   // Mark tab as initially loaded using dual persistence
@@ -101,6 +113,19 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
       }
     }, [isCheckingInitialStatus, hasInitiallyLoaded, refreshData, config.name, handleMarkAsInitiallyLoaded])
   );
+
+  // Safety net: If we have no data after a reasonable time, try loading anyway
+  React.useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (!isCheckingInitialStatus && !hasInitiallyLoaded && windData.length === 0 && !isLoading) {
+        console.warn(`🚨 Safety net triggered for ${config.name} - no data found, forcing refresh`);
+        refreshData();
+        handleMarkAsInitiallyLoaded();
+      }
+    }, 5000); // 5 second safety net
+
+    return () => clearTimeout(safetyTimeout);
+  }, [isCheckingInitialStatus, hasInitiallyLoaded, windData.length, isLoading, refreshData, handleMarkAsInitiallyLoaded, config.name]);
 
   const handleRefresh = async () => {
     await refreshData();

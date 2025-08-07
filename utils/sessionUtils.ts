@@ -63,28 +63,33 @@ export function getGlobalSessionIdSync(): string {
  * 2. If not found, check AsyncStorage (survives some types of app resets)
  */
 export async function hasBeenInitiallyLoaded(tabName: string): Promise<boolean> {
-  const sessionId = await getGlobalSessionId();
-  const key = `initialLoad_${tabName}_${sessionId}`;
-  
-  // First check in-memory cache
-  if (initialLoadStatusCache.has(key)) {
-    const status = initialLoadStatusCache.get(key)!;
-    console.log(`🔍 Found in-memory load status for ${tabName}: ${status}`);
-    return status;
-  }
-  
-  // If not in memory, check AsyncStorage
   try {
-    const storedStatus = await AsyncStorage.getItem(key);
-    const hasLoaded = storedStatus === 'true';
-    console.log(`🔍 Checking AsyncStorage load status for ${tabName} with key ${key}: ${hasLoaded}`);
+    const sessionId = await getGlobalSessionId();
+    const key = `initialLoad_${tabName}_${sessionId}`;
     
-    // Cache the result in memory for faster future access
-    initialLoadStatusCache.set(key, hasLoaded);
+    // First check in-memory cache
+    if (initialLoadStatusCache.has(key)) {
+      const status = initialLoadStatusCache.get(key)!;
+      console.log(`🔍 Found in-memory load status for ${tabName}: ${status}`);
+      return status;
+    }
     
-    return hasLoaded;
+    // If not in memory, check AsyncStorage
+    try {
+      const storedStatus = await AsyncStorage.getItem(key);
+      const hasLoaded = storedStatus === 'true';
+      console.log(`🔍 Checking AsyncStorage load status for ${tabName} with key ${key}: ${hasLoaded}`);
+      
+      // Cache the result in memory for faster future access
+      initialLoadStatusCache.set(key, hasLoaded);
+      
+      return hasLoaded;
+    } catch (storageError) {
+      console.warn('AsyncStorage check failed, falling back to in-memory only:', storageError);
+      return false;
+    }
   } catch (error) {
-    console.warn('Failed to check AsyncStorage load status:', error);
+    console.error('Failed to check load status for', tabName, ':', error);
     return false;
   }
 }
@@ -95,28 +100,33 @@ export async function hasBeenInitiallyLoaded(tabName: string): Promise<boolean> 
  * 2. Store in AsyncStorage (backup persistence)
  */
 export async function markAsInitiallyLoaded(tabName: string): Promise<void> {
-  const sessionId = await getGlobalSessionId();
-  const key = `initialLoad_${tabName}_${sessionId}`;
-  
-  console.log(`💾 Marking ${tabName} as initially loaded with key: ${key}`);
-  
-  // Store in in-memory cache first (most reliable)
-  initialLoadStatusCache.set(key, true);
-  console.log(`✅ Stored in memory cache for ${tabName}`);
-  
-  // Also store in AsyncStorage as backup
   try {
-    await AsyncStorage.setItem(key, 'true');
+    const sessionId = await getGlobalSessionId();
+    const key = `initialLoad_${tabName}_${sessionId}`;
     
-    // Verify storage
-    const verification = await AsyncStorage.getItem(key);
-    console.log(`🔍 AsyncStorage verification for ${key}: ${verification}`);
+    console.log(`💾 Marking ${tabName} as initially loaded with key: ${key}`);
     
-    if (verification !== 'true') {
-      console.warn(`⚠️ AsyncStorage verification failed for ${key}`);
+    // Store in in-memory cache first (most reliable)
+    initialLoadStatusCache.set(key, true);
+    console.log(`✅ Stored in memory cache for ${tabName}`);
+    
+    // Also store in AsyncStorage as backup
+    try {
+      await AsyncStorage.setItem(key, 'true');
+      
+      // Verify storage
+      const verification = await AsyncStorage.getItem(key);
+      console.log(`🔍 AsyncStorage verification for ${key}: ${verification}`);
+      
+      if (verification !== 'true') {
+        console.warn(`⚠️ AsyncStorage verification failed for ${key}`);
+      }
+    } catch (storageError) {
+      console.warn('AsyncStorage persistence failed (in-memory cache still available):', storageError);
     }
   } catch (error) {
-    console.warn('Failed to persist to AsyncStorage (in-memory cache still available):', error);
+    console.error('Failed to mark as initially loaded for', tabName, ':', error);
+    // Don't throw - this shouldn't prevent the app from working
   }
 }
 
