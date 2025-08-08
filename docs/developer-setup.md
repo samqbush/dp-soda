@@ -97,6 +97,14 @@ npm run android-setup
 npm run android-safe
 ```
 
+**⚠️ VS Code Task Environment Issue:**  
+If you encounter Java Runtime errors when running the VS Code task, use the terminal directly:
+```bash
+# Run directly in terminal (bypasses VS Code environment issues)
+npx expo run:android
+```
+This works because your shell environment (with Java from sdkman) is properly loaded in the terminal but may not be inherited by VS Code tasks.
+
 #### Manual Android Development
 ```bash
 # 1. Start emulator manually (if not already running)
@@ -110,6 +118,7 @@ npm run android
 ```
 
 **Common Android Issues & Solutions:**
+- **"Unable to locate a Java Runtime"** → Run `npx expo run:android` directly in terminal instead of using VS Code tasks
 - **"No Android connected device found"** → Use `npm run android-safe` instead
 - **Emulator not detected** → Ensure `ANDROID_HOME` and `ANDROID_SDK_ROOT` are set
 - **ADB not found** → Add `$ANDROID_HOME/platform-tools` to PATH

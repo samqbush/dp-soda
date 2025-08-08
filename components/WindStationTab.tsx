@@ -16,7 +16,7 @@ import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
-import { getGlobalSessionId, hasBeenInitiallyLoaded, markAsInitiallyLoaded } from '@/utils/sessionUtils';
+import { hasBeenInitiallyLoaded, markAsInitiallyLoaded } from '@/utils/sessionUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import { assessWindDirection, getWindDirectionIndicator, getWindDirectionStatusText } from '@/utils/windDirectionUtils';
 import {
@@ -59,11 +59,11 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
   const [isCheckingInitialStatus, setIsCheckingInitialStatus] = React.useState(true);
 
-  // Check if data was already loaded in this global session using dual persistence
+  // Check if data was already loaded in this global session (simplified in-memory check)
   React.useEffect(() => {
-    const checkInitialLoadStatus = async () => {
+    const checkInitialLoadStatus = () => {
       try {
-        const hasLoaded = await hasBeenInitiallyLoaded(config.name);
+        const hasLoaded = hasBeenInitiallyLoaded(config.name);
         if (hasLoaded) {
           console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
           setHasInitiallyLoaded(true);
@@ -78,23 +78,14 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
       }
     };
     
-    // Add timeout as safety net to prevent hanging
-    const timeoutId = setTimeout(() => {
-      console.warn(`⏰ Initial load status check timeout for ${config.name}, proceeding with data load`);
-      setIsCheckingInitialStatus(false);
-    }, 2000); // 2 second timeout
-    
-    checkInitialLoadStatus().finally(() => {
-      clearTimeout(timeoutId);
-    });
-    
-    return () => clearTimeout(timeoutId);
+    // No timeout needed since we're not using AsyncStorage
+    checkInitialLoadStatus();
   }, [config.name]);
 
-  // Mark tab as initially loaded using dual persistence
-  const handleMarkAsInitiallyLoaded = React.useCallback(async () => {
+  // Mark tab as initially loaded (simplified in-memory operation)
+  const handleMarkAsInitiallyLoaded = React.useCallback(() => {
     try {
-      await markAsInitiallyLoaded(config.name);
+      markAsInitiallyLoaded(config.name);
       setHasInitiallyLoaded(true);
     } catch (error) {
       console.warn('Failed to mark as initially loaded:', error);

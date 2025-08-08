@@ -20,8 +20,6 @@
     "increment-version": "node scripts/increment-version.mjs",
     "debug-stations": "node scripts/debug-dp-stations.mjs",
     "debug-transmission": "node scripts/DEBUG-transmission-quality-analysis.mjs",
-    "android-setup": "scripts/android-setup.sh",
-    "android-safe": "scripts/android-safe.sh",
     "prepare": "husky"
   },
   "dependencies": {
