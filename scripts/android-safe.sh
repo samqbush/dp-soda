@@ -14,6 +14,12 @@ fi
 # Set compatibility variables
 export ANDROID_SDK_ROOT=$ANDROID_HOME
 
+# Add Android tools to PATH
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/tools/bin
+
 # Function to check if emulator is running
 check_emulator() {
     adb devices 2>/dev/null | grep -q "emulator.*device"
@@ -81,4 +87,4 @@ echo "🚀 Starting Expo Android development..."
 echo "   (Press Ctrl+C to stop)"
 
 # Start the React Native development server
-exec expo run:android
+exec npx expo run:android

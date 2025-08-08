@@ -6,6 +6,11 @@
 echo "🤖 Android Development Setup Checker"
 echo "===================================="
 
+# Load environment variables from .env file
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
 # Check if Android SDK is available
 if [ -z "$ANDROID_HOME" ]; then
     echo "❌ ANDROID_HOME not set"
@@ -17,6 +22,12 @@ echo "✅ ANDROID_HOME: $ANDROID_HOME"
 
 # Set ANDROID_SDK_ROOT for compatibility
 export ANDROID_SDK_ROOT=$ANDROID_HOME
+
+# Add Android tools to PATH
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/tools/bin
 
 # Check if emulator command exists
 if ! command -v emulator &> /dev/null; then
