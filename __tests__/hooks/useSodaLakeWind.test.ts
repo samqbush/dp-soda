@@ -132,19 +132,26 @@ describe('useSodaLakeWind Hook Tests', () => {
   });
 
   describe('Hook Initialization', () => {
-    it('should initialize with default values', () => {
+    it('should initialize with loading state and automatically fetch data', async () => {
       const { result } = renderHook(() => useSodaLakeWind());
 
+      // Initial state should have loading = true since we auto-fetch data
       expect(result.current.windData).toEqual([]);
       expect(result.current.chartData).toEqual(mockChartData); // From convertToWindDataPoint
       expect(result.current.currentConditions).toBeNull();
       expect(result.current.analysis).toBeNull();
       expect(result.current.transmissionQuality).toBeNull();
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isLoading).toBe(true); // Changed: Now starts loading automatically
       expect(result.current.isLoadingCurrent).toBe(false);
       expect(result.current.error).toBeNull();
       expect(result.current.lastUpdated).toBeNull();
       expect(result.current.currentConditionsUpdated).toBeNull();
+
+      // Wait for automatic data loading to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.windData).toEqual(mockEcowittWindData);
+      });
     });
 
     it('should load user criteria on mount', async () => {
@@ -165,8 +172,11 @@ describe('useSodaLakeWind Hook Tests', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error loading user criteria:', expect.any(Error));
       });
 
-      // Should still initialize normally
-      expect(result.current.windData).toEqual([]);
+      // Should still automatically load data despite criteria loading error
+      await waitFor(() => {
+        expect(result.current.windData).toEqual(mockEcowittWindData);
+        expect(result.current.isLoading).toBe(false);
+      });
       
       consoleErrorSpy.mockRestore();
     });
@@ -538,15 +548,11 @@ describe('useSodaLakeWind Hook Tests', () => {
     it('should handle complete workflow successfully', async () => {
       const { result } = renderHook(() => useSodaLakeWind());
 
-      // Initialize
+      // Initialize - should start loading automatically
       expect(result.current.windData).toEqual([]);
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isLoading).toBe(true); // Changed: Now starts loading automatically
 
-      // Refresh data
-      await waitFor(async () => {
-        await result.current.refreshData();
-      });
-
+      // Wait for automatic initial data load to complete
       await waitFor(() => {
         expect(result.current.windData).toEqual(mockEcowittWindData);
         expect(result.current.analysis).toEqual(mockWindAnalysis);
@@ -556,6 +562,16 @@ describe('useSodaLakeWind Hook Tests', () => {
         expect(result.current.currentConditionsUpdated).toBeInstanceOf(Date);
         expect(result.current.isLoading).toBe(false);
         expect(result.current.error).toBeNull();
+      });
+
+      // Manual refresh should still work
+      await waitFor(async () => {
+        await result.current.refreshData();
+      });
+
+      await waitFor(() => {
+        expect(result.current.windData).toEqual(mockEcowittWindData);
+        expect(result.current.isLoading).toBe(false);
       });
 
       // Clear cache

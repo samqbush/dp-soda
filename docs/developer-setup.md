@@ -81,6 +81,49 @@ npx expo start --tunnel
 
 ## Development Workflow
 
+### Android Development Setup
+
+**⚠️ Important: Always ensure Android emulator is running before starting development**
+
+#### Quick Android Setup Check
+```bash
+# Check your Android development environment
+npm run android-setup
+```
+
+#### Safe Android Development (Recommended)
+```bash
+# Automatically starts emulator if needed, then runs the app
+npm run android-safe
+```
+
+**⚠️ VS Code Task Environment Issue:**  
+If you encounter Java Runtime errors when running the VS Code task, use the terminal directly:
+```bash
+# Run directly in terminal (bypasses VS Code environment issues)
+npx expo run:android
+```
+This works because your shell environment (with Java from sdkman) is properly loaded in the terminal but may not be inherited by VS Code tasks.
+
+#### Manual Android Development
+```bash
+# 1. Start emulator manually (if not already running)
+emulator -avd YourEmulatorName
+
+# 2. Verify device is connected
+adb devices
+
+# 3. Run the app
+npm run android
+```
+
+**Common Android Issues & Solutions:**
+- **"Unable to locate a Java Runtime"** → Run `npx expo run:android` directly in terminal instead of using VS Code tasks
+- **"No Android connected device found"** → Use `npm run android-safe` instead
+- **Emulator not detected** → Ensure `ANDROID_HOME` and `ANDROID_SDK_ROOT` are set
+- **ADB not found** → Add `$ANDROID_HOME/platform-tools` to PATH
+- **Emulator command not found** → Add `$ANDROID_HOME/emulator` to PATH
+
 ### Daily Development
 
 1. **Start the development server**
@@ -90,7 +133,7 @@ npx expo start --tunnel
 
 2. **Choose your development platform**
    - Press `i` for iOS Simulator
-   - Press `a` for Android Emulator  
+   - Press `a` for Android Emulator (ensure emulator is running first!)
    - Scan QR code with Expo Go app on physical device
 
 3. **Live reload** - Changes automatically refresh the app

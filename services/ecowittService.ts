@@ -10,6 +10,60 @@ import {
 // Ecowitt API constants
 const BASE_URL = 'https://api.ecowitt.net/api/v3';
 
+// Request deduplication system
+interface PendingRequest {
+  promise: Promise<any>;
+  timestamp: number;
+}
+
+const pendingRequests = new Map<string, PendingRequest>();
+const REQUEST_CACHE_TTL = 30000; // 30 seconds TTL for request deduplication
+
+/**
+ * Generate a cache key for API requests to enable deduplication
+ */
+function generateRequestKey(endpoint: string, params: any): string {
+  const sortedParams = Object.keys(params)
+    .sort()
+    .map(key => `${key}=${params[key]}`)
+    .join('&');
+  return `${endpoint}?${sortedParams}`;
+}
+
+/**
+ * Deduplicate API requests to prevent multiple simultaneous calls for the same data
+ */
+async function deduplicateRequest<T>(
+  key: string, 
+  requestFn: () => Promise<T>
+): Promise<T> {
+  const now = Date.now();
+  
+  // Clean up expired requests
+  for (const [cacheKey, request] of pendingRequests.entries()) {
+    if (now - request.timestamp > REQUEST_CACHE_TTL) {
+      pendingRequests.delete(cacheKey);
+    }
+  }
+  
+  // Check if we already have this request pending
+  const existing = pendingRequests.get(key);
+  if (existing) {
+    console.log(`🔄 Request deduplication: Using existing request for ${key}`);
+    return existing.promise;
+  }
+  
+  // Create new request
+  console.log(`🆕 Request deduplication: Creating new request for ${key}`);
+  const promise = requestFn().finally(() => {
+    // Clean up after request completes
+    pendingRequests.delete(key);
+  });
+  
+  pendingRequests.set(key, { promise, timestamp: now });
+  return promise;
+}
+
 export interface EcowittWindDataPoint {
   time: string;
   timestamp: number;
@@ -762,12 +816,16 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
 export async function fetchEcowittWindDataForDevice(deviceName: string): Promise<EcowittWindDataPoint[]> {
   console.log(`🌬️ Fetching Ecowitt wind data for ${deviceName}...`);
   
-  try {
-    const config = await getAutoEcowittConfigForDevice(deviceName);
-    
-    // Format dates as YYYY-MM-DD HH:MM:SS in device timezone
-    // The device is in America/Denver timezone, and the API expects dates in device local time
-    const formatEcowittDate = (date: Date): string => {
+  // Use request deduplication to prevent multiple simultaneous API calls
+  const requestKey = `history_${deviceName}_${new Date().toDateString()}`;
+  
+  return deduplicateRequest(requestKey, async () => {
+    try {
+      const config = await getAutoEcowittConfigForDevice(deviceName);
+      
+      // Format dates as YYYY-MM-DD HH:MM:SS in device timezone
+      // The device is in America/Denver timezone, and the API expects dates in device local time
+      const formatEcowittDate = (date: Date): string => {
       // Convert to Mountain Time for the API request
       
       // Fallback implementation for Android devices without Intl support
@@ -934,23 +992,24 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     
     return windDataPoints;
 
-  } catch (error) {
-    console.error(`❌ Error fetching Ecowitt wind data for ${deviceName}:`, error);
-    
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        throw new Error('Network connection failed. Please check your internet connection.');
-      } else if (error.response?.status === 401) {
-        throw new Error(`Invalid API credentials for ${deviceName} data.`);
-      } else if (error.response?.status === 429) {
-        throw new Error('API rate limit exceeded. Please try again later.');
-      } else if (error.response && error.response.status >= 500) {
-        throw new Error('Ecowitt server error. Please try again later.');
+    } catch (error) {
+      console.error(`❌ Error fetching Ecowitt wind data for ${deviceName}:`, error);
+      
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          throw new Error('Network connection failed. Please check your internet connection.');
+        } else if (error.response?.status === 401) {
+          throw new Error(`Invalid API credentials for ${deviceName} data.`);
+        } else if (error.response?.status === 429) {
+          throw new Error('API rate limit exceeded. Please try again later.');
+        } else if (error.response && error.response.status >= 500) {
+          throw new Error('Ecowitt server error. Please try again later.');
+        }
       }
+      
+      throw error;
     }
-    
-    throw error;
-  }
+  });
 }
 
 /**
@@ -964,8 +1023,12 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
 }> {
   console.log(`⚡ Fetching real-time Ecowitt wind data for ${deviceName}...`);
   
-  try {
-    const config = await getAutoEcowittConfigForDevice(deviceName);
+  // Use request deduplication for real-time data with shorter TTL
+  const requestKey = `realtime_${deviceName}_${Math.floor(Date.now() / 10000)}`; // 10-second cache
+  
+  return deduplicateRequest(requestKey, async () => {
+    try {
+      const config = await getAutoEcowittConfigForDevice(deviceName);
     
     const params = {
       application_key: config.applicationKey,
@@ -1053,16 +1116,17 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
 
     return { conditions: currentConditions, transmissionQuality };
 
-  } catch (error) {
-    console.error(`❌ Error fetching real-time wind data for ${deviceName}:`, error);
-    
-    // Don't throw - allow fallback to historical data
-    if (axios.isAxiosError(error)) {
-      console.error('Real-time API request failed:', error.response?.data || error.message);
+    } catch (error) {
+      console.error(`❌ Error fetching real-time wind data for ${deviceName}:`, error);
+      
+      // Don't throw - allow fallback to historical data
+      if (axios.isAxiosError(error)) {
+        console.error('Real-time API request failed:', error.response?.data || error.message);
+      }
+      
+      return { conditions: null };
     }
-    
-    return { conditions: null };
-  }
+  });
 }
 
 /**

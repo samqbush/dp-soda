@@ -6,7 +6,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, LogBox, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
-import { initializeStorage } from '@/services/storageService';
+import { getGlobalSessionId } from '@/utils/sessionUtils';
 
 import { SettingsProvider } from '@/contexts/SettingsContext';
 
@@ -63,24 +63,18 @@ export default function RootLayout() {
     return () => subscription?.remove();
   }, [loaded, isStorageInitialized, appStartTime]);
   
-  // Initialize storage and other critical services
+  // Initialize app services (simplified - no AsyncStorage complexity)
   useEffect(() => {
-    const setupApp = async () => {
+    const setupApp = () => {
       console.log('🚀 App initialization starting...');
       try {
-        console.log('💾 Initializing storage...');
-        // Initialize AsyncStorage
-        const storageReady = await initializeStorage();
-        console.log('💾 Storage initialization result:', storageReady);
-        setIsStorageInitialized(storageReady);
+        console.log('✅ Storage initialization skipped (using in-memory only)');
+        setIsStorageInitialized(true);
         
-        if (!storageReady) {
-          console.warn('⚠️ Storage initialization failed');
-          setInitError('Storage initialization failed');
-        } else {
-          console.log('✅ Storage initialization successful');
-        }
+        // Initialize global session for component remount persistence
+        getGlobalSessionId();
         
+        console.log('✅ App initialization complete');
       } catch (e) {
         console.error('❌ Fatal error during app setup:', e);
         setInitError(`Setup error: ${e instanceof Error ? e.message : 'Unknown error'}`);

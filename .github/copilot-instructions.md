@@ -9,6 +9,7 @@
 - Always monitor the background terminal output when running `npm run lint` to check for code style issues and compilation errors.
 - Always fix all linting errors and warnings before submitting code.
 - Install javascript libraries locally instead of globally with `-g`.
+- All npm scripts should also be VSCode tasks located in `.vscode/tasks.json`
 
 ## Documentation - STRICT ANTI-SPRAWL POLICY
 - **ONLY 4 documentation files allowed:**

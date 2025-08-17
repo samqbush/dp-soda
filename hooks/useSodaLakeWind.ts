@@ -225,23 +225,38 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   }, []);
 
   /**
-   * Load initial cached data
+   * Load initial cached data and automatically fetch fresh data
    */
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Load cached data
-        await loadCachedData();
+        console.log('🏔️ Soda Lake wind data initializing...');
         
-        console.log('🏔️ Soda Lake wind data initialized');
+        // Start loading indicator
+        setIsLoading(true);
+        setError(null);
+        
+        // Try to load cached data first (non-blocking, but currently returns false)
+        try {
+          await loadCachedData();
+        } catch (error) {
+          console.warn('⚠️ Cached data loading failed, will fetch fresh data:', error);
+        }
+        
+        // Always fetch fresh data to ensure user sees current information
+        console.log('🔄 Fetching fresh data automatically on initialization...');
+        await refreshData();
+        
+        console.log('✅ Soda Lake wind data initialization complete');
       } catch (error) {
         console.error('❌ Error initializing Soda Lake data:', error);
-        setError('Failed to initialize data');
+        setError(`Failed to load wind data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setIsLoading(false);
       }
     };
 
     initializeData();
-  }, [loadCachedData]);
+  }, []); // Remove loadCachedData dependency to prevent infinite loops
 
   return {
     // Data state

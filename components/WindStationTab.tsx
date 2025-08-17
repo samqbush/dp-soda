@@ -16,6 +16,7 @@ import { HeaderImage } from '@/components/HeaderImage';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useWindThreshold } from '@/hooks/useWindThreshold';
 import { getWindChartTimeWindow } from '@/utils/timeWindowUtils';
+import { hasBeenInitiallyLoaded, markAsInitiallyLoaded } from '@/utils/sessionUtils';
 import { WindStationData, WindStationConfig } from '@/types/windStation';
 import { assessWindDirection, getWindDirectionIndicator, getWindDirectionStatusText } from '@/utils/windDirectionUtils';
 import {
@@ -54,20 +55,68 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   // Get wind threshold for the chart's yellow line
   const { windThreshold } = useWindThreshold();
 
-  // Track if we've loaded data initially
+  // Track if we've loaded data initially - persist across component remounts using global session
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = React.useState(false);
+  const [isCheckingInitialStatus, setIsCheckingInitialStatus] = React.useState(true);
+
+  // Check if data was already loaded in this global session (simplified in-memory check)
+  React.useEffect(() => {
+    const checkInitialLoadStatus = () => {
+      try {
+        const hasLoaded = hasBeenInitiallyLoaded(config.name);
+        if (hasLoaded) {
+          console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
+          setHasInitiallyLoaded(true);
+        } else {
+          console.log(`🆕 No existing load status found for ${config.name} - will load on focus`);
+        }
+      } catch (error) {
+        console.warn('Failed to check initial load status, will load data anyway:', error);
+        // On error, allow data loading to proceed normally
+      } finally {
+        setIsCheckingInitialStatus(false);
+      }
+    };
+    
+    // No timeout needed since we're not using AsyncStorage
+    checkInitialLoadStatus();
+  }, [config.name]);
+
+  // Mark tab as initially loaded (simplified in-memory operation)
+  const handleMarkAsInitiallyLoaded = React.useCallback(() => {
+    try {
+      markAsInitiallyLoaded(config.name);
+      setHasInitiallyLoaded(true);
+    } catch (error) {
+      console.warn('Failed to mark as initially loaded:', error);
+      setHasInitiallyLoaded(true); // Fallback to in-memory state
+    }
+  }, [config.name]);
 
   // Only refresh data on first navigation to the tab
   useFocusEffect(
     React.useCallback(() => {
-      if (!hasInitiallyLoaded) {
+      // Wait for the initial status check to complete before making loading decisions
+      if (!isCheckingInitialStatus && !hasInitiallyLoaded) {
         console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
-        refreshData();
-        refreshCurrentConditions();
-        setHasInitiallyLoaded(true);
+        refreshData(); // This calls refreshCurrentConditions() internally, no need for duplicate call
+        handleMarkAsInitiallyLoaded();
       }
-    }, [hasInitiallyLoaded, refreshData, refreshCurrentConditions, config.name])
+    }, [isCheckingInitialStatus, hasInitiallyLoaded, refreshData, config.name, handleMarkAsInitiallyLoaded])
   );
+
+  // Safety net: If we have no data after a reasonable time, try loading anyway
+  React.useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (!isCheckingInitialStatus && !hasInitiallyLoaded && windData.length === 0 && !isLoading) {
+        console.warn(`🚨 Safety net triggered for ${config.name} - no data found, forcing refresh`);
+        refreshData();
+        handleMarkAsInitiallyLoaded();
+      }
+    }, 5000); // 5 second safety net
+
+    return () => clearTimeout(safetyTimeout);
+  }, [isCheckingInitialStatus, hasInitiallyLoaded, windData.length, isLoading, refreshData, handleMarkAsInitiallyLoaded, config.name]);
 
   const handleRefresh = async () => {
     await refreshData();

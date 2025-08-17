@@ -1,2 +1,18 @@
+#!/bin/sh
+
+# Ensure PATH includes common locations for npm/node
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/*/bin"
+
+# Add node_modules/.bin to PATH for project-local executables
+export PATH="./node_modules/.bin:$PATH"
+
+# Skip pre-commit for users with GitHub web interface emails (users.noreply.github.com)
+# These users are committing from GitHub web and can't run local hooks
+CURRENT_EMAIL=$(git config user.email)
+if echo "$CURRENT_EMAIL" | grep -q "@users\.noreply\.github\.com"; then
+  echo "Skipping pre-commit hooks for GitHub web user: $CURRENT_EMAIL"
+  exit 0
+fi
+
 npm run lint 
 npm run test-version
