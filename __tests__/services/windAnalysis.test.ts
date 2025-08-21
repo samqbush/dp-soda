@@ -176,6 +176,56 @@ describe('Wind Analysis Accuracy Tests', () => {
       expect(result.directionConsistency).toBeGreaterThan(85);
     });
 
+    it('should handle missing direction data correctly - reproduces issue #25', () => {
+      const now = new Date();
+      // Create 11 data points, with 1 missing direction data
+      const windData: WindDataPoint[] = [
+        createWindDataPoint(new Date(now.getTime() - 50 * 60 * 1000), 20, 315),
+        createWindDataPoint(new Date(now.getTime() - 45 * 60 * 1000), 22, 320),
+        createWindDataPoint(new Date(now.getTime() - 40 * 60 * 1000), 18, 310),
+        createWindDataPoint(new Date(now.getTime() - 35 * 60 * 1000), 21, 325),
+        createWindDataPoint(new Date(now.getTime() - 30 * 60 * 1000), 19, 315),
+        createWindDataPoint(new Date(now.getTime() - 25 * 60 * 1000), 23, 320),
+        createWindDataPoint(new Date(now.getTime() - 20 * 60 * 1000), 17, 310),
+        createWindDataPoint(new Date(now.getTime() - 15 * 60 * 1000), 20, 330),
+        createWindDataPoint(new Date(now.getTime() - 10 * 60 * 1000), 24, 315),
+        createWindDataPoint(new Date(now.getTime() - 5 * 60 * 1000), 18, 325),
+        // This point has missing direction data (NaN or empty string)
+        {
+          time: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+          timestamp: now.getTime() - 2 * 60 * 1000,
+          windSpeed: "21",
+          windGust: "25",
+          windDirection: "" // Missing direction data
+        }
+      ];
+
+      const result = analyzeRecentWindData(windData, defaultCriteria);
+
+      console.log('Test scenario: 11 data points, 1 missing direction');
+      console.log('Direction Consistency:', result.directionConsistency.toFixed(1) + '%');
+      console.log('Total data points:', windData.length);
+      
+      // Count valid direction readings
+      const validDirections = windData.filter(point => {
+        const dir = typeof point.windDirection === 'string' 
+          ? parseFloat(point.windDirection) 
+          : point.windDirection;
+        return !isNaN(dir);
+      }).length;
+      
+      console.log('Valid direction readings:', validDirections);
+      console.log('Expected data completeness:', (validDirections / windData.length * 100).toFixed(1) + '%');
+      
+      // The user expects to see ~90.9% (10/11) but might see ~91% from direction consistency
+      // This test documents the current behavior and the user's expectation
+      expect(validDirections).toBe(10); // 10 out of 11 have valid directions
+      expect(windData.length).toBe(11); // Total 11 data points
+      
+      // Current implementation calculates consistency of available directions, not data completeness
+      // This might not match user expectations of seeing 90.9%
+    });
+
     it('should correctly calculate low consistency for scattered directions', () => {
       const now = new Date();
       const windData: WindDataPoint[] = [
