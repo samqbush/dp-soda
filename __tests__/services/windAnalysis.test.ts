@@ -202,10 +202,6 @@ describe('Wind Analysis Accuracy Tests', () => {
 
       const result = analyzeRecentWindData(windData, defaultCriteria);
 
-      console.log('Test scenario: 11 data points, 1 missing direction');
-      console.log('Direction Consistency:', result.directionConsistency.toFixed(1) + '%');
-      console.log('Total data points:', windData.length);
-      
       // Count valid direction readings
       const validDirections = windData.filter(point => {
         const dir = typeof point.windDirection === 'string' 
@@ -214,16 +210,17 @@ describe('Wind Analysis Accuracy Tests', () => {
         return !isNaN(dir);
       }).length;
       
-      console.log('Valid direction readings:', validDirections);
-      console.log('Expected data completeness:', (validDirections / windData.length * 100).toFixed(1) + '%');
-      
-      // The user expects to see ~90.9% (10/11) but might see ~91% from direction consistency
-      // This test documents the current behavior and the user's expectation
+      // The fix: directionCoverage should show percentage of data points with valid direction readings
       expect(validDirections).toBe(10); // 10 out of 11 have valid directions
       expect(windData.length).toBe(11); // Total 11 data points
       
-      // Current implementation calculates consistency of available directions, not data completeness
-      // This might not match user expectations of seeing 90.9%
+      // After fix: directionCoverage should be ~90.9% (what user expects to see)
+      const expectedCoverage = (validDirections / windData.length) * 100;
+      expect(result.directionCoverage).toBeCloseTo(expectedCoverage, 1); // Should be ~90.9%
+      expect(result.analysis).toContain('Direction Coverage: 90.9%');
+      
+      // Direction consistency should still work for the valid directions (should be high since they're all around NW)
+      expect(result.directionConsistency).toBeGreaterThan(85);
     });
 
     it('should correctly calculate low consistency for scattered directions', () => {

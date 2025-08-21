@@ -279,9 +279,9 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
               </View>
               <View style={styles.analysisItem}>
                 <ThemedText style={styles.analysisValue}>
-                  {analysis.directionConsistency.toFixed(0)}%
+                  {analysis.directionCoverage ? analysis.directionCoverage.toFixed(0) : analysis.directionConsistency.toFixed(0)}%
                 </ThemedText>
-                <ThemedText style={styles.analysisLabel}>Direction Consistency</ThemedText>
+                <ThemedText style={styles.analysisLabel}>Direction Coverage</ThemedText>
               </View>
               <View style={styles.analysisItem}>
                 <ThemedText style={styles.analysisValue}>
