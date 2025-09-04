@@ -6,6 +6,7 @@ import { useAppSettings } from '@/contexts/SettingsContext';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, View, Platform, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
   const { settings, updateSetting } = useAppSettings();
@@ -80,6 +81,45 @@ export default function SettingsScreen() {
                 </ThemedText>
                 <ThemedText style={[styles.warningText, { color: textColor, opacity: 0.8 }]}>
                   Wind Guru features are under development and may not be reliable for critical decisions.
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* App Information Section */}
+        <View style={styles.settingSection}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>App Information</ThemedText>
+          
+          <View style={[styles.settingCard, { backgroundColor: cardColor }]}>
+            <View style={styles.infoRow}>
+              <ThemedText style={styles.infoLabel}>Version</ThemedText>
+              <ThemedText style={styles.infoValue}>
+                {Constants.expoConfig?.version || 'Unknown'}
+              </ThemedText>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <ThemedText style={styles.infoLabel}>Platform</ThemedText>
+              <ThemedText style={styles.infoValue}>
+                {Platform.OS === 'ios' ? 'iOS' : 'Android'} {Platform.Version}
+              </ThemedText>
+            </View>
+            
+            {Constants.expoConfig?.ios?.buildNumber && Platform.OS === 'ios' && (
+              <View style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Build</ThemedText>
+                <ThemedText style={styles.infoValue}>
+                  {Constants.expoConfig.ios.buildNumber}
+                </ThemedText>
+              </View>
+            )}
+            
+            {Constants.expoConfig?.android?.versionCode && Platform.OS === 'android' && (
+              <View style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Build</ThemedText>
+                <ThemedText style={styles.infoValue}>
+                  {Constants.expoConfig.android.versionCode}
                 </ThemedText>
               </View>
             )}
@@ -168,5 +208,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     marginBottom: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  infoLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 16,
+    opacity: 0.7,
   },
 });
