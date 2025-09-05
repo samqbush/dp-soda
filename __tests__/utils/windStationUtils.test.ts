@@ -2,6 +2,7 @@ import {
   formatLastUpdated,
   getCurrentWindSpeed,
   getCurrentWindDirection,
+  getCurrentHumidity,
   getWindDirectionText,
   isDataStale,
   getDataFreshnessMessage,
@@ -19,7 +20,8 @@ describe('Wind Station Utilities Tests', () => {
       windSpeedMph: 11.6,
       windGust: 6.8,
       windGustMph: 15.2,
-      windDirection: 315
+      windDirection: 315,
+      humidity: 52
     },
     {
       time: '2025-07-04T10:30:00.000Z',
@@ -28,7 +30,8 @@ describe('Wind Station Utilities Tests', () => {
       windSpeedMph: 15.9,
       windGust: 9.2,
       windGustMph: 20.6,
-      windDirection: 320
+      windDirection: 320,
+      humidity: 48
     }
   ];
 
@@ -207,6 +210,72 @@ describe('Wind Station Utilities Tests', () => {
 
     it('should return null when no data available', () => {
       const result = getCurrentWindDirection(null, null, []);
+      expect(result).toBe(null);
+    });
+  });
+
+  describe('getCurrentHumidity', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-07-04T11:05:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should return real-time humidity when available and recent', () => {
+      const currentConditionsUpdated = new Date('2025-07-04T11:00:00.000Z');
+      
+      const result = getCurrentHumidity(
+        mockCurrentConditions,
+        currentConditionsUpdated,
+        mockWindData
+      );
+
+      expect(result).toBe(45);
+    });
+
+    it('should fall back to historical data when real-time data is stale', () => {
+      const currentConditionsUpdated = new Date('2025-07-04T10:50:00.000Z');
+      
+      const result = getCurrentHumidity(
+        mockCurrentConditions,
+        currentConditionsUpdated,
+        mockWindData
+      );
+
+      expect(result).toBe(48); // Latest from historical data
+    });
+
+    it('should return null when no humidity data available in real-time conditions', () => {
+      const conditionsWithoutHumidity = {
+        ...mockCurrentConditions,
+        humidity: undefined
+      };
+      const currentConditionsUpdated = new Date('2025-07-04T11:00:00.000Z');
+      
+      const result = getCurrentHumidity(
+        conditionsWithoutHumidity,
+        currentConditionsUpdated,
+        mockWindData
+      );
+
+      expect(result).toBe(48); // Should fall back to historical data
+    });
+
+    it('should return null when no data available', () => {
+      const result = getCurrentHumidity(null, null, []);
+      expect(result).toBe(null);
+    });
+
+    it('should return null when historical data has no humidity', () => {
+      const dataWithoutHumidity = mockWindData.map(point => ({
+        ...point,
+        humidity: undefined
+      }));
+      
+      const result = getCurrentHumidity(null, null, dataWithoutHumidity);
       expect(result).toBe(null);
     });
   });

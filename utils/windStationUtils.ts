@@ -68,6 +68,25 @@ export const getCurrentWindDirection = (
   return latest.windDirection;
 };
 
+export const getCurrentHumidity = (
+  currentConditions: EcowittCurrentWindConditions | null,
+  currentConditionsUpdated: Date | null,
+  windData: EcowittWindDataPoint[]
+): number | null => {
+  // Use real-time data if available, recent (within 10 minutes), and has humidity
+  if (currentConditions && currentConditionsUpdated && currentConditions.humidity !== undefined) {
+    const age = Date.now() - currentConditionsUpdated.getTime();
+    if (age < 10 * 60 * 1000) { // 10 minutes
+      return currentConditions.humidity;
+    }
+  }
+  
+  // Fall back to latest historical data
+  if (windData.length === 0) return null;
+  const latest = windData[windData.length - 1];
+  return latest.humidity || null;
+};
+
 export const getWindDirectionText = (degrees: number | null): string => {
   if (degrees === null) return 'N/A';
   
