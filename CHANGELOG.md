@@ -1,5 +1,156 @@
 # Dawn Patrol Alarm - Changelog
 
+## ****ℹ️ Enhanced App Information**
+- Added comprehensive app information section in Settings
+- Easy access to version details and app metadata
+- Better transparency about app capabilities and current build
+
+**⚡ Significant Performance Improvements**
+- Fixed double data loading issue when app starts - wind data now loads once instead of twice
+- Eliminated unnecessary Android recovery system that was triggering automatic refreshes
+- Removed aggressive splash screen timeout warnings that were causing log noise
+- Streamlined app initialization for faster, smoother startup experience
+
+**🎨 Cleaner Interface**n 1.0.10 - Enhanced Data Display & Performance Optimization Update**
+
+**Branch:** v1.0.10 → main  
+**Date:** September 8, 2025  
+**Files Changed:** 12 files modified, 200+ lines optimized, comprehensive performance improvements  
+**Commits:** 7 focused commits enhancing data accuracy, user interface, and app performance
+
+### 🎯 **Key Highlights**
+- **💧 Enhanced Weather Data** - Added humidity readings to current conditions display
+- **📊 Improved Data Accuracy** - Fixed wind direction analysis to show actual data coverage
+- **📱 Better Android Support** - Resolved chart display issues with larger font sizes
+- **⚡ Performance Optimization** - Eliminated double data loading and unnecessary recovery systems
+- **ℹ️ Enhanced Settings** - Added comprehensive app information section
+- **🎨 Refined User Interface** - Clearer threshold descriptions and better data presentation
+
+---
+
+## 🚀 **USER-FRIENDLY RELEASE NOTES**
+
+### 🌟 **What's New for You**
+
+**💧 Complete Weather Picture**
+- Added humidity readings to Soda Lake current conditions
+- Get a fuller understanding of atmospheric conditions for better wind analysis
+- More comprehensive weather data helps with activity planning
+
+**📊 More Accurate Wind Analysis**
+- Fixed "Direction %" to show actual data coverage instead of consistency
+- Now correctly displays how much of your wind data includes direction readings
+- Example: Shows 90.9% (10 out of 11 readings have direction) instead of misleading 99.4%
+
+**📱 Better Android Experience**
+- Fixed chart labels getting cut off when using larger Android font sizes
+- Wind charts now properly scale with your device's accessibility settings
+- Improved readability for users with vision accessibility needs
+
+**ℹ️ Enhanced App Information**
+- Added comprehensive app information section in Settings
+- Easy access to version details and app metadata
+- Better transparency about app capabilities and current build
+
+**🎨 Clearer Interface**
+- Improved threshold slider descriptions for better understanding
+- More intuitive labels and explanations throughout the app
+- Enhanced user guidance for configuring wind preferences
+
+### 🔧 **Behind the Scenes Improvements**
+
+**🧪 Enhanced Testing**
+- Added comprehensive test coverage for humidity data handling
+- Robust testing for font scaling scenarios on Android
+- Improved test coverage for wind direction analysis edge cases
+
+**🛠️ Code Quality**
+- Better error handling for weather data parsing
+- Improved accessibility support for Android devices
+- Enhanced data validation and processing reliability
+- Eliminated race conditions in data loading logic
+- Simplified Android wrapper component for better maintainability
+
+---
+
+## 📋 **TECHNICAL RELEASE NOTES**
+
+### 🔧 **Detailed Changes**
+
+#### ✨ **New Features**
+- **Humidity Display Integration** (PR #28)
+  - Added humidity readings to Soda Lake current conditions display
+  - Enhanced `windStationUtils.ts` with humidity data extraction
+  - Updated `WindStationTab.tsx` to display humidity alongside temperature
+  - Comprehensive test coverage for humidity data scenarios
+
+#### 🐛 **Bug Fixes**
+- **Android Font Scaling Fix** (PR #24)
+  - Resolved Y-axis label clipping when Android font size is increased
+  - Added dynamic font scaling support to `CustomWindChart.tsx`
+  - Enhanced chart rendering to accommodate accessibility font sizes
+  - Comprehensive test coverage for font scaling scenarios
+
+- **Wind Direction Analysis Accuracy** (PR #26)
+  - Fixed Recent Wind Analysis Direction % to show data coverage instead of consistency
+  - Added `directionCoverage` field to `WindAnalysis` interface
+  - Modified `analyzeRecentWindData` to calculate both direction consistency and coverage
+  - Updated UI to display actual data coverage percentage
+  - Maintains direction consistency for internal alarm logic
+  - Comprehensive test for missing direction data scenarios
+
+- **Performance & Loading Improvements** (Sept 8, 2025)
+  - **Fixed Double Data Loading**: Eliminated race condition where both `useSodaLakeWind` hook and `WindStationTab` were loading data simultaneously
+  - **Removed Aggressive Recovery Systems**: Disabled unnecessary 30-second Android recovery timeout that was causing unwanted refreshes
+  - **Simplified Splash Screen Logic**: Removed 5-second force timeout that was creating log noise and race conditions
+  - **Streamlined Component Initialization**: `useSodaLakeWind` hook now waits for component to trigger data fetch instead of auto-loading
+
+#### 🎨 **User Interface Improvements**
+- **Enhanced Settings Screen** (commit 1428c56)
+  - Added comprehensive app information section to settings screen
+  - Updated threshold description for better user understanding
+  - Improved accessibility and user guidance
+
+#### 🧹 **Maintenance**
+- **Version Management** (commit e4fa64a)
+  - Updated version to 1.0.10
+  - Incremented build numbers for iOS (14) and Android
+  - Cleaned up old release notes and testing files
+
+- **Performance Optimization** (Sept 8, 2025)
+  - Simplified `AndroidSafeWrapper.tsx` by removing unnecessary app state monitoring
+  - Removed automatic recovery timeout logic that was no longer needed
+  - Streamlined `_layout.tsx` splash screen management
+  - Eliminated redundant data loading paths in wind data hooks
+
+### 📁 **Files Modified**
+```
+__tests__/components/CustomWindChart.fontScaling.test.tsx (new)
+__tests__/services/windAnalysis.test.ts (enhanced)
+__tests__/utils/windStationUtils.test.ts (enhanced)
+app/(tabs)/settings.tsx (enhanced)
+app/_layout.tsx (optimized - splash screen logic)
+components/AndroidSafeWrapper.tsx (simplified - removed recovery systems)
+components/CustomWindChart.tsx (improved)
+components/ThresholdSlider.tsx (improved)
+components/WindStationTab.tsx (enhanced)
+hooks/useSodaLakeWind.ts (optimized - removed auto-loading)
+services/windService.ts (improved)
+utils/windStationUtils.ts (enhanced)
+app.config.js (version update)
+```
+
+### 🔗 **Commit References**
+- `10a662f` - Add humidity reading to Soda Lake current conditions display (#28)
+- `032a0ad` - Fix Y-axis label clipping when Android font size is increased (#24)
+- `89c6cab` - Fix Recent Wind Analysis Direction % to show data coverage instead of consistency (#26)
+- `1428c56` - feat: add app information section to settings screen and update threshold description
+- `e4fa64a` - chore: update version to 1.0.10 and increment build numbers
+- `[Sept 8]` - perf: fix double data loading by removing auto-initialization from useSodaLakeWind hook
+- `[Sept 8]` - perf: disable unnecessary Android recovery system and simplify splash screen logic
+
+---
+
 ## **Version 1.0.8 - Major Architecture Simplification & Performance Update**
 
 **Branch:** patch/remove-alarm → main  

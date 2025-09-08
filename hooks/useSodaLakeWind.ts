@@ -225,38 +225,25 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   }, []);
 
   /**
-   * Load initial cached data and automatically fetch fresh data
+   * Initialize hook - load user preferences but don't auto-fetch data
+   * Let the component control when to fetch data based on focus/navigation
    */
   useEffect(() => {
-    const initializeData = async () => {
+    const initializeHook = async () => {
       try {
-        console.log('🏔️ Soda Lake wind data initializing...');
+        console.log('🏔️ Soda Lake wind data hook initializing...');
         
-        // Start loading indicator
-        setIsLoading(true);
-        setError(null);
-        
-        // Try to load cached data first (non-blocking, but currently returns false)
-        try {
-          await loadCachedData();
-        } catch (error) {
-          console.warn('⚠️ Cached data loading failed, will fetch fresh data:', error);
-        }
-        
-        // Always fetch fresh data to ensure user sees current information
-        console.log('🔄 Fetching fresh data automatically on initialization...');
-        await refreshData();
-        
-        console.log('✅ Soda Lake wind data initialization complete');
+        // Only load user preferences, don't auto-fetch data
+        // The WindStationTab component will control when to actually fetch data
+        console.log('✅ Soda Lake wind data hook initialization complete (waiting for component to trigger data fetch)');
       } catch (error) {
-        console.error('❌ Error initializing Soda Lake data:', error);
-        setError(`Failed to load wind data: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        setIsLoading(false);
+        console.error('❌ Error initializing Soda Lake hook:', error);
+        setError(`Failed to initialize: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
-    initializeData();
-  }, []); // Remove loadCachedData dependency to prevent infinite loops
+    initializeHook();
+  }, []); // Empty dependency array - only run once on mount
 
   return {
     // Data state
