@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Dimensions, StyleSheet } from 'react-native';
+import { View, ScrollView, Dimensions, StyleSheet, PixelRatio } from 'react-native';
 import Svg, { Line, Circle, Text, Path } from 'react-native-svg';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -80,10 +80,20 @@ export function CustomWindChart({
 
   console.log('📊 Chart sizing data points:', recentData.length);
 
-  // Chart dimensions
+  // Font scale detection for responsive layout
+  const fontScale = PixelRatio.getFontScale();
+  console.log('📱 Font scale detected:', fontScale);
+
+  // Chart dimensions with responsive Y-axis width
   const screenWidth = Dimensions.get('window').width;
   const chartHeight = 360;
-  const padding = { top: 20, bottom: 60, left: 50, right: 20 };
+  
+  // Calculate responsive Y-axis container width based on font scaling
+  // Base width is 50px, but we need extra space when font scale > 1
+  const baseYAxisWidth = 50;
+  const yAxisWidth = Math.max(baseYAxisWidth, baseYAxisWidth * fontScale * 1.2);
+  
+  const padding = { top: 20, bottom: 60, left: yAxisWidth, right: 20 };
   
   // Calculate chart width based on time span for proper label spacing
   const timeSpanMs = new Date(recentData[recentData.length - 1].time).getTime() - new Date(recentData[0].time).getTime();
@@ -174,7 +184,7 @@ export function CustomWindChart({
     });
 
   // Smart label selection: prioritize hour marks and maintain spacing
-  const labelData: Array<{x: number, y: number, label: string, index: number}> = [];
+  const labelData: {x: number, y: number, label: string, index: number}[] = [];
   
   allPotentialLabels.forEach((potential, i) => {
     // Always include the first label
@@ -335,18 +345,21 @@ export function CustomWindChart({
       
       <View style={styles.chartWrapper}>
         {/* Fixed Y-axis labels */}
-        <View style={[styles.yAxisContainer, { height: chartHeight }]}>
+        <View style={[styles.yAxisContainer, { height: chartHeight, width: yAxisWidth }]}>
           {yLabels.map((label, index) => (
             <View
               key={`y-label-${index}`}
               style={[
                 styles.yLabel,
                 { 
-                  top: label.y - 8, // Center text on grid line
+                  top: label.y - 8 * fontScale, // Center text on grid line, adjusted for font scale
                 }
               ]}
             >
-              <ThemedText style={styles.yLabelText}>
+              <ThemedText style={[styles.yLabelText, { 
+                fontSize: Math.min(14 / fontScale, 14), // Scale down text when font scale is large
+                lineHeight: Math.min(18 / fontScale, 18) * fontScale // Ensure proper line height
+              }]}>
                 {label.value}
               </ThemedText>
             </View>
@@ -645,7 +658,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   yAxisContainer: {
-    width: 50,
     position: 'relative',
     paddingRight: 10,
   },

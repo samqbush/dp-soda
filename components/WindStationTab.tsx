@@ -23,6 +23,7 @@ import {
   formatLastUpdated,
   getCurrentWindSpeed,
   getCurrentWindDirection,
+  getCurrentHumidity,
   getWindDirectionText,
   isDataStale,
   getDataFreshnessMessage
@@ -124,6 +125,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
 
   const currentWindSpeed = getCurrentWindSpeed(currentConditions, currentConditionsUpdated, windData);
   const currentWindDirection = getCurrentWindDirection(currentConditions, currentConditionsUpdated, windData);
+  const currentHumidity = getCurrentHumidity(currentConditions, currentConditionsUpdated, windData);
   const dataStale = isDataStale(currentConditions, currentConditionsUpdated, windData);
   const freshnessMessage = getDataFreshnessMessage(currentConditions, currentConditionsUpdated, windData);
 
@@ -216,6 +218,12 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
               </View>
             </View>
             <View style={styles.conditionItem}>
+              <ThemedText style={styles.conditionLabel}>Humidity</ThemedText>
+              <ThemedText style={styles.conditionValue}>
+                {currentHumidity !== null ? `${currentHumidity.toFixed(0)}%` : '--'}
+              </ThemedText>
+            </View>
+            <View style={styles.conditionItem}>
               <ThemedText style={styles.conditionLabel}>Last Updated</ThemedText>
               <ThemedText style={styles.conditionValue}>
                 {formatLastUpdated(currentConditions, currentConditionsUpdated, windData)}
@@ -279,9 +287,9 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
               </View>
               <View style={styles.analysisItem}>
                 <ThemedText style={styles.analysisValue}>
-                  {analysis.directionConsistency.toFixed(0)}%
+                  {analysis.directionCoverage ? analysis.directionCoverage.toFixed(0) : analysis.directionConsistency.toFixed(0)}%
                 </ThemedText>
-                <ThemedText style={styles.analysisLabel}>Direction Consistency</ThemedText>
+                <ThemedText style={styles.analysisLabel}>Direction Coverage</ThemedText>
               </View>
               <View style={styles.analysisItem}>
                 <ThemedText style={styles.analysisValue}>

@@ -72,7 +72,7 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
   }, [saveTimeout]);
 
   const getThresholdDescription = (value: number) => {
-    if (value < 10) return 'Light Breeze - go mountain biking';
+    if (value < 10) return 'Light Breeze - Canoe Club';
     if (value < 15) return 'Moderate wind - get your downwind board and big wing';
     if (value < 20) return 'Good wind - ideal conditions for most riders';
     if (value < 30) return 'Strong wind - downsize your wing';

@@ -19,6 +19,7 @@ export interface WindAnalysis {
   isAlarmWorthy: boolean;
   averageSpeed: number;
   directionConsistency: number;
+  directionCoverage?: number; // Optional: percentage of data points with valid direction readings
   consecutiveGoodPoints: number;
   analysis: string;
 }
@@ -852,7 +853,7 @@ export const analyzeRecentWindData = (
     ? speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length 
     : 0;
 
-  // Calculate direction consistency
+  // Calculate direction coverage (percentage of data points with valid direction readings)
   const directions = recentData
     .map(point => {
       const dir = typeof point.windDirection === 'string' 
@@ -862,6 +863,11 @@ export const analyzeRecentWindData = (
     })
     .filter(dir => !isNaN(dir));
 
+  const totalDataPoints = recentData.length;
+  const validDirectionCount = directions.length;
+  const directionCoverage = totalDataPoints > 0 ? (validDirectionCount / totalDataPoints) * 100 : 0;
+  
+  // Calculate direction consistency for the valid directions
   const directionConsistency = calculateDirectionConsistency(directions);
 
   // Count consecutive good data points
@@ -892,12 +898,14 @@ export const analyzeRecentWindData = (
     `Avg Speed: ${averageSpeed.toFixed(1)}mph, ` +
     `Direction: ${avgDirection.toFixed(0)}° (${getDirectionName(avgDirection)}), ` +
     `Direction Consistency: ${directionConsistency.toFixed(1)}%, ` +
+    `Direction Coverage: ${directionCoverage.toFixed(1)}%, ` +
     `Consecutive Good Points: ${consecutiveGoodPoints}`;
 
   return {
     isAlarmWorthy: isCurrentlyFavorable, // Renamed for clarity - this indicates if current conditions are favorable
     averageSpeed,
     directionConsistency,
+    directionCoverage,
     consecutiveGoodPoints,
     analysis
   };

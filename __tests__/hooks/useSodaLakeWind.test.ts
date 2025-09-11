@@ -132,22 +132,27 @@ describe('useSodaLakeWind Hook Tests', () => {
   });
 
   describe('Hook Initialization', () => {
-    it('should initialize with loading state and automatically fetch data', async () => {
+    it('should initialize without auto-loading data and wait for manual trigger', async () => {
       const { result } = renderHook(() => useSodaLakeWind());
 
-      // Initial state should have loading = true since we auto-fetch data
+      // Initial state should NOT be loading since we no longer auto-fetch data
       expect(result.current.windData).toEqual([]);
       expect(result.current.chartData).toEqual(mockChartData); // From convertToWindDataPoint
       expect(result.current.currentConditions).toBeNull();
       expect(result.current.analysis).toBeNull();
       expect(result.current.transmissionQuality).toBeNull();
-      expect(result.current.isLoading).toBe(true); // Changed: Now starts loading automatically
+      expect(result.current.isLoading).toBe(false); // Changed: No longer auto-loads
       expect(result.current.isLoadingCurrent).toBe(false);
       expect(result.current.error).toBeNull();
       expect(result.current.lastUpdated).toBeNull();
       expect(result.current.currentConditionsUpdated).toBeNull();
 
-      // Wait for automatic data loading to complete
+      // Data should only load when manually triggered
+      await waitFor(async () => {
+        await result.current.refreshData();
+      });
+
+      // After manual refresh, data should be loaded
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
         expect(result.current.windData).toEqual(mockEcowittWindData);
@@ -172,7 +177,11 @@ describe('useSodaLakeWind Hook Tests', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error loading user criteria:', expect.any(Error));
       });
 
-      // Should still automatically load data despite criteria loading error
+      // Should be ready to load data when manually triggered, despite criteria loading error
+      await waitFor(async () => {
+        await result.current.refreshData();
+      });
+
       await waitFor(() => {
         expect(result.current.windData).toEqual(mockEcowittWindData);
         expect(result.current.isLoading).toBe(false);
@@ -548,11 +557,16 @@ describe('useSodaLakeWind Hook Tests', () => {
     it('should handle complete workflow successfully', async () => {
       const { result } = renderHook(() => useSodaLakeWind());
 
-      // Initialize - should start loading automatically
+      // Initialize - should NOT start loading automatically anymore
       expect(result.current.windData).toEqual([]);
-      expect(result.current.isLoading).toBe(true); // Changed: Now starts loading automatically
+      expect(result.current.isLoading).toBe(false); // Changed: No longer auto-loads
 
-      // Wait for automatic initial data load to complete
+      // Manually trigger data load
+      await waitFor(async () => {
+        await result.current.refreshData();
+      });
+
+      // Wait for manual data load to complete
       await waitFor(() => {
         expect(result.current.windData).toEqual(mockEcowittWindData);
         expect(result.current.analysis).toEqual(mockWindAnalysis);
@@ -659,17 +673,19 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       it('should handle cached data loading errors', async () => {
-        // Create a spy that will throw on the specific call we want to test
-        const consoleLogSpy = jest.spyOn(console, 'log');
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
         
-        // Make console.log throw on second call (the cached data message)
-        consoleLogSpy.mockImplementationOnce(() => {}) // First call succeeds
-          .mockImplementationOnce(() => {
-            throw new Error('Cache read error');
-          });
-
+        // Mock loadCachedData to throw an error when called manually
         const { result } = renderHook(() => useSodaLakeWind());
+
+        // Mock console.log to throw when loadCachedData tries to log
+        const originalLog = console.log;
+        console.log = jest.fn().mockImplementation((message) => {
+          if (message.includes('Loading cached Soda Lake wind data')) {
+            throw new Error('Cache read error');
+          }
+          return originalLog(message);
+        });
 
         await act(async () => {
           const loadResult = await result.current.loadCachedData();
@@ -681,7 +697,7 @@ describe('useSodaLakeWind Hook Tests', () => {
           expect.any(Error)
         );
 
-        consoleLogSpy.mockRestore();
+        console.log = originalLog;
         consoleErrorSpy.mockRestore();
       });
     });

@@ -15,7 +15,7 @@ import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { prepareSplashScreen, setupSplashScreenTimeout } from '@/services/androidSplash';
+import { prepareSplashScreen } from '@/services/androidSplash';
 import { getGlobalSessionId } from '@/utils/sessionUtils';
 
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -30,11 +30,7 @@ if (!__DEV__) {
 }
 
 // Keep the splash screen visible while we fetch resources
-// And set a safety timeout to ensure it doesn't get stuck
-prepareSplashScreen().then(() => {
-  // Always set a safety timeout to hide splash screen
-  setupSplashScreenTimeout(6000);
-}).catch(error => console.log('Error setting up splash screen:', error));
+prepareSplashScreen().catch(error => console.log('Error setting up splash screen:', error));
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -84,7 +80,7 @@ export default function RootLayout() {
     setupApp();
   }, []);
   
-  // Ensure splash screen hides even if initialization takes too long
+  // Ensure splash screen hides when resources are ready
   useEffect(() => {
     const hideSplash = async () => {
       try {
@@ -94,29 +90,7 @@ export default function RootLayout() {
           setTimeout(async () => {
             await SplashScreen.hideAsync();
           }, Platform.OS === 'android' ? 300 : 200);
-          return;
         }
-        
-        // Set a maximum timeout to ensure splash screen doesn't stay forever
-        const MAXIMUM_SPLASH_TIME = 5000; // 5 seconds max
-        
-        setTimeout(async () => {
-          // If we're still showing splash after timeout, force hide it
-          if (!loaded || !isStorageInitialized) {
-            console.warn('⚠️ Force hiding splash screen after timeout');
-            try {
-              await SplashScreen.hideAsync();
-              
-              // If we had to force hide, set initialized to true anyway
-              // to let the app continue loading
-              if (!isStorageInitialized) {
-                setIsStorageInitialized(true);
-              }
-            } catch (e) {
-              console.error('Failed to force hide splash:', e);
-            }
-          }
-        }, MAXIMUM_SPLASH_TIME);
       } catch (e) {
         console.warn('Error in splash screen management:', e);
         // Last resort - try to hide splash screen directly
