@@ -11,6 +11,7 @@ import {
     type TransmissionQualityInfo
 } from '@/services/ecowittService';
 import { analyzeRecentWindData, getAlarmCriteria, type AlarmCriteria, type WindAnalysis, type WindDataPoint } from '@/services/windService';
+import { fetchSunriseData, type SunriseData } from '@/services/sunriseService';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface UseSodaLakeWindReturn {
@@ -20,6 +21,7 @@ export interface UseSodaLakeWindReturn {
   currentConditions: EcowittCurrentWindConditions | null; // Real-time current conditions
   analysis: WindAnalysis | null;
   transmissionQuality: TransmissionQualityInfo | null; // Transmission quality analysis
+  sunriseData: SunriseData | null; // Sunrise/sunset data for Morrison, CO
   
   // Loading and error states
   isLoading: boolean;
@@ -43,6 +45,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
   const [currentConditions, setCurrentConditions] = useState<EcowittCurrentWindConditions | null>(null);
   const [analysis, setAnalysis] = useState<WindAnalysis | null>(null);
   const [transmissionQuality, setTransmissionQuality] = useState<TransmissionQualityInfo | null>(null);
+  const [sunriseData, setSunriseData] = useState<SunriseData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCurrent, setIsLoadingCurrent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,26 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     } catch (error) {
       console.error('❌ Error loading cached Soda Lake data:', error);
       return false;
+    }
+  }, []);
+
+  /**
+   * Refresh sunrise data for Morrison, CO
+   */
+  const refreshSunriseData = useCallback(async (): Promise<void> => {
+    try {
+      console.log('🌅 Refreshing sunrise data for Morrison, CO...');
+      const sunrise = await fetchSunriseData();
+      setSunriseData(sunrise);
+      
+      if (sunrise) {
+        console.log('✅ Updated sunrise data:', sunrise.formatted);
+      } else {
+        console.warn('⚠️ Failed to fetch sunrise data');
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing sunrise data:', error);
+      // Don't set error state - this is supplementary data
     }
   }, []);
 
@@ -183,6 +206,9 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
       
       console.log('✅ Smart refreshed Soda Lake wind data:', freshData.length, 'points');
       
+      // Also refresh sunrise data
+      await refreshSunriseData();
+      
       // Also refresh current conditions from real-time API
       await refreshCurrentConditions();
       
@@ -195,7 +221,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadCachedData, refreshCurrentConditions, userMinimumSpeed]);
+  }, [loadCachedData, refreshCurrentConditions, refreshSunriseData, userMinimumSpeed]);
 
   /**
    * Clear cached data
@@ -233,6 +259,9 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
       try {
         console.log('🏔️ Soda Lake wind data hook initializing...');
         
+        // Load sunrise data immediately since it doesn't depend on wind data
+        await refreshSunriseData();
+        
         // Only load user preferences, don't auto-fetch data
         // The WindStationTab component will control when to actually fetch data
         console.log('✅ Soda Lake wind data hook initialization complete (waiting for component to trigger data fetch)');
@@ -243,7 +272,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     };
 
     initializeHook();
-  }, []); // Empty dependency array - only run once on mount
+  }, [refreshSunriseData]); // Include refreshSunriseData in dependency array
 
   return {
     // Data state
@@ -252,6 +281,7 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     currentConditions,
     analysis,
     transmissionQuality,
+    sunriseData,
     
     // Loading and error states
     isLoading,
