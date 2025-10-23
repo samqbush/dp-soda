@@ -272,7 +272,8 @@ export const useSodaLakeWind = (): UseSodaLakeWindReturn => {
     };
 
     initializeHook();
-  }, [refreshSunriseData]); // Include refreshSunriseData in dependency array
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshSunriseData is stable and only needed on mount
+  }, []);
 
   return {
     // Data state
