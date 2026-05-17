@@ -12,8 +12,6 @@ jest.mock('@/config/ecowittConfig', () => ({
 }));
 
 import {
-  getEcowittConfig,
-  setEcowittConfig,
   selectDeviceByName,
   convertToWindDataPoint,
   analyzeOverallTransmissionQuality,
@@ -34,69 +32,6 @@ describe('EcowittService Core Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('Configuration Management', () => {
-    const mockConfig: EcowittApiConfig = {
-      applicationKey: 'test-app-key',
-      apiKey: 'test-api-key',
-      macAddress: '00:11:22:33:44:55',
-    };
-
-    describe('getEcowittConfig', () => {
-      it('should return config when stored as JSON', async () => {
-        const configJson = JSON.stringify(mockConfig);
-        mockAsyncStorage.getItem.mockResolvedValue(configJson);
-
-        const result = await getEcowittConfig();
-
-        expect(result).toEqual(mockConfig);
-        expect(mockAsyncStorage.getItem).toHaveBeenCalledWith('ecowitt_config');
-      });
-
-      it('should return null when no config is stored', async () => {
-        mockAsyncStorage.getItem.mockResolvedValue(null);
-
-        const result = await getEcowittConfig();
-
-        expect(result).toBe(null);
-      });
-
-      it('should return null when config JSON is invalid', async () => {
-        mockAsyncStorage.getItem.mockResolvedValue('invalid-json');
-        
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-        const result = await getEcowittConfig();
-
-        expect(result).toBe(null);
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Ecowitt config:', expect.any(Error));
-        
-        consoleErrorSpy.mockRestore();
-      });
-    });
-
-    describe('setEcowittConfig', () => {
-      it('should save config as JSON to storage', async () => {
-        mockAsyncStorage.setItem.mockResolvedValue();
-
-        await setEcowittConfig(mockConfig);
-
-        expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('ecowitt_config', JSON.stringify(mockConfig));
-      });
-
-      it('should handle storage errors', async () => {
-        const storageError = new Error('Storage failed');
-        mockAsyncStorage.setItem.mockRejectedValue(storageError);
-        
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-        await expect(setEcowittConfig(mockConfig)).rejects.toThrow('Storage failed');
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving Ecowitt config:', storageError);
-        
-        consoleErrorSpy.mockRestore();
-      });
-    });
   });
 
   describe('Device Management', () => {

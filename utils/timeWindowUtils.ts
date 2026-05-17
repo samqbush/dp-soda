@@ -22,7 +22,7 @@ export function getWindChartTimeWindow(): TimeWindow {
   const now = new Date();
   const currentHour = now.getHours();
   
-  console.log('🕐 Calculating time window:', {
+  if (__DEV__) console.log('🕐 Calculating time window:', {
     currentTime: now.toISOString(),
     currentHour: currentHour
   });
@@ -34,7 +34,7 @@ export function getWindChartTimeWindow(): TimeWindow {
       endHour: 21, // 9pm
       isMultiDay: true // This indicates we want previous day's data
     };
-    console.log('🌙 Early morning detected - using previous day window:', result);
+    if (__DEV__) console.log('🌙 Early morning detected - using previous day window:', result);
     return result;
   }
   
@@ -44,7 +44,7 @@ export function getWindChartTimeWindow(): TimeWindow {
       startHour: 4,
       endHour: 23 // Show all available data for the day up to current time
     };
-    console.log('☀️ Daytime detected - using current day window through current time:', result);
+    if (__DEV__) console.log('☀️ Daytime detected - using current day window through current time:', result);
     return result;
   }
   
@@ -53,7 +53,7 @@ export function getWindChartTimeWindow(): TimeWindow {
     startHour: 4,
     endHour: 21 // 9pm
   };
-  console.log('🌆 Evening detected - using full day window:', result);
+  if (__DEV__) console.log('🌆 Evening detected - using full day window:', result);
   return result;
 }
 
@@ -73,7 +73,7 @@ export function filterWindDataByTimeWindow<T extends { time: string | Date }>(
   
   const now = new Date();
   
-  console.log('🔍 Filtering wind data:', {
+  if (__DEV__) console.log('🔍 Filtering wind data:', {
     totalPoints: data.length,
     timeWindow: timeWindow,
     currentTime: now.toISOString(),
@@ -108,7 +108,7 @@ export function filterWindDataByTimeWindow<T extends { time: string | Date }>(
     }
   });
   
-  console.log('✅ Filtered result:', {
+  if (__DEV__) console.log('✅ Filtered result:', {
     filteredPoints: filtered.length,
     timeRange: filtered.length > 0 ? {
       first: new Date(filtered[0].time).toISOString(),

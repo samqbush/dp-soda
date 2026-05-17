@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 // WindAlert API constants
 const BASE_URL = 'https://windalert.com';
 const SPOT_ID = '149264'; // (Soda Lake Dam 1)
+const WF_TOKEN = Constants.expoConfig?.extra?.WF_TOKEN || process.env.WF_TOKEN || '';
 
 export interface WindDataPoint {
   time: string;
@@ -65,7 +67,7 @@ const DEFAULT_CRITERIA: AlarmCriteria = {
  */
 export const fetchWindData = async (): Promise<WindDataPoint[]> => {
   try {
-    console.log('🌊 Starting wind data fetch...');
+    if (__DEV__) console.log('🌊 Starting wind data fetch...');
     
     // Check if we're in a web environment (CORS issues expected)
     // Use React Native Platform detection as primary method
@@ -77,10 +79,10 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       window.location.href.startsWith('http')
     );
     
-    console.log(`📱 Platform detected: ${Platform.OS}, isWeb: ${isWeb}`);
+    if (__DEV__) console.log(`📱 Platform detected: ${Platform.OS}, isWeb: ${isWeb}`);
     
     // Try real API call for both web and mobile environments
-    console.log('🌐 Attempting real API call...');
+    if (__DEV__) console.log('🌐 Attempting real API call...');
     const now = Date.now();
     const params = {
       callback: `jQuery17206585233276552562_${now}`,
@@ -97,11 +99,11 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       time_end_offset_hours: 0,
       type: 'dataonly',
       model_ids: -101,
-      wf_token: 'f546a4d1e7115896684766407a63e45c',
+      wf_token: WF_TOKEN,
       _: now
     };
 
-    console.log('📡 Making API request with params:', { spot_id: SPOT_ID });
+    if (__DEV__) console.log('📡 Making API request with params:', { spot_id: SPOT_ID });
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -121,7 +123,7 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
         timeout: 15000 // 15 second timeout
       });
 
-      console.log('✅ API response received:', {
+      if (__DEV__) console.log('✅ API response received:', {
         status: response.status,
         hasData: !!response.data,
         dataType: typeof response.data
@@ -140,7 +142,7 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       // Process data similar to the original script
       const processedData = processWindData(json);
       
-      console.log('📊 Processed wind data:', {
+      if (__DEV__) console.log('📊 Processed wind data:', {
         totalPoints: processedData.length,
         firstPoint: processedData[0],
         lastPoint: processedData[processedData.length - 1]
@@ -156,10 +158,10 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
       
       // For web environment, CORS is expected - try cache first
       if (isWeb) {
-        console.log('🌐 Web environment - trying cached data due to expected CORS issues');
+        if (__DEV__) console.log('🌐 Web environment - trying cached data due to expected CORS issues');
         const cachedData = await getCachedWindData();
         if (cachedData && cachedData.length > 0) {
-          console.log('💾 Using cached wind data in web environment');
+          if (__DEV__) console.log('💾 Using cached wind data in web environment');
           return cachedData;
         }
         console.warn('❌ No cached data available in web environment');
@@ -174,7 +176,7 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
     // Try to return cached data if available
     const cachedData = await getCachedWindData();
     if (cachedData && cachedData.length > 0) {
-      console.log('💾 Returning cached wind data due to fetch error');
+      if (__DEV__) console.log('💾 Returning cached wind data due to fetch error');
       return cachedData;
     }
     
@@ -192,7 +194,7 @@ export const fetchWindData = async (): Promise<WindDataPoint[]> => {
  * Processes the raw wind data response
  */
 const processWindData = (graphData: any): WindDataPoint[] => {
-  console.log('Processing graph data:', Object.keys(graphData));
+  if (__DEV__) console.log('Processing graph data:', Object.keys(graphData));
   
   const avgArr = graphData.wind_avg_data || [];
   const gustArr = graphData.wind_gust_data || [];
@@ -236,7 +238,8 @@ const processWindData = (graphData: any): WindDataPoint[] => {
 export const analyzeWindData = (
   data: WindDataPoint[], 
   criteria: AlarmCriteria = DEFAULT_CRITERIA,
-  targetTime?: Date
+  targetTime?: Date,
+  skipTimeFilter: boolean = false
 ): WindAnalysis => {
   if (!data.length) {
     return {
@@ -248,20 +251,19 @@ export const analyzeWindData = (
     };
   }
 
-  // Filter data for the alarm window (3am-5am)
-  const now = targetTime || new Date();
-  const alarmStart = new Date(now);
-  alarmStart.setHours(3, 0, 0, 0);
-  const alarmEnd = new Date(now);
-  alarmEnd.setHours(5, 0, 0, 0);
+  let alarmWindowData: WindDataPoint[];
 
-  // Use hour-based filtering for simulated test data
-  const alarmWindowData = data.filter(point => {
-    const pointTime = new Date(point.time);
-    // For test scenarios, we'll use hours rather than full date comparison
-    const hour = pointTime.getHours();
-    return hour >= 3 && hour <= 5;
-  });
+  if (skipTimeFilter) {
+    // Data is already filtered by the caller (e.g., verifyWindConditions)
+    alarmWindowData = data;
+  } else {
+    // Filter data for the alarm window (3am-5am)
+    alarmWindowData = data.filter(point => {
+      const pointTime = new Date(point.time);
+      const hour = pointTime.getHours();
+      return hour >= 3 && hour < 5;
+    });
+  }
 
   if (alarmWindowData.length === 0) {
     return {
@@ -432,8 +434,8 @@ const countConsecutiveGoodPoints = (
   let maxConsecutive = 0;
   let currentConsecutive = 0;
 
-  console.log(`Counting consecutive good points with minimum speed: ${criteria.minimumAverageSpeed}mph`);
-  console.log(`Data points to analyze: ${data.length}`);
+  if (__DEV__) console.log(`Counting consecutive good points with minimum speed: ${criteria.minimumAverageSpeed}mph`);
+  if (__DEV__) console.log(`Data points to analyze: ${data.length}`);
   
   for (const point of data) {
     // Handle both string and number types for windSpeed
@@ -443,19 +445,19 @@ const countConsecutiveGoodPoints = (
     const isGoodPoint = !isNaN(speed) && speed >= criteria.minimumAverageSpeed;
     const pointTime = new Date(point.time);
 
-    console.log(`Point at ${pointTime.toISOString()} - Speed: ${speed}mph, IsGood: ${isGoodPoint}`);
+    if (__DEV__) console.log(`Point at ${pointTime.toISOString()} - Speed: ${speed}mph, IsGood: ${isGoodPoint}`);
     
     if (isGoodPoint) {
       currentConsecutive++;
-      console.log(`  ✓ Good point - current streak: ${currentConsecutive}`);
+      if (__DEV__) console.log(`  ✓ Good point - current streak: ${currentConsecutive}`);
       maxConsecutive = Math.max(maxConsecutive, currentConsecutive);
     } else {
-      console.log(`  ✗ Not a good point - resetting streak`);
+      if (__DEV__) console.log(`  ✗ Not a good point - resetting streak`);
       currentConsecutive = 0;
     }
   }
 
-  console.log(`Maximum consecutive good points found: ${maxConsecutive}`);
+  if (__DEV__) console.log(`Maximum consecutive good points found: ${maxConsecutive}`);
   return maxConsecutive;
 };
 
@@ -475,9 +477,9 @@ const cacheWindData = async (data: WindDataPoint[]): Promise<void> => {
       timestamp: new Date().toISOString()
     };
     
-    console.log(`📦 Caching ${data.length} wind data points`);
+    if (__DEV__) console.log(`📦 Caching ${data.length} wind data points`);
     await AsyncStorage.setItem('windData', JSON.stringify(cacheData));
-    console.log('✅ Wind data cached successfully');
+    if (__DEV__) console.log('✅ Wind data cached successfully');
   } catch (error) {
     console.error('❌ Error caching wind data:', error);
     // Don't throw - this is a non-critical operation
@@ -489,7 +491,7 @@ const cacheWindData = async (data: WindDataPoint[]): Promise<void> => {
  */
 export const getCachedWindData = async (): Promise<WindDataPoint[] | null> => {
   try {
-    console.log('🔍 Attempting to load cached wind data');
+    if (__DEV__) console.log('🔍 Attempting to load cached wind data');
     
     // First check if AsyncStorage is available
     if (!AsyncStorage) {
@@ -499,7 +501,7 @@ export const getCachedWindData = async (): Promise<WindDataPoint[] | null> => {
     
     const cached = await AsyncStorage.getItem('windData');
     if (!cached) {
-      console.log('ℹ️ No cached wind data found');
+      if (__DEV__) console.log('ℹ️ No cached wind data found');
       return null;
     }
     
@@ -516,11 +518,11 @@ export const getCachedWindData = async (): Promise<WindDataPoint[] | null> => {
       
       // Return cached data if less than 2 hours old
       if (cacheAge < 2 * 60 * 60 * 1000) {
-        console.log(`✅ Found valid cached data (${cacheData.data.length} points)`);
+        if (__DEV__) console.log(`✅ Found valid cached data (${cacheData.data.length} points)`);
         return cacheData.data;
       }
       
-      console.log('⚠️ Cached data is too old, not using');
+      if (__DEV__) console.log('⚠️ Cached data is too old, not using');
       return null;
     } catch (parseError) {
       console.error('❌ Error parsing cached data:', parseError);
@@ -577,10 +579,10 @@ export const verifyWindConditions = (
     const pointTime = new Date(point.time);
     // For test scenarios, we'll use hours rather than full date comparison
     const hour = pointTime.getHours();
-    return hour >= 6 && hour <= 8;
+    return hour >= 6 && hour < 8;
   });
 
-  return analyzeWindData(verifyWindowData, criteria);
+  return analyzeWindData(verifyWindowData, criteria, undefined, true);
 };
 
 /**
@@ -602,7 +604,7 @@ export const verifyWindConditions = (
  */
 export const loadPreloadedData = async (): Promise<WindDataPoint[]> => {
   try {
-    console.log('🔄 Loading preloaded wind data...');
+    if (__DEV__) console.log('🔄 Loading preloaded wind data...');
     
     // Try to load from a preload file or use the real data we fetched
     const realWindData: WindDataPoint[] = [
@@ -611,11 +613,11 @@ export const loadPreloadedData = async (): Promise<WindDataPoint[]> => {
     ];
     
     if (realWindData.length === 0) {
-      console.log('📝 No preloaded data available, returning empty array');
+      if (__DEV__) console.log('📝 No preloaded data available, returning empty array');
       return [];
     }
     
-    console.log(`📊 Loaded ${realWindData.length} preloaded data points`);
+    if (__DEV__) console.log(`📊 Loaded ${realWindData.length} preloaded data points`);
     await cacheWindData(realWindData);
     return realWindData;
   } catch (error) {
@@ -630,7 +632,7 @@ export const loadPreloadedData = async (): Promise<WindDataPoint[]> => {
  */
 export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
   try {
-    console.log('🌊 Force fetching REAL wind data...');
+    if (__DEV__) console.log('🌊 Force fetching REAL wind data...');
     
     // Always make real API call regardless of environment
     const now = Date.now();
@@ -649,11 +651,11 @@ export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
       time_end_offset_hours: 0,
       type: 'dataonly',
       model_ids: -101,
-      wf_token: 'f546a4d1e7115896684766407a63e45c',
+      wf_token: WF_TOKEN,
       _: now
     };
 
-    console.log('📡 Making FORCED API request with params:', { spot_id: SPOT_ID });
+    if (__DEV__) console.log('📡 Making FORCED API request with params:', { spot_id: SPOT_ID });
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -671,7 +673,7 @@ export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
       timeout: 15000 // 15 second timeout
     });
 
-    console.log('✅ REAL API response received:', {
+    if (__DEV__) console.log('✅ REAL API response received:', {
       status: response.status,
       hasData: !!response.data,
       dataType: typeof response.data
@@ -690,7 +692,7 @@ export const fetchRealWindData = async (): Promise<WindDataPoint[]> => {
     // Process data similar to the original script
     const processedData = processWindData(json);
     
-    console.log('📊 Processed REAL wind data:', {
+    if (__DEV__) console.log('📊 Processed REAL wind data:', {
       totalPoints: processedData.length,
       firstPoint: processedData[0],
       lastPoint: processedData[processedData.length - 1]

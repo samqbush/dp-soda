@@ -13,22 +13,9 @@ const BASE_URL = 'https://api.ecowitt.net/api/v3';
 // Request deduplication system
 interface PendingRequest {
   promise: Promise<any>;
-  timestamp: number;
 }
 
 const pendingRequests = new Map<string, PendingRequest>();
-const REQUEST_CACHE_TTL = 30000; // 30 seconds TTL for request deduplication
-
-/**
- * Generate a cache key for API requests to enable deduplication
- */
-function generateRequestKey(endpoint: string, params: any): string {
-  const sortedParams = Object.keys(params)
-    .sort()
-    .map(key => `${key}=${params[key]}`)
-    .join('&');
-  return `${endpoint}?${sortedParams}`;
-}
 
 /**
  * Deduplicate API requests to prevent multiple simultaneous calls for the same data
@@ -37,30 +24,21 @@ async function deduplicateRequest<T>(
   key: string, 
   requestFn: () => Promise<T>
 ): Promise<T> {
-  const now = Date.now();
-  
-  // Clean up expired requests
-  for (const [cacheKey, request] of pendingRequests.entries()) {
-    if (now - request.timestamp > REQUEST_CACHE_TTL) {
-      pendingRequests.delete(cacheKey);
-    }
-  }
-  
-  // Check if we already have this request pending
+  // Check if we already have this request in-flight
   const existing = pendingRequests.get(key);
   if (existing) {
-    console.log(`🔄 Request deduplication: Using existing request for ${key}`);
+    if (__DEV__) console.log(`🔄 Request deduplication: Using existing request for ${key}`);
     return existing.promise;
   }
   
   // Create new request
-  console.log(`🆕 Request deduplication: Creating new request for ${key}`);
+  if (__DEV__) console.log(`🆕 Request deduplication: Creating new request for ${key}`);
   const promise = requestFn().finally(() => {
     // Clean up after request completes
     pendingRequests.delete(key);
   });
   
-  pendingRequests.set(key, { promise, timestamp: now });
+  pendingRequests.set(key, { promise });
   return promise;
 }
 
@@ -226,10 +204,6 @@ export interface TransmissionGap {
   affectedSensors: string[]; // List of missing sensor types
 }
 
-// Storage keys
-const ECOWITT_CONFIG_KEY = 'ecowitt_config';
-const ECOWITT_CACHE_KEY = 'ecowitt_wind_data_cache';
-
 /**
  * Convert m/s to mph
  */
@@ -238,75 +212,85 @@ function msToMph(ms: number): number {
 }
 
 /**
- * Get stored Ecowitt API configuration (legacy function - kept for compatibility)
+ * Format a Date as 'YYYY-MM-DD HH:MM:SS' in America/Denver timezone.
+ * The Ecowitt API expects dates in the device's local time.
  */
-export async function getEcowittConfig(): Promise<EcowittApiConfig | null> {
-  try {
-    const configJson = await AsyncStorage.getItem(ECOWITT_CONFIG_KEY);
-    return configJson ? JSON.parse(configJson) : null;
-  } catch (error) {
-    console.error('Error loading Ecowitt config:', error);
-    return null;
+function formatEcowittDate(date: Date): string {
+  // Fallback implementation for Android devices without Intl support
+  if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
+    const utcTime = date.getTime();
+    const isDST = isDaylightSavingTime(date);
+    const mtOffset = isDST ? -6 : -7; // MDT = UTC-6, MST = UTC-7
+    const mtTime = new Date(utcTime + (mtOffset * 60 * 60 * 1000));
+    
+    const year = mtTime.getUTCFullYear();
+    const month = String(mtTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(mtTime.getUTCDate()).padStart(2, '0');
+    const hour = String(mtTime.getUTCHours()).padStart(2, '0');
+    const minute = String(mtTime.getUTCMinutes()).padStart(2, '0');
+    const second = String(mtTime.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   }
+  
+  // Use Intl when available (iOS and modern Android)
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
+  
+  const formatter = new Intl.DateTimeFormat('en-CA', options);
+  const parts = formatter.formatToParts(date);
+  
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const hour = parts.find(p => p.type === 'hour')?.value;
+  const minute = parts.find(p => p.type === 'minute')?.value;
+  const second = parts.find(p => p.type === 'second')?.value;
+  
+  if (!year || !month || !day || !hour || !minute || !second) {
+    throw new Error('Failed to extract date parts from Intl.DateTimeFormat');
+  }
+  
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
 /**
- * Debug function to test device list API and log response structure
+ * Get start and end of current day in Mountain Time
  */
-export async function debugDeviceListAPI(): Promise<void> {
-  console.log('🔍 DEBUG: Testing device list API...');
+function getMountainTimeDayRange(): { startOfDay: Date; endOfDay: Date } {
+  const now = new Date();
   
-  try {
-    const params = {
-      application_key: ECOWITT_CONFIG.applicationKey,
-      api_key: ECOWITT_CONFIG.apiKey,
-      call_back: 'device', // Request device information
+  if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
+    // Fallback: use local time (assumes device is in Mountain Time)
+    return {
+      startOfDay: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      endOfDay: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
     };
-
-    console.log('📡 DEBUG: Making API request to device/list');
-    
-    const response = await axios.get(`${BASE_URL}/device/list`, {
-      params,
-      timeout: 10000,
-      headers: {
-        'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
-        })
-      }
-    });
-
-    console.log('📊 DEBUG: Raw API response:', JSON.stringify(response.data, null, 2));
-    console.log('📊 DEBUG: Response status:', response.status);
-    console.log('📊 DEBUG: Response headers:', response.headers);
-    
-    if (response.data.code !== 0) {
-      console.error('❌ DEBUG: API returned error code:', response.data.code, response.data.msg);
-    } else {
-      console.log('✅ DEBUG: API call successful');
-      console.log('📊 DEBUG: Response data structure:');
-      console.log('  - data exists:', !!response.data.data);
-      console.log('  - list exists:', !!response.data.data?.list);
-      console.log('  - list is array:', Array.isArray(response.data.data?.list));
-      console.log('  - list length:', response.data.data?.list?.length);
-      console.log('  - pageNum:', response.data.data?.pageNum);
-      console.log('  - total:', response.data.data?.total);
-      
-      if (response.data.data?.list) {
-        response.data.data.list.forEach((device: any, index: number) => {
-          console.log(`  - Device ${index}:`, JSON.stringify(device, null, 4));
-        });
-      }
-    }
-    
-  } catch (error) {
-    console.error('❌ DEBUG: Device list API failed:', error);
-    if (axios.isAxiosError(error)) {
-      console.error('❌ DEBUG: Response data:', error.response?.data);
-      console.error('❌ DEBUG: Response status:', error.response?.status);
-    }
   }
+  
+  const denverFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const denverParts = denverFormatter.formatToParts(now);
+  const mtYear = parseInt(denverParts.find(p => p.type === 'year')?.value || '0');
+  const mtMonth = parseInt(denverParts.find(p => p.type === 'month')?.value || '0') - 1;
+  const mtDate = parseInt(denverParts.find(p => p.type === 'day')?.value || '0');
+  
+  return {
+    startOfDay: new Date(mtYear, mtMonth, mtDate),
+    endOfDay: new Date(mtYear, mtMonth, mtDate, 23, 59, 59)
+  };
 }
 
 // In-memory cache for device list to prevent rapid API calls
@@ -327,13 +311,13 @@ const DEVICE_LIST_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for in-memory cac
  * Includes throttling and caching to prevent rate limiting
  */
 export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
-  console.log('📱 Fetching Ecowitt device list...');
+  if (__DEV__) console.log('📱 Fetching Ecowitt device list...');
   
   try {
     // Check in-memory cache first
     const now = Date.now();
     if (deviceListCache.data && (now - deviceListCache.timestamp) < DEVICE_LIST_CACHE_DURATION) {
-      console.log('📱 Using cached device list');
+      if (__DEV__) console.log('📱 Using cached device list');
       return deviceListCache.data;
     }
 
@@ -343,7 +327,7 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
       call_back: 'device', // Request device information
     };
 
-    console.log('📡 Making Ecowitt device list API request');
+    if (__DEV__) console.log('📡 Making Ecowitt device list API request');
 
     // Use a promise to handle the API request
     if (!deviceListCache.promise) {
@@ -369,7 +353,7 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
         }
 
         const deviceList = response.data.data.list;
-        console.log('📊 Received Ecowitt devices:', deviceList.length);
+        if (__DEV__) console.log('📊 Received Ecowitt devices:', deviceList.length);
 
         // Update in-memory cache
         deviceListCache = {
@@ -381,27 +365,31 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
         return deviceList;
 
       }).catch(error => {
-        deviceListCache.promise = null; // Reset promise on error
+        // Clear the promise cache BEFORE re-throwing so concurrent callers
+        // don't hold a reference to a rejected promise
+        deviceListCache.promise = null;
         console.error('❌ Error fetching Ecowitt device list:', error);
         
+        let rethrowError: Error;
         if (axios.isAxiosError(error)) {
           if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-            throw new Error('Network connection failed. Please check your internet connection.');
+            rethrowError = new Error('Network connection failed. Please check your internet connection.');
           } else if (error.response?.status === 401) {
-            throw new Error('Invalid API credentials for device list.');
+            rethrowError = new Error('Invalid API credentials for device list.');
           } else if (error.response?.status === 429) {
-            throw new Error('API rate limit exceeded. Please try again later.');
+            rethrowError = new Error('API rate limit exceeded. Please try again later.');
           } else if (error.response && error.response.status >= 500) {
-            throw new Error('Ecowitt server error. Please try again later.');
+            rethrowError = new Error('Ecowitt server error. Please try again later.');
+          } else {
+            rethrowError = error;
           }
+        } else if (error instanceof Error && error.message.includes('Operation too frequent')) {
+          rethrowError = new Error('Ecowitt API rate limit exceeded. Please wait a moment and try again.');
+        } else {
+          rethrowError = error;
         }
         
-        // Check for specific Ecowitt "Operation too frequent" error
-        if (error instanceof Error && error.message.includes('Operation too frequent')) {
-          throw new Error('Ecowitt API rate limit exceeded. Please wait a moment and try again.');
-        }
-        
-        throw error;
+        throw rethrowError;
       });
     }
 
@@ -428,13 +416,13 @@ export async function getDeviceMacAddress(): Promise<string> {
       
       // Use cached MAC if it's still valid (within cache duration)
       if (parsed.timestamp && (now - parsed.timestamp) < MAC_ADDRESS_CACHE_DURATION && parsed.macAddress) {
-        console.log('📱 Using cached device MAC address');
+        if (__DEV__) console.log('📱 Using cached device MAC address');
         return parsed.macAddress;
       }
     }
 
     // Fetch fresh device list
-    console.log('🔍 Fetching fresh device MAC address...');
+    if (__DEV__) console.log('🔍 Fetching fresh device MAC address...');
     const devices = await fetchEcowittDeviceList();
     
     if (!devices || devices.length === 0) {
@@ -452,9 +440,9 @@ export async function getDeviceMacAddress(): Promise<string> {
       if (!selectedDevice) {
         throw new Error('No valid devices found in your Ecowitt account.');
       }
-      console.log('⚠️ No Standley device found, using first device:', selectedDevice.name || 'Unknown');
+      if (__DEV__) console.log('⚠️ No Standley device found, using first device:', selectedDevice.name || 'Unknown');
     } else {
-      console.log('✅ Using Standley device:', selectedDevice.name || 'Unknown');
+      if (__DEV__) console.log('✅ Using Standley device:', selectedDevice.name || 'Unknown');
     }
 
     // Validate device has required fields
@@ -471,7 +459,7 @@ export async function getDeviceMacAddress(): Promise<string> {
     };
     
     await AsyncStorage.setItem(DEVICE_MAC_STORAGE_KEY, JSON.stringify(cacheData));
-    console.log('💾 Cached device MAC address for device:', selectedDevice.name || 'Unknown');
+    if (__DEV__) console.log('💾 Cached device MAC address for device:', selectedDevice.name || 'Unknown');
     
     return selectedDevice.mac;
 
@@ -503,7 +491,7 @@ export function selectDeviceByName(devices: EcowittDevice[], deviceName: string)
   }
   
   if (selectedDevice) {
-    console.log(`✅ Found device "${deviceName}":`, selectedDevice.name, `(${selectedDevice.mac})`);
+    if (__DEV__) console.log(`✅ Found device "${deviceName}":`, selectedDevice.name, `(${selectedDevice.mac})`);
     return selectedDevice;
   }
   
@@ -526,12 +514,12 @@ export async function getDeviceMacAddressForDevice(deviceName: string): Promise<
       
       // Use cached MAC if it's still valid (within cache duration)
       if (parsed.timestamp && (now - parsed.timestamp) < MAC_ADDRESS_CACHE_DURATION && parsed.macAddress) {
-        console.log(`📱 Using cached device MAC address for ${deviceName}`);
+        if (__DEV__) console.log(`📱 Using cached device MAC address for ${deviceName}`);
         return parsed.macAddress;
       }
     }
 
-    console.log(`🔍 Fetching device MAC address for: ${deviceName}...`);
+    if (__DEV__) console.log(`🔍 Fetching device MAC address for: ${deviceName}...`);
     const devices = await fetchEcowittDeviceList();
     
     if (!devices || devices.length === 0) {
@@ -560,9 +548,9 @@ export async function getDeviceMacAddressForDevice(deviceName: string): Promise<
     };
     
     await AsyncStorage.setItem(deviceCacheKey, JSON.stringify(cacheData));
-    console.log(`💾 Cached device MAC address for ${deviceName}:`, selectedDevice.name || 'Unknown');
+    if (__DEV__) console.log(`💾 Cached device MAC address for ${deviceName}:`, selectedDevice.name || 'Unknown');
 
-    console.log(`✅ Using device "${deviceName}":`, selectedDevice.name || 'Unknown');
+    if (__DEV__) console.log(`✅ Using device "${deviceName}":`, selectedDevice.name || 'Unknown');
     return selectedDevice.mac;
 
   } catch (error) {
@@ -570,7 +558,7 @@ export async function getDeviceMacAddressForDevice(deviceName: string): Promise<
     
     // If we get a rate limit error, try to return a cached value even if it's older
     if (error instanceof Error && error.message.includes('Operation too frequent')) {
-      console.log(`⚠️ Rate limited, attempting to use any cached MAC for ${deviceName}...`);
+      if (__DEV__) console.log(`⚠️ Rate limited, attempting to use any cached MAC for ${deviceName}...`);
       
       const deviceCacheKey = `${DEVICE_MAC_STORAGE_KEY}_${deviceName.replace(/\s+/g, '_')}`;
       const cachedMacData = await AsyncStorage.getItem(deviceCacheKey);
@@ -578,7 +566,7 @@ export async function getDeviceMacAddressForDevice(deviceName: string): Promise<
       if (cachedMacData) {
         const parsed = JSON.parse(cachedMacData);
         if (parsed.macAddress) {
-          console.log(`📱 Using older cached MAC for ${deviceName} due to rate limiting`);
+          if (__DEV__) console.log(`📱 Using older cached MAC for ${deviceName} due to rate limiting`);
           return parsed.macAddress;
         }
       }
@@ -615,82 +603,17 @@ export async function getAutoEcowittConfigForDevice(deviceName: string): Promise
 }
 
 /**
- * Store Ecowitt API configuration
- */
-export async function setEcowittConfig(config: EcowittApiConfig): Promise<void> {
-  try {
-    await AsyncStorage.setItem(ECOWITT_CONFIG_KEY, JSON.stringify(config));
-  } catch (error) {
-    console.error('Error saving Ecowitt config:', error);
-    throw error;
-  }
-}
-
-/**
  * Fetch historic wind data from Ecowitt API for current day
  */
 export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
-  console.log('🌬️ Fetching Ecowitt wind data...');
+  if (__DEV__) console.log('🌬️ Fetching Ecowitt wind data...');
   
   // Use auto-configuration instead of manual config
   const config = await getAutoEcowittConfig();
 
   try {
-    // Get today's date range
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
-
-    // Format dates as YYYY-MM-DD HH:MM:SS in device timezone
-    // The device is in America/Denver timezone, and the API expects dates in device local time
-    const formatEcowittDate = (date: Date): string => {
-      // Convert to Mountain Time for the API request
-      // In summer (MDT), this is UTC-6; in winter (MST), this is UTC-7
-      // For June 2025, we're in Mountain Daylight Time (UTC-6)
-      
-      // Fallback implementation for Android devices without Intl support
-      if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
-        // Manual conversion to Mountain Time (UTC-6 for MDT, UTC-7 for MST)
-        // For simplicity, we'll assume MDT (UTC-6) during summer months
-        const utcTime = date.getTime();
-        const isDST = isDaylightSavingTime(date);
-        const mtOffset = isDST ? -6 : -7; // MDT = UTC-6, MST = UTC-7
-        const mtTime = new Date(utcTime + (mtOffset * 60 * 60 * 1000));
-        
-        const year = mtTime.getUTCFullYear();
-        const month = String(mtTime.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(mtTime.getUTCDate()).padStart(2, '0');
-        const hour = String(mtTime.getUTCHours()).padStart(2, '0');
-        const minute = String(mtTime.getUTCMinutes()).padStart(2, '0');
-        const second = String(mtTime.getUTCSeconds()).padStart(2, '0');
-        
-        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-      }
-      
-      // Use Intl when available (iOS and modern Android)
-      const options: Intl.DateTimeFormatOptions = {
-        timeZone: 'America/Denver',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      };
-      
-      const formatter = new Intl.DateTimeFormat('en-CA', options);
-      const parts = formatter.formatToParts(date);
-      
-      const year = parts.find(p => p.type === 'year')?.value || '2025';
-      const month = parts.find(p => p.type === 'month')?.value || '01';
-      const day = parts.find(p => p.type === 'day')?.value || '01';
-      const hour = parts.find(p => p.type === 'hour')?.value || '00';
-      const minute = parts.find(p => p.type === 'minute')?.value || '00';
-      const second = parts.find(p => p.type === 'second')?.value || '00';
-      
-      return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-    };
+    // Get today's date range in Mountain Time (device timezone)
+    const { startOfDay, endOfDay } = getMountainTimeDayRange();
 
     const params = {
       application_key: config.applicationKey,
@@ -705,7 +628,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       call_back: 'wind', // Request wind data
     };
 
-    console.log('📡 Making Ecowitt API request with params:', {
+    if (__DEV__) console.log('📡 Making Ecowitt API request with params:', {
       ...params,
       api_key: '***hidden***'
     });
@@ -722,8 +645,8 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       }
     });
 
-    console.log('📊 Ecowitt API response received. Status:', response.status);
-    console.log('📊 Response data structure:', JSON.stringify(response.data, null, 2));
+    if (__DEV__) console.log('📊 Ecowitt API response received. Status:', response.status);
+    if (__DEV__) console.log('📊 Response data structure:', JSON.stringify(response.data, null, 2));
 
     if (response.data.code !== 0) {
       throw new Error(`Ecowitt API error: ${response.data.msg}`);
@@ -732,7 +655,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
     // Handle empty data response gracefully (station offline or no data available)
     if (!response.data.data || Array.isArray(response.data.data) && response.data.data.length === 0) {
       console.warn(`⚠️ No data available from Ecowitt station - station may be offline or not reporting data`);
-      console.log(`🔄 API returned success but empty data array`);
+      if (__DEV__) console.log(`🔄 API returned success but empty data array`);
       return []; // Return empty array instead of crashing
     }
 
@@ -750,7 +673,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
 
     // Get timestamps from wind speed data (they should be consistent across all measurements)
     const timestamps = Object.keys(windData.wind_speed.list);
-    console.log('📊 Received Ecowitt data points:', timestamps.length);
+    if (__DEV__) console.log('📊 Received Ecowitt data points:', timestamps.length);
 
     // Transform API response to our format
     const windDataPoints: EcowittWindDataPoint[] = timestamps
@@ -785,10 +708,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       .filter(point => !isNaN(point.windSpeedMph) && point.windSpeedMph >= 0)
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // Cache the data (TODO: Re-implement caching)
-    // await cacheEcowittData(windDataPoints);
-    
-    console.log('✅ Processed Ecowitt wind data points:', windDataPoints.length);
+    if (__DEV__) console.log('✅ Processed Ecowitt wind data points:', windDataPoints.length);
     return windDataPoints;
 
   } catch (error) {
@@ -814,7 +734,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
  * Fetch historic wind data from Ecowitt API for specific device
  */
 export async function fetchEcowittWindDataForDevice(deviceName: string): Promise<EcowittWindDataPoint[]> {
-  console.log(`🌬️ Fetching Ecowitt wind data for ${deviceName}...`);
+  if (__DEV__) console.log(`🌬️ Fetching Ecowitt wind data for ${deviceName}...`);
   
   // Use request deduplication to prevent multiple simultaneous API calls
   const requestKey = `history_${deviceName}_${new Date().toDateString()}`;
@@ -823,57 +743,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     try {
       const config = await getAutoEcowittConfigForDevice(deviceName);
       
-      // Format dates as YYYY-MM-DD HH:MM:SS in device timezone
-      // The device is in America/Denver timezone, and the API expects dates in device local time
-      const formatEcowittDate = (date: Date): string => {
-      // Convert to Mountain Time for the API request
-      
-      // Fallback implementation for Android devices without Intl support
-      if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
-        // Manual conversion to Mountain Time (UTC-6 for MDT, UTC-7 for MST)
-        const utcTime = date.getTime();
-        const isDST = isDaylightSavingTime(date);
-        const mtOffset = isDST ? -6 : -7; // MDT = UTC-6, MST = UTC-7
-        const mtTime = new Date(utcTime + (mtOffset * 60 * 60 * 1000));
-        
-        const year = mtTime.getUTCFullYear();
-        const month = String(mtTime.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(mtTime.getUTCDate()).padStart(2, '0');
-        const hour = String(mtTime.getUTCHours()).padStart(2, '0');
-        const minute = String(mtTime.getUTCMinutes()).padStart(2, '0');
-        const second = String(mtTime.getUTCSeconds()).padStart(2, '0');
-        
-        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-      }
-      
-      // Use Intl when available (iOS and modern Android)
-      const options: Intl.DateTimeFormatOptions = {
-        timeZone: 'America/Denver',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      };
-      
-      const formatter = new Intl.DateTimeFormat('en-CA', options);
-      const parts = formatter.formatToParts(date);
-      
-      const year = parts.find(p => p.type === 'year')?.value || '2025';
-      const month = parts.find(p => p.type === 'month')?.value || '01';
-      const day = parts.find(p => p.type === 'day')?.value || '01';
-      const hour = parts.find(p => p.type === 'hour')?.value || '00';
-      const minute = parts.find(p => p.type === 'minute')?.value || '00';
-      const second = parts.find(p => p.type === 'second')?.value || '00';
-      
-      return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-    };
-    
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      const { startOfDay, endOfDay } = getMountainTimeDayRange();
     
     const params = {
       application_key: config.applicationKey,
@@ -888,7 +758,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       call_back: 'wind,outdoor,indoor', // Request wind data + outdoor/indoor for transmission quality detection
     };
 
-    console.log(`📡 Making Ecowitt history API request for ${deviceName}`);
+    if (__DEV__) console.log(`📡 Making Ecowitt history API request for ${deviceName}`);
 
     const response = await axios.get<EcowittHistoricResponse>(`${BASE_URL}/device/history`, {
       params,
@@ -909,7 +779,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     // Handle empty data response gracefully (station offline or no data available)
     if (!response.data.data || Array.isArray(response.data.data) && response.data.data.length === 0) {
       console.warn(`⚠️ No data available from ${deviceName} - station may be offline or not reporting data`);
-      console.log(`🔄 API returned success but empty data array for ${deviceName}`);
+      if (__DEV__) console.log(`🔄 API returned success but empty data array for ${deviceName}`);
       return []; // Return empty array instead of crashing
     }
 
@@ -926,7 +796,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
 
     // Get timestamps from wind speed data (they should be consistent across all measurements)
     const timestamps = Object.keys(windSpeedData.wind_speed.list);
-    console.log(`📊 Received ${timestamps.length} data points for ${deviceName}`);
+    if (__DEV__) console.log(`📊 Received ${timestamps.length} data points for ${deviceName}`);
 
     // Transform API response to our format with transmission quality analysis
     const windDataPoints: EcowittWindDataPoint[] = timestamps
@@ -986,9 +856,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       })
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // Cache the data using enhanced caching (TODO: Re-implement caching)
-    // await cacheEcowittDataEnhanced(deviceName, windDataPoints, false);
-    console.log(`✅ Successfully fetched and cached ${windDataPoints.length} wind data points for ${deviceName}`);
+    if (__DEV__) console.log(`✅ Successfully fetched and cached ${windDataPoints.length} wind data points for ${deviceName}`);
     
     return windDataPoints;
 
@@ -1021,7 +889,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
   conditions: EcowittCurrentWindConditions | null;
   transmissionQuality?: { isFullTransmission: boolean; hasOutdoorSensors: boolean; missingDataFields: string[] };
 }> {
-  console.log(`⚡ Fetching real-time Ecowitt wind data for ${deviceName}...`);
+  if (__DEV__) console.log(`⚡ Fetching real-time Ecowitt wind data for ${deviceName}...`);
   
   // Use request deduplication for real-time data with shorter TTL
   const requestKey = `realtime_${deviceName}_${Math.floor(Date.now() / 10000)}`; // 10-second cache
@@ -1039,7 +907,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
       temp_unitid: '1', // Celsius
     };
 
-    console.log(`📡 Making Ecowitt real-time API request for ${deviceName}`);
+    if (__DEV__) console.log(`📡 Making Ecowitt real-time API request for ${deviceName}`);
 
     const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
       params,
@@ -1107,7 +975,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
       missingDataFields: missingFields
     };
 
-    console.log(`✅ Retrieved real-time wind data for ${deviceName}:`, {
+    if (__DEV__) console.log(`✅ Retrieved real-time wind data for ${deviceName}:`, {
       windSpeed: currentConditions.windSpeedMph,
       direction: currentConditions.windDirection,
       timestamp: new Date(currentConditions.timestamp).toLocaleString(),
@@ -1133,7 +1001,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
  * Fetch current real-time wind data from Ecowitt API
  */
 export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promise<EcowittCurrentWindConditions | null> {
-  console.log('🔄 Fetching Ecowitt real-time data...');
+  if (__DEV__) console.log('🔄 Fetching Ecowitt real-time data...');
   
   try {
     const params = {
@@ -1141,9 +1009,11 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
       api_key: config.apiKey,
       mac: config.macAddress,
       call_back: 'wind', // Request wind data
+      wind_speed_unitid: '6', // m/s - consistent with fetchEcowittRealTimeWindData
+      temp_unitid: '1', // Celsius
     };
 
-    console.log('📡 Making Ecowitt real-time API request');
+    if (__DEV__) console.log('📡 Making Ecowitt real-time API request');
 
     const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
       params,
@@ -1169,32 +1039,28 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
 
     const windData = response.data.data.wind;
     
-    // Extract wind measurements
-    const windSpeedMph = parseFloat(windData.wind_speed?.value || '0');
-    const windGustMph = parseFloat(windData.wind_gust?.value || windSpeedMph.toString());
+    // Extract wind measurements (values are in m/s since we requested wind_speed_unitid: '6')
+    const windSpeedMs = parseFloat(windData.wind_speed?.value || '0');
+    const windGustMs = parseFloat(windData.wind_gust?.value || windSpeedMs.toString());
     const windDirection = parseFloat(windData.wind_direction?.value || '0');
     
     // Use the timestamp from wind speed (they should all be the same)
     const timestamp = parseInt(windData.wind_speed?.time || '0') * 1000;
     const timeString = new Date(timestamp).toISOString();
     
-    // Convert mph to m/s for internal consistency
-    const windSpeedMs = windSpeedMph / 2.237;
-    const windGustMs = windGustMph / 2.237;
-    
     const realTimeConditions: EcowittCurrentWindConditions = {
       windSpeed: windSpeedMs,
-      windSpeedMph,
+      windSpeedMph: msToMph(windSpeedMs),
       windGust: windGustMs,
-      windGustMph,
+      windGustMph: msToMph(windGustMs),
       windDirection,
       timestamp,
       time: timeString
     };
     
-    console.log('✅ Processed real-time wind data:', {
+    if (__DEV__) console.log('✅ Processed real-time wind data:', {
       time: timeString,
-      windSpeedMph,
+      windSpeedMph: realTimeConditions.windSpeedMph,
       windDirection
     });
     
@@ -1223,7 +1089,7 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
  * Fetch combined wind data: historical + real-time for complete coverage
  */
 export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoint[]> {
-  console.log('🌬️ Fetching combined Ecowitt wind data (historical + real-time)...');
+  if (__DEV__) console.log('🌬️ Fetching combined Ecowitt wind data (historical + real-time)...');
   
   const config = await getAutoEcowittConfig();
   
@@ -1257,24 +1123,25 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
           humidity: realTimeData.humidity
         };
         
-        // Simple transmission quality fallback for legacy function
+        // Determine transmission quality based on whether wind data is present
+        const hasWindData = realTimeData.windSpeed !== undefined && realTimeData.windDirection !== undefined;
         realTimePoint.transmissionQuality = {
-          isFullTransmission: false,
+          isFullTransmission: hasWindData,
           hasOutdoorSensors: true,
           missingDataFields: []
         };
         
         combinedData.push(realTimePoint);
-        console.log('✅ Added real-time data point to historical data');
+        if (__DEV__) console.log('✅ Added real-time data point to historical data');
       } else {
-        console.log('⚠️ Real-time data is not newer than historical data');
+        if (__DEV__) console.log('⚠️ Real-time data is not newer than historical data');
       }
     }
     
     // Sort by timestamp to ensure proper order
     combinedData.sort((a, b) => a.timestamp - b.timestamp);
     
-    console.log(`✅ Combined data: ${historicalData.length} historical + ${realTimeData ? 1 : 0} real-time = ${combinedData.length} total points`);
+    if (__DEV__) console.log(`✅ Combined data: ${historicalData.length} historical + ${realTimeData ? 1 : 0} real-time = ${combinedData.length} total points`);
     
     return combinedData;
     
@@ -1282,7 +1149,7 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
     console.error('❌ Error fetching combined wind data:', error);
     
     // Fallback to historical data only if real-time fails
-    console.log('⚠️ Falling back to historical data only');
+    if (__DEV__) console.log('⚠️ Falling back to historical data only');
     return await fetchEcowittWindData();
   }
 }
@@ -1291,7 +1158,7 @@ export async function fetchEcowittCombinedWindData(): Promise<EcowittWindDataPoi
  * Fetch combined wind data for specific device: historical + real-time
  */
 export async function fetchEcowittCombinedWindDataForDevice(deviceName: string): Promise<EcowittWindDataPoint[]> {
-  console.log(`🌬️ Fetching combined wind data for ${deviceName} (historical + real-time)...`);
+  if (__DEV__) console.log(`🌬️ Fetching combined wind data for ${deviceName} (historical + real-time)...`);
   
   try {
     // Fetch historical data for the day
@@ -1324,27 +1191,27 @@ export async function fetchEcowittCombinedWindDataForDevice(deviceName: string):
           temperature: realTimeData.temperature,
           humidity: realTimeData.humidity,
           transmissionQuality: realTimeTransmissionQuality || {
-            isFullTransmission: false,
+            isFullTransmission: realTimeData.windSpeed !== undefined && realTimeData.windDirection !== undefined,
             hasOutdoorSensors: true,
             missingDataFields: []
           }
         };
         
         combinedData.push(realTimePoint);
-        console.log(`✅ Added real-time data point for ${deviceName} with transmission quality:`, {
+        if (__DEV__) console.log(`✅ Added real-time data point for ${deviceName} with transmission quality:`, {
           isFullTransmission: realTimeTransmissionQuality?.isFullTransmission,
           hasOutdoorSensors: realTimeTransmissionQuality?.hasOutdoorSensors,
           missingFields: realTimeTransmissionQuality?.missingDataFields
         });
       } else {
-        console.log(`⚠️ Real-time data for ${deviceName} is not newer than historical data`);
+        if (__DEV__) console.log(`⚠️ Real-time data for ${deviceName} is not newer than historical data`);
       }
     }
     
     // Sort by timestamp to ensure proper order
     combinedData.sort((a, b) => a.timestamp - b.timestamp);
     
-    console.log(`✅ Combined data for ${deviceName}: ${historicalData.length} historical + ${realTimeData ? 1 : 0} real-time = ${combinedData.length} total points`);
+    if (__DEV__) console.log(`✅ Combined data for ${deviceName}: ${historicalData.length} historical + ${realTimeData ? 1 : 0} real-time = ${combinedData.length} total points`);
     
     return combinedData;
     
@@ -1352,7 +1219,7 @@ export async function fetchEcowittCombinedWindDataForDevice(deviceName: string):
     console.error(`❌ Error fetching combined wind data for ${deviceName}:`, error);
     
     // Fallback to historical data only if real-time fails
-    console.log(`⚠️ Falling back to historical data only for ${deviceName}`);
+    if (__DEV__) console.log(`⚠️ Falling back to historical data only for ${deviceName}`);
     return await fetchEcowittWindDataForDevice(deviceName);
   }
 }
@@ -1379,7 +1246,7 @@ export async function clearDeviceCache(deviceName: string): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
     const cacheKey = `ecowitt_${deviceName}_${today}`;
     await AsyncStorage.removeItem(cacheKey);
-    console.log(`🗑️ Cleared cache for ${deviceName}`);
+    if (__DEV__) console.log(`🗑️ Cleared cache for ${deviceName}`);
   } catch (error) {
     console.error(`Error clearing cache for ${deviceName}:`, error);
   }
@@ -1449,7 +1316,7 @@ export function analyzeOverallTransmissionQuality(windDataPoints: EcowittWindDat
   let currentGap: TransmissionGap | null = null;
   const MIN_GAP_DURATION_MINUTES = 15; // Report gaps of 15+ minutes
   
-  console.log(`🔍 Analyzing ${windDataPoints.length} data points for transmission gaps (min duration: ${MIN_GAP_DURATION_MINUTES} min)...`);
+  if (__DEV__) console.log(`🔍 Analyzing ${windDataPoints.length} data points for transmission gaps (min duration: ${MIN_GAP_DURATION_MINUTES} min)...`);
   
   // Analyze each data point for transmission quality
   for (let i = 0; i < windDataPoints.length; i++) {
@@ -1546,9 +1413,9 @@ export function analyzeOverallTransmissionQuality(windDataPoints: EcowittWindDat
   }
 
   // Log detected gaps
-  console.log(`📊 Gap detection complete: ${transmissionGaps.length} gaps found (≥${MIN_GAP_DURATION_MINUTES} min)`);
+  if (__DEV__) console.log(`📊 Gap detection complete: ${transmissionGaps.length} gaps found (≥${MIN_GAP_DURATION_MINUTES} min)`);
   transmissionGaps.forEach((gap, index) => {
-    console.log(`  Gap ${index + 1}: ${gap.type} (${gap.durationMinutes} min) from ${new Date(gap.startTime).toLocaleTimeString()} to ${new Date(gap.endTime).toLocaleTimeString()}`);
+    if (__DEV__) console.log(`  Gap ${index + 1}: ${gap.type} (${gap.durationMinutes} min) from ${new Date(gap.startTime).toLocaleTimeString()} to ${new Date(gap.endTime).toLocaleTimeString()}`);
   });
 
   // Determine current status based on the latest data point
@@ -1565,7 +1432,7 @@ export function analyzeOverallTransmissionQuality(windDataPoints: EcowittWindDat
     currentStatus = 'indoor-only';
   }
 
-  console.log('📊 Current transmission status analysis:', {
+  if (__DEV__) console.log('📊 Current transmission status analysis:', {
     hasLatestQuality: !!latestQuality,
     isFullTransmission: latestQuality?.isFullTransmission,
     hasOutdoorSensors: latestQuality?.hasOutdoorSensors,

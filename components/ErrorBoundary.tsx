@@ -45,10 +45,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     // Store error for debugging
     try {
       AsyncStorage.setItem('lastError', JSON.stringify(errorDetails))
-        .then(() => console.log('Error details saved to AsyncStorage'))
-        .catch(err => console.log('Failed to save error details:', err));
+        .then(() => { if (__DEV__) console.log('Error details saved to AsyncStorage'); })
+        .catch(err => { if (__DEV__) console.log('Failed to save error details:', err); });
     } catch (e) {
-      console.log('Failed to save error details:', e);
+      if (__DEV__) console.log('Failed to save error details:', e);
     }
     
     this.setState({
@@ -61,8 +61,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       // Clear cached data if the error might be related to corrupted cache
       if (this.state.error?.message?.includes('JSON') || 
           this.state.error?.message?.includes('parse') ||
-          this.state.error?.message?.includes('data')) {
-        console.log('Clearing potentially corrupted cached data...');
+          this.state.error?.message?.includes('corrupted')) {
+        if (__DEV__) console.log('Clearing potentially corrupted cached data...');
         await AsyncStorage.removeItem('windData');
       }
       
@@ -78,7 +78,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   handleReset = async () => {
     try {
       // Clear all app data
-      console.log('Performing full storage reset...');
+      if (__DEV__) console.log('Performing full storage reset...');
       await AsyncStorage.clear();
       this.setState({ hasError: false, error: undefined, errorInfo: undefined });
     } catch (e) {

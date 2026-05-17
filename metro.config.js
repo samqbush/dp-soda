@@ -3,14 +3,13 @@ const { getDefaultConfig } = require('expo/metro-config');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Disable Hermes and use JSC for better compatibility
+// Hermes is the default JS engine for Expo SDK 53+
 config.transformer = {
   ...config.transformer,
   minifierConfig: {
     ...config.transformer.minifierConfig,
     keep_fnames: true,
   },
-  hermesParser: false,
 };
 
 // Ensure proper asset resolution

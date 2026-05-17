@@ -8,7 +8,6 @@ jest.mock('@/services/ecowittService', () => ({
   analyzeOverallTransmissionQuality: jest.fn(),
   clearDeviceCache: jest.fn(),
   convertToWindDataPoint: jest.fn(),
-  debugDeviceListAPI: jest.fn(),
   fetchEcowittCombinedWindDataForDevice: jest.fn(),
   fetchEcowittRealTimeWindData: jest.fn(),
   getAutoEcowittConfigForDevice: jest.fn(),
@@ -128,7 +127,6 @@ describe('useStandleyLakeWind Hook Tests', () => {
       conditions: mockCurrentConditions
     });
     mockEcowittService.clearDeviceCache.mockResolvedValue();
-    mockEcowittService.debugDeviceListAPI.mockResolvedValue();
   });
 
   describe('Hook Initialization', () => {
@@ -470,36 +468,6 @@ describe('useStandleyLakeWind Hook Tests', () => {
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error clearing cache:', clearError);
         expect(result.current.error).toBe('Failed to clear cache');
-      });
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('Debug API', () => {
-    it('should call debug API successfully', async () => {
-      const { result } = renderHook(() => useStandleyLakeWind());
-
-      await waitFor(async () => {
-        await result.current.debugAPI();
-      });
-
-      expect(mockEcowittService.debugDeviceListAPI).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle debug API errors', async () => {
-      const debugError = new Error('Debug failed');
-      mockEcowittService.debugDeviceListAPI.mockRejectedValue(debugError);
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const { result } = renderHook(() => useStandleyLakeWind());
-
-      await waitFor(async () => {
-        await result.current.debugAPI();
-      });
-
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Debug API failed:', debugError);
       });
 
       consoleErrorSpy.mockRestore();

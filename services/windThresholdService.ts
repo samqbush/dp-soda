@@ -33,10 +33,10 @@ class WindThresholdService {
 
   async setThreshold(threshold: number): Promise<void> {
     this.currentThreshold = threshold;
+    this.notifyListeners();
     
     try {
       await AsyncStorage.setItem(WIND_THRESHOLD_KEY, JSON.stringify(threshold));
-      this.notifyListeners();
     } catch (error) {
       console.error('Failed to save wind threshold:', error);
     }
