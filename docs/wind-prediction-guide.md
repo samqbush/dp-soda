@@ -707,6 +707,27 @@ This time-based system ensures users get the most relevant and accurate informat
 - Advanced machine learning model deployment
 - Historical pattern analysis and seasonal adjustments
 
+## Historical: Planned Prediction Lifecycle
+
+The following prediction workflow was designed for the local system before server migration. It documents the intended time-based prediction lifecycle:
+
+### Daily Prediction Phases
+
+1. **Preview (before 6 PM)**: Preliminary forecast calculated on each refresh using current weather models
+2. **Evening Lock (6 PM – 11:59 PM)**: User refreshes to lock prediction using complete thermal cycle data. Auto-locks at 11 PM if not manually triggered.
+3. **Locked (Midnight – 6 AM)**: Prediction frozen; survives app restarts
+4. **Active (6 – 8 AM)**: Live dawn patrol window with real-time verification
+5. **Verified (after 8 AM)**: Post-event accuracy tracking
+
+### Key Design Principles
+
+- **User control**: Refresh during the 6–11 PM window to set the next day's prediction
+- **Progressive enhancement**: Later refreshes use more complete weather data
+- **Automatic failsafe**: System auto-locks at 11 PM regardless
+- **Persistence**: Locked predictions survive app restarts, auto-cleanup after 7 days
+
+> **Note**: This lifecycle was never fully implemented in production. The server-based system will incorporate these concepts with improved reliability.
+
 ---
 
 *Documentation updated: June 30, 2025*  

@@ -585,3 +585,67 @@ wavePattern: 10%          (updated: uses transportWindAnalysis)
 - Enhanced factor display with MKI-specific explanations
 - Advanced prediction windows based on wave evolution
 - Activity-specific MKI guidance and safety considerations
+
+## Ecowitt API Reference
+
+The app uses the [Ecowitt API v3](https://api.ecowitt.net/api/v3/) to retrieve weather station data for Standley Lake monitoring.
+
+### Authentication
+
+All requests require:
+- `application_key` — Ecowitt developer application key
+- `api_key` — Account-level API key
+- `mac` — Device MAC address (e.g., `FF:FF:FF:FF:FF:FF`)
+
+### Endpoints
+
+#### Real-Time Data
+
+```
+GET https://api.ecowitt.net/api/v3/device/real_time
+```
+
+Returns the latest data (within past 2 hours). Key parameters:
+- `call_back` — Fields to return (e.g., `outdoor`, `indoor.humidity`, or `all`)
+- `wind_speed_unitid` — `9` for mph (default), `7` for km/h, `8` for knots
+
+#### Device History
+
+```
+GET https://api.ecowitt.net/api/v3/device/history
+```
+
+Returns historical data with resolution constraints:
+| Time Range | Resolution | Max Span per Request |
+|---|---|---|
+| Past 90 days | 5 min | 1 day |
+| Past 365 days | 30 min | 1 week |
+| Past 730 days | 240 min | 1 month |
+| Past 1460 days | 24 hours | 1 year |
+
+Key parameters:
+- `start_date` / `end_date` — ISO 8601 format (e.g., `2022-01-01 00:00:00`)
+- `cycle_type` — `auto`, `5min`, `30min`, `4hour`, or `1day`
+- `call_back` — Fields to return (supports comma-separated, e.g., `outdoor.temp,indoor.humidity`)
+
+### Unit Options
+
+| Measurement | Parameter | Values |
+|---|---|---|
+| Temperature | `temp_unitid` | `1` = °C, `2` = °F (default) |
+| Wind Speed | `wind_speed_unitid` | `6` = m/s, `7` = km/h, `8` = knots, `9` = mph (default) |
+| Pressure | `pressure_unitid` | `3` = hPa, `4` = inHg (default), `5` = mmHg |
+| Rainfall | `rainfall_unitid` | `12` = mm, `13` = in (default) |
+
+### Response Format
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "time": "1649409577",
+  "data": { ... }
+}
+```
+
+Non-zero `code` values indicate errors. The `data` object structure varies by endpoint and `call_back` parameter.

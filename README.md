@@ -8,25 +8,20 @@ A wind monitoring app for Soda Lake (Soda Lake Dam 1) in Colorado that helps you
 - **Smart Analysis**: Advanced wind pattern analysis with multiple data sources
 - **Configurable Thresholds**: Customize wind speed preferences for visual indicators
 - **Standley Lake Monitor**: Real-time wind conditions via Ecowitt weather stations
-- **🚀 NEW: Wind Guru Server Migration**: Advanced katabatic wind predictions moved to server-based architecture
+- **Wind Guru (Experimental)**: Advanced katabatic wind predictions (server migration in progress)
 
-## Wind Guru: Server-Based Predictions
+## Wind Guru Tab
 
-**Enhanced Performance & Accuracy (In Development)**
+**Experimental Feature — Server Migration In Progress**
 
-The Wind Guru tab has been upgraded from a complex local prediction system to a server-based solution for improved performance and accuracy. Users will benefit from:
+The Wind Guru tab provides advanced katabatic wind predictions for Morrison, CO. It is currently an experimental feature (disabled by default) that can be enabled in Settings under "App Features."
 
-### Coming Soon: Server-Powered Features
+The tab currently shows a server migration notice — the local prediction engine has been removed and server-based predictions are under development. When complete, the server system will provide:
 
-**🌟 Enhanced Prediction Capabilities:**
-- **Machine Learning Models**: Advanced pattern recognition from comprehensive datasets
-- **Real-Time Processing**: Continuous monitoring and instant prediction updates
-- **Multi-Location Analysis**: Comparative analysis across multiple wind sites
-- **Improved Accuracy**: Access to more sophisticated weather modeling
-- **Faster Performance**: No local processing delays, instant server results
-
-**🎯 Previous Local System (Migrated):**
-The previous system included local 5-factor katabatic analysis, real-time prediction tracking, and complex atmospheric calculations. This functionality has been moved to server infrastructure for enhanced capabilities.
+- Machine learning models for pattern recognition
+- Real-time processing and instant prediction updates
+- Multi-location analysis across wind sites
+- Improved accuracy via sophisticated weather modeling
 
 ## Getting Started
 
@@ -64,6 +59,7 @@ The Dawn Patrol app helps you decide when to head to the beach by analyzing wind
 
 ### Settings Screen
 
+- Tap the "Settings" tab to access settings
 - **Test Different Scenarios**: Try different wind conditions to see how the alarm responds
 - **Customize Parameters**: Adjust minimum wind speed, direction consistency, and other criteria
 - **Real-time Feedback**: See immediate analysis results as you change settings
@@ -74,25 +70,12 @@ The Dawn Patrol app helps you decide when to head to the beach by analyzing wind
   - Inconsistent wind direction
   - Wrong wind direction (opposite of preferred)
   - Few good consecutive data points
-
-### Settings Screen
-
-- Tap the "Settings" tab to access settings
-- Adjust all wind criteria to match your activity needs
 - Changes take effect immediately with real-time analysis update
 - Reset to defaults with a single tap
 
 ### Wind Guru Tab
 
-The enhanced **Wind Guru** tab provides revolutionary MKI wind prediction:
-
-- **6-Factor MKI Analysis**: Complete atmospheric interaction assessment 
-- **Live Probability Scoring**: Real-time percentage with confidence levels
-- **Enhanced Factor Breakdown**: Detailed analysis of precipitation, sky, pressure, temperature, wave patterns, and stability
-- **Mountain Wave Assessment**: Froude number analysis and wave enhancement potential
-- **Visual MKI Indicators**: Color-coded probability bars and comprehensive condition status
-- **Scientific Recommendations**: GO/MAYBE/SKIP guidance based on atmospheric research
-- **Advanced Insights**: Optimal time windows and detailed meteorological analysis with wave considerations
+The Wind Guru tab is an experimental feature for advanced katabatic wind predictions (disabled by default). Enable it in Settings → App Features. See the [Wind Guru Tab](#wind-guru-tab) section above for details on current functionality.
 
 ## Customizing Your Experience
 
@@ -128,35 +111,30 @@ Currently, the app is optimized for Soda Lake (Soda Lake Dam 1) in Colorado.
 
 ## Documentation
 
-Comprehensive documentation is available in the [`docs/`](docs/) directory:
+Project documentation:
 
-**Quick Links:**
-- 📖 **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
-- 👤 **[User Guide](docs/user-guide.md)** - How to use the app effectively
-- 🔬 **[Wind Prediction Guide](docs/wind-prediction-guide.md)** - Understanding katabatic wind analysis
-- 👨‍💻 **[Developer Setup](docs/developer-setup.md)** - Contributing to the project
-- 🚀 **[Deployment Guide](docs/deployment.md)** - Build and release processes
-- 🛠️ **[Troubleshooting Guide](docs/troubleshooting.md)** - Fixing common issues
-
-The documentation has been recently reorganized (June 10, 2025) to eliminate sprawl and improve accessibility. Historical development documentation is preserved in `docs/archive/` for reference.
+- 📖 **[README](README.md)** - User-facing features and usage guide (this file)
+- 👨‍💻 **[Developer Setup](docs/developer-setup.md)** - Build, deploy, and contribute
+- 🏗️ **[Architecture](docs/architecture.md)** - Technical system design
+- 🔬 **[Wind Prediction Guide](docs/wind-prediction-guide.md)** - Katabatic wind analysis theory
 
 ## CI/CD with GitHub Actions
 
 This project uses GitHub Actions for continuous integration and delivery:
 
-- Automatic builds for Android releases
+- Automatic builds for Android and iOS releases
 - Environment variables securely managed through GitHub secrets
-- Complete signing and packaging for Google Play Store distribution
+- Complete signing and packaging for distribution
 
 For details on setting up the CI/CD environment:
-1. See [Deployment Guide](docs/deployment.md) for CI/CD configuration details
-2. Review `.github/workflows/android.yml` for workflow configuration
+1. See [Developer Setup](docs/developer-setup.md) for CI/CD configuration details
+2. Review `.github/workflows/build-and-release.yml` for workflow configuration
 
 ## Coming Soon
 
 - Push notifications for ideal conditions
 - Historical accuracy tracking
-- iOS builds in GitHub Actions workflow
+- Server-powered Wind Guru predictions
 
 ## Contact & Support
 
