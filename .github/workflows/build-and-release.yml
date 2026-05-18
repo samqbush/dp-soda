@@ -418,7 +418,7 @@ jobs:
       - name: 🏗️ Build Android App Bundle
         run: |
           cd android
-          ./gradlew bundleRelease -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
+          ./gradlew bundleRelease
 
       # Fallback manual signing of the AAB with jarsigner
       - name: 🔏 Manual signing fallback
