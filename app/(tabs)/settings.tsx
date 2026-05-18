@@ -102,7 +102,7 @@ export default function SettingsScreen() {
             <View style={styles.infoRow}>
               <ThemedText style={styles.infoLabel}>Platform</ThemedText>
               <ThemedText style={styles.infoValue}>
-                {Platform.OS === 'ios' ? 'iOS' : 'Android'} {Platform.Version}
+                {Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'web' ? 'Web' : 'Android'} {Platform.Version}
               </ThemedText>
             </View>
             

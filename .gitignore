@@ -50,3 +50,4 @@ app-example
 test-results/
 playwright-report/
 blob-report/
+.playwright-cli/

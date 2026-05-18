@@ -10,6 +10,18 @@ import {
 // Ecowitt API constants
 const BASE_URL = 'https://api.ecowitt.net/api/v3';
 
+// Only set User-Agent on native — browsers block this header in fetch/XHR
+const getNativeHeaders = (): Record<string, string> => {
+  if (Platform.OS === 'web') return {};
+  return {
+    'User-Agent': Platform.select({
+      ios: 'DawnPatrol/1.0 (iOS)',
+      android: 'DawnPatrol/1.0 (Android)',
+      default: 'DawnPatrol/1.0'
+    }) ?? 'DawnPatrol/1.0'
+  };
+};
+
 // Request deduplication system
 interface PendingRequest {
   promise: Promise<any>;
@@ -334,13 +346,7 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
       deviceListCache.promise = axios.get<EcowittDeviceListResponse>(`${BASE_URL}/device/list`, {
         params,
         timeout: 10000,
-        headers: {
-          'User-Agent': Platform.select({
-            ios: 'DawnPatrol/1.0 (iOS)',
-            android: 'DawnPatrol/1.0 (Android)',
-            default: 'DawnPatrol/1.0'
-          })
-        }
+        headers: getNativeHeaders()
       }).then(response => {
         if (response.data.code !== 0) {
           throw new Error(`Ecowitt device list API error: ${response.data.msg}`);
@@ -763,13 +769,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
     const response = await axios.get<EcowittHistoricResponse>(`${BASE_URL}/device/history`, {
       params,
       timeout: 15000, // Longer timeout for history data
-      headers: {
-        'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
-        })
-      }
+      headers: getNativeHeaders()
     });
 
     if (response.data.code !== 0) {
@@ -912,13 +912,7 @@ export async function fetchEcowittRealTimeWindData(deviceName: string): Promise<
     const response = await axios.get<EcowittRealTimeResponse>(`${BASE_URL}/device/real_time`, {
       params,
       timeout: 10000, // Shorter timeout for real-time data
-      headers: {
-        'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
-        })
-      }
+      headers: getNativeHeaders()
     });
 
     if (response.data.code !== 0) {
