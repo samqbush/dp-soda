@@ -385,6 +385,26 @@ jobs:
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
 
+      - name: 🚫 Disable lintVital (OOM on RN library lint)
+        run: |
+          # Inject lint { checkReleaseBuilds false } into app/build.gradle
+          sed -i '/^android {/a\    lint { checkReleaseBuilds false }' android/app/build.gradle
+          # Also disable for all subprojects
+          cat >> android/build.gradle << 'EOF'
+
+          subprojects {
+              afterEvaluate {
+                  if (project.hasProperty("android")) {
+                      android {
+                          lint {
+                              checkReleaseBuilds false
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
       - name: 🔧 Add build metadata
         run: |
           if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
@@ -404,7 +424,7 @@ jobs:
       - name: 🏗️ Build Android App Bundle
         run: |
           cd android
-          ./gradlew bundleRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
+          ./gradlew bundleRelease -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
 
       # Fallback manual signing of the AAB with jarsigner
       - name: 🔏 Manual signing fallback
