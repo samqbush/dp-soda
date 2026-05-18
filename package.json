@@ -25,7 +25,8 @@
     "test:e2e:ios": "npx playwright test --project=ios",
     "test:e2e:android": "npx playwright test --project=android",
     "test:e2e:headed": "npx playwright test --headed",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "mkdir -p node_modules/@expo/metro/node_modules && ln -sf ../../../metro-runtime node_modules/@expo/metro/node_modules/metro-runtime"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
