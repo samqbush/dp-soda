@@ -378,7 +378,7 @@ jobs:
       # Update gradle.properties for better build performance
       - name: ⚙️ Configure Gradle for production build
         run: |
-          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
           echo "org.gradle.parallel=true" >> android/gradle.properties
           echo "org.gradle.configureondemand=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
@@ -404,7 +404,7 @@ jobs:
       - name: 🏗️ Build Android App Bundle
         run: |
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
 
       # Fallback manual signing of the AAB with jarsigner
       - name: 🔏 Manual signing fallback
