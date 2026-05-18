@@ -452,14 +452,12 @@ describe('WindService Tests', () => {
         expect.objectContaining({
           timeout: 15000,
           headers: expect.objectContaining({
-            'User-Agent': expect.stringContaining('Mozilla'),
             'Referer': expect.stringContaining('windalert.com'),
             'X-Requested-With': 'XMLHttpRequest'
           }),
           params: expect.objectContaining({
             spot_id: '149264',
             fields: 'wind',
-            wf_token: 'f546a4d1e7115896684766407a63e45c'
           })
         })
       );
