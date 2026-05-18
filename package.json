@@ -21,6 +21,9 @@
     "debug-stations": "node scripts/debug-dp-stations.mjs",
     "debug-transmission": "node scripts/DEBUG-transmission-quality-analysis.mjs",
     "test:e2e": "npx playwright test",
+    "test:e2e:web": "npx playwright test --project=web",
+    "test:e2e:ios": "npx playwright test --project=ios",
+    "test:e2e:android": "npx playwright test --project=android",
     "test:e2e:headed": "npx playwright test --headed",
     "prepare": "husky"
   },

@@ -14,8 +14,16 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'web',
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    },
+    {
+      name: 'ios',
+      use: { ...devices['iPhone 14'] },
+    },
+    {
+      name: 'android',
+      use: { ...devices['Pixel 7'], channel: 'chrome' },
     },
   ],
 });
