@@ -389,18 +389,12 @@ jobs:
         run: |
           # Inject lint { checkReleaseBuilds false } into app/build.gradle
           sed -i '/^android {/a\    lint { checkReleaseBuilds false }' android/app/build.gradle
-          # Also disable for all subprojects
-          cat >> android/build.gradle << 'EOF'
-
-          subprojects {
-              afterEvaluate {
-                  if (project.hasProperty("android")) {
-                      android {
-                          lint {
-                              checkReleaseBuilds false
-                          }
-                      }
-                  }
+          # Use init script to disable lint for all subprojects (avoids afterEvaluate timing issue)
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+              plugins.withId("com.android.library") {
+                  android.lint.checkReleaseBuilds = false
               }
           }
           EOF
