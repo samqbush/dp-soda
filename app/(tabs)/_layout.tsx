@@ -44,6 +44,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="boulder-res"
+        options={{
+          title: 'Boulder Res',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="drop.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="wind-guru"
         options={{
           title: 'Wind Guru',

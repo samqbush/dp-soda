@@ -21,6 +21,7 @@ const MAPPING = {
   'wind': 'air',
   'alarm.fill': 'alarm',
   'cloud.sun.fill': 'wb-sunny',
+  'drop.fill': 'water-drop',
 } satisfies Record<string, ComponentProps<typeof MaterialIcons>['name']>;
 
 /**
