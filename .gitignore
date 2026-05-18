@@ -45,3 +45,8 @@ yarn-error.*
 coverage/
 
 app-example
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
