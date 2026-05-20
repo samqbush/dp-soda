@@ -5,6 +5,7 @@ import {
   TransmissionQualityInfo 
 } from '@/services/ecowittService';
 import { WindDataPoint, WindAnalysis } from '@/services/windService';
+import { SunriseData } from '@/services/sunriseService';
 
 export interface WindStationData {
   // Data state
@@ -13,6 +14,7 @@ export interface WindStationData {
   currentConditions: EcowittCurrentWindConditions | null;
   analysis: WindAnalysis | null;
   transmissionQuality?: TransmissionQualityInfo | null;
+  sunriseData?: SunriseData | null;
   
   // Loading and error states
   isLoading: boolean;

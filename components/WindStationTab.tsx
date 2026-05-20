@@ -41,6 +41,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
     currentConditions,
     analysis,
     transmissionQuality,
+    sunriseData,
     isLoading,
     isLoadingCurrent,
     error,
@@ -265,6 +266,14 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
                 {formatLastUpdated(currentConditions, currentConditionsUpdated, windData)}
               </ThemedText>
             </View>
+            {sunriseData && (
+              <View style={styles.conditionItem}>
+                <ThemedText style={styles.conditionLabel}>Sunrise Today</ThemedText>
+                <ThemedText style={styles.conditionValue}>
+                  {sunriseData.formatted.sunrise}
+                </ThemedText>
+              </View>
+            )}
           </View>
           {/* Data freshness message */}
           <ThemedText style={styles.freshnessMessage}>
