@@ -588,7 +588,7 @@ wavePattern: 10%          (updated: uses transportWindAnalysis)
 
 ## Ecowitt API Reference
 
-The app uses the [Ecowitt API v3](https://api.ecowitt.net/api/v3/) to retrieve weather station data for Standley Lake monitoring.
+The app uses the [Ecowitt API v3](https://api.ecowitt.net/api/v3/) to retrieve weather station data for all monitored stations (Soda Lake, Standley Lake, and Boulder Reservoir).
 
 ### Authentication
 
