@@ -116,7 +116,6 @@ Project documentation:
 - 📖 **[README](README.md)** - User-facing features and usage guide (this file)
 - 👨‍💻 **[Developer Setup](docs/developer-setup.md)** - Build, deploy, and contribute
 - 🏗️ **[Architecture](docs/architecture.md)** - Technical system design
-- 🔬 **[Wind Prediction Guide](docs/wind-prediction-guide.md)** - Katabatic wind analysis theory
 
 ## CI/CD with GitHub Actions
 

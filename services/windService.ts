@@ -60,7 +60,7 @@ const DEFAULT_CRITERIA: AlarmCriteria = {
 export const analyzeWindData = (
   data: WindDataPoint[], 
   criteria: AlarmCriteria = DEFAULT_CRITERIA,
-  targetTime?: Date,
+  _targetTime?: Date,
   skipTimeFilter: boolean = false
 ): WindAnalysis => {
   if (!data.length) {

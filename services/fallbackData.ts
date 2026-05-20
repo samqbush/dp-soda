@@ -54,6 +54,6 @@ export function getEmergencyFallbackData(): WindDataPoint[] {
 export default getEmergencyFallbackData;
 
 /**
- * @deprecated Use getEmergencyFallbackData() instead. This re-computes on each access.
+ * @deprecated Use getEmergencyFallbackData() instead. This is a static snapshot from module load time.
  */
 export const EMERGENCY_FALLBACK_DATA = getEmergencyFallbackData();

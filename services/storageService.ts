@@ -60,10 +60,11 @@ export const initializeStorage = async (): Promise<boolean> => {
     const storagePromise = (async (): Promise<boolean> => {
       if (Platform.OS === 'android') {
         // On Android, sometimes AsyncStorage initialization can hang
+        let timeoutId: ReturnType<typeof setTimeout>;
         const result = await Promise.race([
-          testAsyncStorage(),
+          testAsyncStorage().then(v => { clearTimeout(timeoutId); return v; }),
           new Promise<boolean>((resolve) => {
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
               console.warn('⚠️ AsyncStorage test timed out - assuming failure');
               resolve(false);
             }, 5000);
