@@ -97,7 +97,6 @@ jobs:
         run: |
           echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
           echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
-          echo "WF_TOKEN=${{ secrets.WF_TOKEN }}" >> .env
           echo "✅ Created .env file with API credentials"
 
       # Set up Xcode
@@ -275,7 +274,6 @@ jobs:
         run: |
           echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
           echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
-          echo "WF_TOKEN=${{ secrets.WF_TOKEN }}" >> .env
           echo "✅ Created .env file with API credentials"
         
       # Android build setup

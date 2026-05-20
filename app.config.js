@@ -108,8 +108,7 @@ module.exports = {
       // Environment variables for secure API access
       OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY,
       ECOWITT_APPLICATION_KEY: process.env.ECOWITT_APPLICATION_KEY,
-      ECOWITT_API_KEY: process.env.ECOWITT_API_KEY,
-      WF_TOKEN: process.env.WF_TOKEN
+      ECOWITT_API_KEY: process.env.ECOWITT_API_KEY
     },
     owner: "samqbush"
   }
