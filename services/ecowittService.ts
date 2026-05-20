@@ -275,16 +275,21 @@ function formatEcowittDate(date: Date): string {
 }
 
 /**
- * Get start and end of current day in Mountain Time
+ * Get start and end of current day in Mountain Time as formatted strings.
+ * Returns Ecowitt-formatted date strings directly to avoid timezone conversion issues
+ * when the device is outside Mountain Time.
  */
-function getMountainTimeDayRange(): { startOfDay: Date; endOfDay: Date } {
+function getMountainTimeDayRange(): { startOfDay: string; endOfDay: string } {
   const now = new Date();
   
   if (typeof Intl === 'undefined' || !Intl.DateTimeFormat) {
     // Fallback: use local time (assumes device is in Mountain Time)
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
     return {
-      startOfDay: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-      endOfDay: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+      startOfDay: `${y}-${m}-${d} 00:00:00`,
+      endOfDay: `${y}-${m}-${d} 23:59:59`
     };
   }
   
@@ -295,13 +300,13 @@ function getMountainTimeDayRange(): { startOfDay: Date; endOfDay: Date } {
     day: '2-digit',
   });
   const denverParts = denverFormatter.formatToParts(now);
-  const mtYear = parseInt(denverParts.find(p => p.type === 'year')?.value || '0');
-  const mtMonth = parseInt(denverParts.find(p => p.type === 'month')?.value || '0') - 1;
-  const mtDate = parseInt(denverParts.find(p => p.type === 'day')?.value || '0');
+  const year = denverParts.find(p => p.type === 'year')?.value;
+  const month = denverParts.find(p => p.type === 'month')?.value;
+  const day = denverParts.find(p => p.type === 'day')?.value;
   
   return {
-    startOfDay: new Date(mtYear, mtMonth, mtDate),
-    endOfDay: new Date(mtYear, mtMonth, mtDate, 23, 59, 59)
+    startOfDay: `${year}-${month}-${day} 00:00:00`,
+    endOfDay: `${year}-${month}-${day} 23:59:59`
   };
 }
 
@@ -392,7 +397,7 @@ export async function fetchEcowittDeviceList(): Promise<EcowittDevice[]> {
         } else if (error instanceof Error && error.message.includes('Operation too frequent')) {
           rethrowError = new Error('Ecowitt API rate limit exceeded. Please wait a moment and try again.');
         } else {
-          rethrowError = error;
+          rethrowError = error instanceof Error ? error : new Error(String(error));
         }
         
         throw rethrowError;
@@ -625,8 +630,8 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       application_key: config.applicationKey,
       api_key: config.apiKey,
       mac: config.macAddress,
-      start_date: formatEcowittDate(startOfDay),
-      end_date: formatEcowittDate(endOfDay),
+      start_date: startOfDay,
+      end_date: endOfDay,
       cycle_type: '5min', // 5-minute intervals for detailed data
       temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
       pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
@@ -755,8 +760,8 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       application_key: config.applicationKey,
       api_key: config.apiKey,
       mac: config.macAddress,
-      start_date: formatEcowittDate(startOfDay),
-      end_date: formatEcowittDate(endOfDay),
+      start_date: startOfDay,
+      end_date: endOfDay,
       cycle_type: '5min', // 5-minute intervals for detailed data
       temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
       pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)

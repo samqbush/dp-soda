@@ -9,6 +9,10 @@ test.describe('Tab Navigation', () => {
     await page.getByRole('tab', { name: /Standley Lake/ }).click({ force: true });
     await expect(page.getByText('Standley Lake Wind Monitor')).toBeVisible({ timeout: 10000 });
 
+    // Navigate to Boulder Reservoir
+    await page.getByRole('tab', { name: /Boulder/ }).click({ force: true });
+    await expect(page.getByText('Boulder Reservoir Wind Monitor')).toBeVisible({ timeout: 10000 });
+
     // Navigate to Settings
     await page.getByRole('tab', { name: /Settings/ }).click({ force: true });
     await expect(page.getByText('Configure your app preferences')).toBeVisible({ timeout: 10000 });
