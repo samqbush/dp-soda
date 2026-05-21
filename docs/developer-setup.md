@@ -46,7 +46,7 @@ Complete setup guide for developers working on the Dawn Patrol Alarm project.
 
 ```bash
 git clone https://github.com/samqbush/dp-soda.git
-cd dp-react
+cd dp-soda
 npm install
 ```
 
@@ -146,7 +146,7 @@ npm run test:e2e:headed
 ## Project Structure
 
 ```
-dp-react/
+dp-soda/
 ├── app/                       # Screens (Expo Router file-based routing)
 │   ├── _layout.tsx            # Root layout and navigation
 │   ├── +not-found.tsx         # 404 screen

@@ -5,7 +5,7 @@ import {
   TransmissionQualityInfo 
 } from '@/services/ecowittService';
 import { WindDataPoint, WindAnalysis } from '@/services/windService';
-import { SunriseData } from '@/services/sunriseService';
+import type { SunriseData } from '@/services/sunriseService';
 
 export interface WindStationData {
   // Data state

@@ -64,10 +64,7 @@ export async function fetchSunriseData(): Promise<SunriseData | null> {
           lng: MORRISON_COORDS.lng,
           formatted: 0 // Request ISO 8601 UTC times
         },
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'DawnPatrol/1.0'
-        }
+        timeout: 10000
       }
     );
 
