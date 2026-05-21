@@ -6,6 +6,8 @@
 - Always fix all linting errors and warnings before submitting code.
 - Install javascript libraries locally instead of globally with `-g`.
 - All npm scripts should also be VSCode tasks located in `.vscode/tasks.json`
+- This application is built and released using github actions in .github/workflows
+- It is manually published to the playstore and App store using the release notes from github actions as the release notes for the app store releases.
 
 ## Documentation - STRICT ANTI-SPRAWL POLICY
 - **ONLY 3 documentation files allowed:**
