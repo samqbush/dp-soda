@@ -76,7 +76,7 @@ export const analyzeWindData = (
   let alarmWindowData: WindDataPoint[];
 
   if (skipTimeFilter) {
-    // Data is already filtered by the caller (e.g., verifyWindConditions)
+    // Data is already filtered by the caller
     alarmWindowData = data;
   } else {
     // Filter data for the alarm window (3am-5am)

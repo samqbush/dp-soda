@@ -1,6 +1,6 @@
 # Architecture Guide
 
-Complete technical architecture overview of the Dawn Patrol Alarm application.
+Technical architecture overview of the Dawn Patrol Alarm application.
 
 ## Table of Contents
 
@@ -10,176 +10,111 @@ Complete technical architecture overview of the Dawn Patrol Alarm application.
 4. [Component Architecture](#component-architecture)
 5. [State Management](#state-management)
 6. [API Integration](#api-integration)
-7. [Android Optimizations](#android-optimizations)
+7. [Transmission Quality Monitoring](#transmission-quality-monitoring)
 8. [Performance Considerations](#performance-considerations)
-9. [Transmission Quality Monitoring](#transmission-quality-monitoring)
 
 ## System Architecture
 
 ### High-Level Overview
 
-Dawn Patrol Alarm follows a **service-oriented architecture** with clear separation of concerns:
+Dawn Patrol follows a **service-oriented architecture** with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         UI Layer                            │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Screens  │    │  Components │    │   Layouts   │     │
+│  │   Screens   │    │  Components │    │   Layouts   │     │
+│  │  (app/tabs) │    │ (components)│    │ (app/_layout│     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 ├─────────────────────────────────────────────────────────────┤
 │                    Business Logic Layer                     │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Hooks    │    │   Analyzers │    │   Reducers  │     │
+│  │    Hooks    │    │  Contexts   │    │   Config    │     │
+│  │  (hooks/)   │    │ (contexts/) │    │  (config/)  │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 ├─────────────────────────────────────────────────────────────┤
 │                      Service Layer                          │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │ Weather API │    │   Storage   │    │ Audio/Alarm │     │
+│  │  Ecowitt    │    │   Storage   │    │    Wind     │     │
+│  │  Service    │    │   Service   │    │   Service   │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 ├─────────────────────────────────────────────────────────────┤
 │                      Platform Layer                         │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Expo     │    │React Native │    │   Native    │     │
+│  │  Expo SDK   │    │React Native │    │  Native iOS │     │
+│  │     55      │    │    0.83     │    │  / Android  │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Design Principles
 
-1. **Self-Contained**: No backend server dependency
-2. **Mobile-First**: Optimized for mobile interfaces and interactions
-3. **Offline-Capable**: Cached data for reliability
-4. **Predictable**: Clear data flow and state management
-5. **Maintainable**: Modular architecture with clear boundaries
+1. **Service-based**: All API calls and data processing happen in service modules
+2. **Hook-driven UI**: Custom hooks bridge services to components
+3. **No mock data**: Errors are displayed to users, never hidden behind fake data
+4. **Offline-capable**: Cached data provides continuity during network issues
+5. **Multi-station**: Same architecture pattern replicated per weather station
 
 ## Core Services
 
-### Weather Service (`services/weatherService.ts`)
+### Ecowitt Service (`services/ecowittService.ts`)
 
-**Purpose**: Centralized weather data management with multiple data sources
-
-**Key Features**:
-- OpenWeatherMap API integration
-- Intelligent fallback system (API → Cache → Mock)
-- 30-minute caching to minimize API calls
-- Data source tracking and error handling
-
-```typescript
-// Service interface
-interface WeatherService {
-  getCurrentWeather(): Promise<WeatherData>;
-  getForecast(): Promise<ForecastData>;
-  getDataSource(): 'api' | 'cache' | 'mock';
-}
-```
-
-**Data Flow**:
-1. Request weather data
-2. Check cache validity (30 minutes)
-3. If expired, fetch from OpenWeatherMap API
-4. Fall back to cached data if API fails
-5. Fall back to mock data if all else fails
-
-### Weather Data Functionality (Removed)
-
-**Note**: The `useWeatherData.ts` hook has been **removed** as weather prediction functionality has been migrated to server-side processing.
-
-**Previous Features (Removed in Server Migration)**:
-- ~~Advanced wind prediction using 6-factor MKI meteorological analysis~~
-- ~~Local katabatic analysis factors (precipitation, sky conditions, pressure, temperature, wave patterns, atmospheric stability)~~
-- ~~MKI enhancement features and prediction tracking~~
-
-**Current Features**:
-- Basic weather data fetching from Open-Meteo API
-- Simple temperature differential calculations
-- Pressure trend analysis
-- Cache management and error handling
-
-**Server Migration**: Complex wind prediction logic moved to server infrastructure for enhanced performance and accuracy.
-
-**Calculation Process**:
-```typescript
-// Enhanced MKI calculation flow
-const calculatePrediction = (weatherData: WeatherData, waveAnalysis: MountainWaveAnalysis) => {
-  const rainScore = calculateRainFactor(weatherData);
-  const skyScore = calculateSkyFactor(weatherData);
-  const pressureScore = calculatePressureFactor(weatherData);
-  const tempScore = calculateTemperatureFactor(weatherData);
-  const waveScore = calculateWavePatternFactor(waveAnalysis);
-  const stabilityScore = calculateStabilityFactor(weatherData);
-  
-  const weightedProbability = calculateWeightedMKIScore(factors);
-  const confidence = calculateMKIConfidence(weatherData, waveAnalysis);
-  
-  return { prediction: weightedProbability, confidence, mkiFactors };
-};
-```
-
-### Mountain Wave Analyzer (`services/mountainWaveAnalyzer.ts`)
-
-**Purpose**: Analyzes mountain wave conditions for MKI integration
+**Purpose**: Primary data source — fetches wind data from Ecowitt weather stations
 
 **Key Functions**:
-- **Froude Number Calculation**: Fr = U/(N*H) for mountain wave assessment
-- **Wave Pattern Analysis**: Amplitude, organization, and surface coupling evaluation
-- **Atmospheric Stability Profiling**: Multi-layer stability assessment
-- **Enhancement Potential**: Determines positive/neutral/negative wave impact on katabatic flow
+- `fetchEcowittCombinedWindDataForDevice()` — combines historical + real-time APIs to eliminate data gaps
+- Real-time data fetching for current conditions
+- Historical data fetching for chart display
 
-**Analysis Output**:
-```typescript
-interface MountainWaveAnalysis {
-  froudeNumber: number;
-  waveAmplitude: 'low' | 'moderate' | 'high';
-  waveOrganization: 'organized' | 'mixed' | 'chaotic';
-  surfaceCoupling: 'strong' | 'moderate' | 'weak';
-  enhancement: 'positive' | 'neutral' | 'negative';
-  confidence: number;
-}
-```
+**Data Strategy**:
+- Historical API provides data from start of day
+- Real-time API provides current conditions
+- Combined approach eliminates the common 7am–1pm data gap issue
 
-### Audio Service (`services/alarmAudioService.ts`)
+### Wind Service (`services/windService.ts`)
 
-**Purpose**: Audio playback and alarm management
+**Purpose**: Wind data processing and analysis
 
-**Features**:
-- Alarm sound playback
-- Volume control
-- Background audio capabilities
-- Platform-specific optimizations
+### Wind Threshold Service (`services/windThresholdService.ts`)
+
+**Purpose**: Manages user-configured wind speed thresholds with persistence via AsyncStorage
+
+### Storage Service (`services/storageService.ts`)
+
+**Purpose**: AsyncStorage wrapper for local data persistence
+
+### Sunrise Service (`services/sunriseService.ts`)
+
+**Purpose**: Calculates sunrise/sunset times for dawn patrol timing
+
+### App Logger (`services/appLogger.ts`)
+
+**Purpose**: Centralized logging utility
+
+### Fallback Data (`services/fallbackData.ts`)
+
+**Purpose**: Provides fallback data structure when API calls fail (not mock data — used for error state display)
 
 ## Data Flow
 
-### Primary Data Flow (Simplified for Server-Based Predictions)
+### Primary Data Flow
 
 ```
-User Interface
-      ↓
-Custom Hooks (useWindData)
-      ↓
-Weather Service
-      ↓
-API/Cache/Mock Data
-      ↓
-Basic Data Processing
-      ↓
-State Updates
-      ↓
-UI Re-render
-```
-
-### State Flow Example
-
-1. **User opens app** → `useWindData` hook activates
-2. **Hook requests data** → `weatherService.getCurrentWeather()`
-3. **Service checks cache** → Valid? Return cached : Fetch new
-4. **Data processed** → Basic weather data formatting
-5. **State updated** → Simple state management
-6. **UI updates** → Components re-render with new data
-
-### Wind Guru Server Integration (Coming Soon)
-
-```
-Client Request → Server API → AI Analysis → Prediction Response → UI Update
+User opens tab (e.g., Standley Lake)
+       ↓
+useStandleyLakeWind hook activates
+       ↓
+Calls ecowittService.fetchEcowittCombinedWindDataForDevice()
+       ↓
+Ecowitt API (historical + real-time)
+       ↓
+Data processed (timestamps, units, gap detection)
+       ↓
+Transmission quality analyzed
+       ↓
+Hook state updated
+       ↓
+WindStationTab + CustomWindChart re-render
 ```
 
 ### Error Handling Flow
@@ -191,461 +126,163 @@ API Request
     ↓
 [Failure] → Check Cache
     ↓
-[Cache Valid] → Use Cached Data → Update UI
+[Cache Valid] → Use Cached Data → Update UI (with stale indicator)
     ↓
-[Cache Invalid] → Use Mock Data → Show Warning → Update UI
+[Cache Invalid] → Show Error Message → Update UI
 ```
 
 ## Component Architecture
 
 ### Screen Components (`/app`)
 
-**Structure**: File-based routing with Expo Router
 ```
 app/
-├── _layout.tsx           # Root layout with navigation
-├── (tabs)/              # Tab-based navigation
-│   ├── _layout.tsx      # Tab layout configuration
-│   ├── index.tsx        # Home/Wind data screen
-│   ├── wind-guru.tsx    # Katabatic predictions  
-│   └── ...              # Additional tab screens
-└── +not-found.tsx       # 404 error screen
+├── _layout.tsx              # Root layout, SettingsContext provider
+├── +not-found.tsx           # 404 screen
+└── (tabs)/
+    ├── _layout.tsx          # Tab bar config (5 tabs)
+    ├── index.tsx            # Soda Lake (home)
+    ├── standley-lake.tsx    # Standley Lake
+    ├── boulder-res.tsx      # Boulder Reservoir
+    ├── wind-guru.tsx        # Predictions (experimental, gated)
+    └── settings.tsx         # App settings
 ```
-
-**Key Patterns**:
-- Each screen is a functional component
-- Uses custom hooks for data and state
-- Implements error boundaries for crash recovery
-- Supports both light and dark themes
 
 ### Reusable Components (`/components`)
 
-**Organization**:
-```
-components/
-├── ui/                  # Generic UI components
-├── WindChart.tsx        # Wind data visualization
-├── WindDataDisplay.tsx  # Wind data presentation
-├── AndroidSafeWrapper.tsx # Android crash protection
-├── ErrorBoundary.tsx    # Error recovery
-└── ...                  # Feature-specific components
-```
+| Component | Purpose |
+|-----------|---------|
+| `WindStationTab.tsx` | Shared layout for wind station screens |
+| `CustomWindChart.tsx` | SVG chart with scrolling, gap handling, time labels |
+| `DayPredictionCard.tsx` | Wind prediction display card |
+| `WeeklyForecast.tsx` | 7-day forecast component |
+| `ThresholdSlider.tsx` | Wind threshold configuration slider |
+| `ErrorBoundary.tsx` | Crash recovery wrapper |
+| `HeaderImage.tsx` | Tab header image display |
+| `LoadingScreen.tsx` | Loading state display |
+| `SafeImage.tsx` | Protected image loading |
 
-**Design Patterns**:
-- **Composition over inheritance**
-- **Props-based configuration**
-- **Consistent theming support**
-- **Android-specific safety wrappers**
+### UI Primitives (`/components/ui`)
 
-### Android-Specific Components
-
-Due to Android platform challenges, several components provide crash protection:
-
-- `AndroidSafeWrapper`: Generic crash protection wrapper
-- `SafeImage`: Protected image loading
-- `WhiteScreenDetective`: White screen detection and recovery
-- `GlobalCrashRecovery`: App-wide crash recovery system
+- `IconSymbol.tsx` / `IconSymbol.ios.tsx` — Platform-specific icon rendering
+- `TabBarBackground.tsx` / `TabBarBackground.ios.tsx` — Tab bar styling
 
 ## State Management
 
-### Hook-Based State Management
+### Pattern: Custom Hooks + Context
 
-**Primary Pattern**: Custom hooks with `useReducer` for complex state
+**SettingsContext** (`contexts/SettingsContext.tsx`):
+- Wind Guru enabled/disabled toggle
+- Wind threshold preferences
+- Persisted via AsyncStorage
 
+**Station Wind Hooks**:
+- `useStationWind.ts` — Base hook for wind data fetching
+- `useStandleyLakeWind.ts` — Standley Lake specific config
+- `useSodaLakeWind.ts` — Soda Lake specific config
+- `useBoulderResWind.ts` — Boulder Reservoir specific config
+- `useWindThreshold.ts` — Threshold value management
+
+Each station hook follows the same pattern:
 ```typescript
-// Example: Wind alarm state management
-const useWindAlarmReducer = () => {
-  const [state, dispatch] = useReducer(windAlarmReducer, initialState);
-  
-  const actions = {
-    setWeatherData: (data: WeatherData) => 
-      dispatch({ type: 'SET_WEATHER_DATA', payload: data }),
-    setPrediction: (prediction: KatabaticPrediction) =>
-      dispatch({ type: 'SET_PREDICTION', payload: prediction }),
-    // ... other actions
-  };
-  
-  return { state, actions };
-};
+const { windData, loading, error, refresh, transmissionQuality } = useStandleyLakeWind();
 ```
 
-### State Structure
+### Theme
 
-```typescript
-interface AppState {
-  // Weather data
-  currentWeather: WeatherData | null;
-  forecast: ForecastData | null;
-  
-  // Predictions
-  todayPrediction: KatabaticPrediction | null;
-  tomorrowPrediction: KatabaticPrediction | null;
-  
-  // UI state
-  loading: boolean;
-  error: string | null;
-  dataSource: 'api' | 'cache' | 'mock';
-  
-  // Settings
-  userPreferences: UserPreferences;
-}
-```
-
-### Context Usage
-
-Context is used sparingly, primarily for:
-- Theme management (light/dark mode)
-- Global error handling
-- User preferences
-- Debug settings (development only)
+- `useColorScheme.ts` / `useColorScheme.web.ts` — System theme detection
+- `useThemeColor.ts` — Color values for current theme
 
 ## API Integration
 
-### OpenWeatherMap Integration
+### Ecowitt API (Primary)
 
-**Configuration**:
-```typescript
-const weatherConfig = {
-  baseUrl: 'https://api.openweathermap.org/data/2.5',
-  apiKey: process.env.OPENWEATHER_API_KEY,
-  locations: {
-    morrison: { lat: 39.6525, lon: -105.1178 },
-    nederland: { lat: 39.9617, lon: -105.5067 }
-  }
-};
-```
+**Authentication**: Application key + API key + device MAC address
 
-**Data Processing**:
-1. Fetch current weather for both elevation points
-2. Fetch 5-day forecast for trend analysis
-3. Convert units (Kelvin → Fahrenheit, m/s → mph)
-4. Extract relevant time windows (2-5 AM, 6-8 AM)
-5. Calculate gradients and changes
+**Endpoints**:
 
-### Ecowitt Integration (Optional)
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/v3/device/real_time` | Current conditions (last 2 hours) |
+| `/api/v3/device/history` | Historical data (5-min resolution for past 90 days) |
 
-**Purpose**: Standley Lake real-time monitoring
-**Configuration**: Requires separate API credentials
-**Usage**: Supplementary data source for Front Range conditions
+**Configuration** (`config/ecowittConfig.ts`):
+- Station MAC addresses
+- Device names and locations
+- API parameter defaults
 
-### Caching Strategy
+**Unit Configuration**:
+| Measurement | Default |
+|-------------|---------|
+| Wind Speed | mph (`wind_speed_unitid: 9`) |
+| Temperature | °F (`temp_unitid: 2`) |
+| Pressure | inHg (`pressure_unitid: 4`) |
 
-**Cache Duration**: 30 minutes for weather data
-**Storage**: AsyncStorage for persistence across app sessions
-**Validation**: Timestamp-based expiration
-**Fallback**: Graceful degradation to mock data
+**History Resolution Constraints**:
+| Time Range | Resolution | Max Span |
+|---|---|---|
+| Past 90 days | 5 min | 1 day |
+| Past 365 days | 30 min | 1 week |
+| Past 730 days | 240 min | 1 month |
 
-## Android Optimizations
+### OpenWeatherMap API (Secondary)
 
-### Crash Prevention
-
-**Challenge**: Android platform instability with React Native
-**Solution**: Multi-layered protection system
-
-1. **Error Boundaries**: Catch and recover from component crashes
-2. **Safe Wrappers**: Protect crash-prone native operations
-3. **White Screen Detection**: Detect and recover from white screen crashes
-4. **Global Recovery**: App-wide crash recovery with state restoration
-
-### Memory Management
-
-- **Image Optimization**: Proper image loading and disposal
-- **Component Cleanup**: Cleanup timers and listeners
-- **Memory Monitoring**: Debug tools for memory leak detection
-
-### Performance Optimizations
-
-- **Lazy Loading**: Load components only when needed
-- **Efficient Re-renders**: useMemo and useCallback optimization
-- **Background Processing**: Minimize main thread blocking
-
-## Performance Considerations
-
-### Data Fetching Optimization
-
-1. **Intelligent Caching**: 30-minute cache prevents excessive API calls
-2. **Background Updates**: Refresh data without blocking UI
-3. **Optimistic Updates**: Show cached data immediately, update when fresh data arrives
-
-### Rendering Optimization
-
-1. **Component Memoization**: Prevent unnecessary re-renders
-2. **State Colocational**: Keep state close to where it's used
-3. **Virtualization**: Efficient list rendering for large datasets (future consideration)
-
-### Bundle Size Management
-
-1. **Tree Shaking**: Remove unused code
-2. **Dynamic Imports**: Load features on demand
-3. **Asset Optimization**: Compress images and fonts
-
-### Network Efficiency
-
-1. **Request Batching**: Combine multiple API calls when possible
-2. **Compression**: Enable gzip for API responses
-3. **Connection Pooling**: Reuse connections for better performance
-
-## MKI Integration Architecture
-
-### Mountain Wave-Katabatic Interaction Implementation
-
-The Phase 4 MKI integration represents a significant architectural enhancement that transforms the prediction system from basic meteorological analysis to sophisticated atmospheric science modeling.
-
-### Enhanced Prediction Pipeline
-
-```
-Weather Data Input
-      ↓
-Basic Meteorological Analysis (4 factors)
-      ↓
-Mountain Wave Analysis (NEW)
-      ↓
-Atmospheric Stability Profiling (NEW)
-      ↓
-MKI Integration & Enhancement Calculation
-      ↓
-6-Factor Weighted Prediction with Confidence
-```
-
-### New Service Integration
-
-**Mountain Wave Analyzer Service**:
-- Calculates Froude numbers for wave assessment
-- Analyzes wave amplitude, organization, and surface coupling
-- Determines enhancement potential (positive/neutral/negative)
-- Integrates with main prediction pipeline
-
-**Enhanced Katabatic Analyzer**:
-- Rebalanced factor weights for 6-factor system (25%, 20%, 20%, 15%, 15%, 5%)
-- Advanced bonus system with MKI-aware calculations
-- Multi-scale confidence assessment
-- Nonlinear interaction modeling
-
-### Technical Implementation Benefits
-
-1. **Accuracy Improvement**: Target 15-25% increase in prediction accuracy
-2. **Edge Case Handling**: Better handling of marginal conditions with wave enhancement
-3. **Scientific Foundation**: First practical consumer implementation of MKI research
-4. **Scalable Architecture**: Foundation for future machine learning integration
-
-### Performance Considerations for MKI
-
-- **Computation Caching**: Complex Froude number calculations cached for 30 minutes
-- **Background Processing**: Wave analysis performed asynchronously
-- **Graceful Degradation**: Falls back to 4-factor system if wave data unavailable
-- **Memory Optimization**: Efficient wave pattern data structures
-
-## Security Considerations
-
-### API Key Management
-
-- **Environment Variables**: Never commit API keys to version control
-- **Runtime Configuration**: Support for dynamic key configuration
-- **Secure Storage**: Use Expo SecureStore for sensitive data
-
-### Data Privacy
-
-- **Local Processing**: All analysis happens on-device
-- **No User Tracking**: No personal data collection
-- **Minimal Permissions**: Request only necessary device permissions
+Used for weather forecast data. Configured via `OPENWEATHER_API_KEY` environment variable.
 
 ## Transmission Quality Monitoring
 
 ### Overview
 
-The app includes comprehensive transmission quality monitoring to detect and handle antenna issues that cause incomplete data transmission from weather stations.
+Detects antenna issues that cause incomplete data transmission from weather stations, distinguishing "station can't transmit" from "no wind."
 
 ### Implementation
 
-#### Core Components
+**Analysis Functions**:
+- `analyzeDataPointTransmissionQuality()` — per-reading analysis
+- `analyzeOverallTransmissionQuality()` — temporal pattern detection
 
-1. **TransmissionQualityInfo Interface**
-   - `isFullTransmission`: Boolean indicating complete sensor data
-   - `hasOutdoorSensors`: Boolean for outdoor temperature/humidity availability
-   - `hasWindData`: Boolean for wind sensor availability
-   - `transmissionGaps`: Array of detected gaps with timing and type
-   - `currentTransmissionStatus`: Current status (good/partial/indoor-only/offline)
+**Quality States**:
+- `good` — All sensors reporting
+- `partial` — Some sensors missing
+- `indoor-only` — Antenna issue (only indoor sensors transmitting)
+- `offline` — No data received
 
-2. **Data Point Analysis**
-   - `analyzeDataPointTransmissionQuality()`: Analyzes individual readings
-   - Detects missing outdoor sensors vs. indoor-only transmissions
-   - Identifies antenna issues when only indoor data is transmitted
+**Integration**:
+- Station wind hooks include `transmissionQuality` in their return value
+- UI displays color-coded status indicators
+- Chart gaps are annotated with transmission context
 
-3. **Temporal Analysis**
-   - `analyzeOverallTransmissionQuality()`: Analyzes patterns over time
-   - Detects gaps and their duration
-   - Categorizes gap types (antenna, offline, partial)
-
-#### Integration Points
-
-1. **Data Fetching**
-   - Modified API calls to request wind + outdoor + indoor data
-   - Enhanced response parsing to detect missing fields
-   - Quality metadata attached to each data point
-
-2. **Hook Updates**
-   - `useSodaLakeWind` and `useStandleyLakeWind` now include transmission quality
-   - Automatic analysis on data refresh
-   - State management for quality information
-
-3. **UI Components**
-   - Transmission status indicators in current conditions
-   - Detailed alerts for antenna issues
-   - Chart context explanations for data gaps
-   - Color-coded status messages
-
-#### Data Flow
+### Data Flow
 
 ```
 API Response → Data Point Analysis → Quality Metadata → Hook State → UI Alerts
-     ↓                                      ↓                          ↓
-Enhanced Parsing → Individual Assessment → Overall Analysis → User Warnings
 ```
 
-### Benefits
+## Performance Considerations
 
-1. **User Understanding**: Clear distinction between technical issues and weather conditions
-2. **Data Transparency**: Users know when gaps are due to transmission problems
-3. **Reliability**: Better interpretation of incomplete data
-4. **Troubleshooting**: Helps identify station hardware issues
+### Data Fetching
+- Combined historical + real-time API calls minimize round-trips
+- Auto-refresh only on first tab navigation (not every focus)
+- Pull-to-refresh for manual updates
 
-## Wind Prediction System Architecture
+### Rendering
+- SVG-based charts (CustomWindChart) for smooth scrolling
+- Proper gap handling avoids false interpolation
+- Dynamic chart width based on data range
 
-### Hybrid 5-Factor Implementation Summary
+### Caching
+- AsyncStorage for data persistence across sessions
+- Stale data shown immediately while fresh data loads
+- Configurable cache duration per data type
 
-Successfully updated the Wind Guru prediction system from a theoretical 6-factor system to a practical 5-factor hybrid system combining NOAA and OpenWeather APIs with real meteorological data.
+## Security
 
-#### 1. Hybrid Weather Service (`hybridWeatherService.ts`)
-- **Primary NOAA Integration**: Rain probability, sky cover, temperature grids, transport winds
-- **Secondary OpenWeather Integration**: Pressure trends and backup data
-- **Smart Fallback Logic**: NOAA → OpenWeather → Cache → Mock data progression
-- **Data Source Tracking**: Real-time monitoring of which API provides each factor
+### API Key Management
+- Environment variables (`.env`) — never committed to version control
+- GitHub Actions secrets for CI/CD builds
+- No API keys bundled in app binary (injected at build time via `app.config.js`)
 
-#### 2. Updated 5-Factor Katabatic Analyzer (`katabaticAnalyzer.ts`)
-**Current Factors:**
-- **Factor #1 - Rain Probability (25% weight)**: NOAA precipitation forecasts
-- **Factor #2 - Clear Sky Conditions (25% weight)**: NOAA sky cover analysis  
-- **Factor #3 - Pressure Change (20% weight)**: OpenWeather pressure trends
-- **Factor #4 - Temperature Differential (15% weight)**: NOAA temperature grid data
-- **Factor #5 - Wave Pattern Analysis (10% weight)**: NOAA transport winds + mixing height data
-
-**Algorithm Enhancements:**
-- Rebalanced factor weights for 5-factor system (25%/25%/20%/15%/10%)
-- Enhanced bonus system for multiple favorable factors
-- Improved confidence calculation accounting for hybrid data sources
-
-#### Factor Weighting System
-```
-precipitation: 25%        (replaces atmospheric stability)
-skyConditions: 25%        (same) 
-pressureChange: 20%       (same)
-temperatureDifferential: 15%  (same)
-wavePattern: 10%          (updated: uses transportWindAnalysis)
-```
-
-#### Confidence Calculation
-- **High Confidence**: 4+ factors met with hybrid data reliability
-- **Medium Confidence**: 3-4 factors met with some data uncertainty
-- **Low Confidence**: <3 factors met or significant data gaps
-
-#### Bonus System (Updated for 5-factor)
-- **4+ factors met**: 20% bonus
-- **5 factors met**: Additional 25% bonus (45% total)
-- **Positive wave enhancement**: Additional 10% bonus when confidence >70%
-
-### Wind Guru Enhancement Plan: MKI Integration
-
-#### Current System Strengths
-- 5-factor analysis system (Precipitation, Sky Conditions, Pressure, Temperature, Wave Pattern) 
-- Confidence calculation with factor weighting
-- Real-time verification and learning
-- User-friendly presentation with probability and recommendations
-
-#### Future Enhancement Phases
-
-**Phase 1: Enhanced Data Collection**
-- Synoptic Wind Data: Upper-level wind speed and direction (2-4km altitude)
-- Atmospheric Stability: Calculate Brunt-Väisälä frequency and stability profile
-- Froude Number: Compute Fr = U/NH for mountain wave assessment
-- Multi-level Temperature: Temperature profiles for stability analysis
-- Enhanced Pressure Data: Higher temporal resolution pressure measurements
-
-**Phase 2: MKI Factor Integration**
-- Wave Pattern Factor: Calculate Froude number from synoptic conditions
-- Atmospheric Stability Factor: Multi-layer stability optimization
-- Expand factor weighting system to 6 factors
-- Update recommendation logic for MKI scenarios
-
-**Phase 3: Advanced Prediction Logic**
-- Multi-scale Variability Modeling (mesoscale/microscale)
-- Enhanced Pressure Analysis with wave-induced modifications
-- Coupling Efficiency Calculation for wave energy transmission
-
-**Phase 4: Advanced UI/UX**
-- Enhanced factor display with MKI-specific explanations
-- Advanced prediction windows based on wave evolution
-- Activity-specific MKI guidance and safety considerations
-
-## Ecowitt API Reference
-
-The app uses the [Ecowitt API v3](https://api.ecowitt.net/api/v3/) to retrieve weather station data for Standley Lake monitoring.
-
-### Authentication
-
-All requests require:
-- `application_key` — Ecowitt developer application key
-- `api_key` — Account-level API key
-- `mac` — Device MAC address (e.g., `FF:FF:FF:FF:FF:FF`)
-
-### Endpoints
-
-#### Real-Time Data
-
-```
-GET https://api.ecowitt.net/api/v3/device/real_time
-```
-
-Returns the latest data (within past 2 hours). Key parameters:
-- `call_back` — Fields to return (e.g., `outdoor`, `indoor.humidity`, or `all`)
-- `wind_speed_unitid` — `9` for mph (default), `7` for km/h, `8` for knots
-
-#### Device History
-
-```
-GET https://api.ecowitt.net/api/v3/device/history
-```
-
-Returns historical data with resolution constraints:
-| Time Range | Resolution | Max Span per Request |
-|---|---|---|
-| Past 90 days | 5 min | 1 day |
-| Past 365 days | 30 min | 1 week |
-| Past 730 days | 240 min | 1 month |
-| Past 1460 days | 24 hours | 1 year |
-
-Key parameters:
-- `start_date` / `end_date` — ISO 8601 format (e.g., `2022-01-01 00:00:00`)
-- `cycle_type` — `auto`, `5min`, `30min`, `4hour`, or `1day`
-- `call_back` — Fields to return (supports comma-separated, e.g., `outdoor.temp,indoor.humidity`)
-
-### Unit Options
-
-| Measurement | Parameter | Values |
-|---|---|---|
-| Temperature | `temp_unitid` | `1` = °C, `2` = °F (default) |
-| Wind Speed | `wind_speed_unitid` | `6` = m/s, `7` = km/h, `8` = knots, `9` = mph (default) |
-| Pressure | `pressure_unitid` | `3` = hPa, `4` = inHg (default), `5` = mmHg |
-| Rainfall | `rainfall_unitid` | `12` = mm, `13` = in (default) |
-
-### Response Format
-
-```json
-{
-  "code": 0,
-  "msg": "success",
-  "time": "1649409577",
-  "data": { ... }
-}
-```
-
-Non-zero `code` values indicate errors. The `data` object structure varies by endpoint and `call_back` parameter.
+### Data Privacy
+- All processing happens on-device
+- No user tracking or personal data collection
+- Minimal permissions (network access only)
