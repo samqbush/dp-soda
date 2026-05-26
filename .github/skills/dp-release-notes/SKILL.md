@@ -1,5 +1,5 @@
 ---
-name: release-notes
+name: dp-release-notes
 description: >
   Generate release notes for the Dawn Patrol wind monitoring app by analyzing git changes
   between branches. Produces two versions: user-friendly notes for App Store / Play Store
