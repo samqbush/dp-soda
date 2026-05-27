@@ -1,23 +1,23 @@
 import { test, expect } from './fixtures';
 
 test.describe('Boulder Reservoir Tab', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.getByRole('tab', { name: /Boulder/ }).click({ force: true });
-  });
-
   test('loads and displays station name', async ({ page }) => {
+    await page.goto('/boulder-res');
     await expect(page.getByText('Boulder Reservoir Wind Monitor')).toBeVisible({ timeout: 10000 });
   });
 
   test('shows subtitle description', async ({ page }) => {
+    await page.goto('/boulder-res');
     await expect(page.getByText('Ecowitt monitor located at Boulder Reservoir')).toBeVisible({ timeout: 10000 });
   });
 
   test('displays wind data after loading', async ({ page }) => {
-    await expect(page.getByText(/mph/i)).toBeVisible({ timeout: 30000 });
+    await page.goto('/boulder-res');
+    await expect(page.getByText(/mph/i).first()).toBeVisible({ timeout: 30000 });
   });
 
   test('shows current conditions card', async ({ page }) => {
+    await page.goto('/boulder-res');
     await expect(page.getByText('Current Conditions')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Wind Speed')).toBeVisible();
     await expect(page.getByText('Direction')).toBeVisible();
@@ -26,6 +26,7 @@ test.describe('Boulder Reservoir Tab', () => {
   });
 
   test('shows wind chart when data is available', async ({ page }) => {
+    await page.goto('/boulder-res');
     await expect(page.getByText("Today's Wind Speed")).toBeVisible({ timeout: 30000 });
   });
 });
