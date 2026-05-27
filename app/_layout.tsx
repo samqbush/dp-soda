@@ -7,13 +7,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { AppState, LogBox, Platform, Text, View } from 'react-native';
+import { AppState, LogBox, Platform, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { AndroidSafeWrapper } from '@/components/AndroidSafeWrapper';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { SafeAppLoader } from '@/components/SafeAppLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen } from '@/services/androidSplash';
 import { getGlobalSessionId } from '@/utils/sessionUtils';
@@ -30,7 +28,7 @@ if (!__DEV__) {
 }
 
 // Keep the splash screen visible while we fetch resources
-prepareSplashScreen().catch(error => console.log('Error setting up splash screen:', error));
+prepareSplashScreen().catch(error => { if (__DEV__) console.log('Error setting up splash screen:', error); });
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -39,6 +37,7 @@ export default function RootLayout() {
   });
   const [isStorageInitialized, setIsStorageInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [appStartTime] = useState(Date.now());
   const [isStuck, setIsStuck] = useState(false);
   
@@ -62,15 +61,15 @@ export default function RootLayout() {
   // Initialize app services (simplified - no AsyncStorage complexity)
   useEffect(() => {
     const setupApp = () => {
-      console.log('🚀 App initialization starting...');
+      if (__DEV__) console.log('🚀 App initialization starting...');
       try {
-        console.log('✅ Storage initialization skipped (using in-memory only)');
+        if (__DEV__) console.log('✅ Storage initialization skipped (using in-memory only)');
         setIsStorageInitialized(true);
         
         // Initialize global session for component remount persistence
         getGlobalSessionId();
         
-        console.log('✅ App initialization complete');
+        if (__DEV__) console.log('✅ App initialization complete');
       } catch (e) {
         console.error('❌ Fatal error during app setup:', e);
         setInitError(`Setup error: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -78,7 +77,7 @@ export default function RootLayout() {
     };
     
     setupApp();
-  }, []);
+  }, [retryCount]);
   
   // Ensure splash screen hides when resources are ready
   useEffect(() => {
@@ -86,7 +85,7 @@ export default function RootLayout() {
       try {
         if (loaded && isStorageInitialized) {
           // Normal flow - both conditions met
-          console.log('✅ Resources loaded - hiding splash screen normally');
+          if (__DEV__) console.log('✅ Resources loaded - hiding splash screen normally');
           setTimeout(async () => {
             await SplashScreen.hideAsync();
           }, Platform.OS === 'android' ? 300 : 200);
@@ -113,14 +112,11 @@ export default function RootLayout() {
 
   // Normal initialization state - loading resources
   if ((!loaded || !isStorageInitialized || !minimumLoadingComplete) && !isStuck) {
-    // Use SafeAppLoader for Android, simple loading for iOS
-    return Platform.OS === 'android' 
-      ? <SafeAppLoader /> 
-      : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Loading...</Text>
-        </View>
-      );
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading...</Text>
+      </View>
+    );
   }
   
   // Emergency fallback UI if app is stuck
@@ -162,35 +158,39 @@ export default function RootLayout() {
         <Text style={{ fontSize: 14, color: 'red', textAlign: 'center', marginBottom: 20 }}>
           {initError}
         </Text>
-        <View style={{
-          backgroundColor: '#007AFF',
-          paddingHorizontal: 20,
-          paddingVertical: 10,
-          borderRadius: 8
-        }}>
+        <Pressable
+          onPress={() => {
+            setInitError(null);
+            setRetryCount(c => c + 1);
+          }}
+          style={{
+            backgroundColor: '#007AFF',
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 8
+          }}
+        >
           <Text style={{ color: 'white', fontWeight: 'bold' }}>
             Try Again
           </Text>
-        </View>
+        </Pressable>
       </View>
     );
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AndroidSafeWrapper>
-        <ErrorBoundary>
-          <SettingsProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </SettingsProvider>
-        </ErrorBoundary>
-      </AndroidSafeWrapper>
+      <ErrorBoundary>
+        <SettingsProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </SettingsProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

@@ -10,15 +10,18 @@ Complete setup guide for developers working on the Dawn Patrol Alarm project.
 4. [Project Structure](#project-structure)
 5. [Key Technologies](#key-technologies)
 6. [Development Guidelines](#development-guidelines)
+7. [Build & Deployment](#build-process--deployment)
+8. [Ecowitt Sensors](#ecowitt-sensor-troubleshooting)
 
 ## Prerequisites
 
 ### Required Tools
 
-- **Node.js** (v18 or higher)
+- **Node.js** (v20 or higher)
 - **npm** (comes with Node.js)
 - **Expo CLI** (installed via npm)
 - **Git** for version control
+- **JDK 17** for Android builds (`JAVA_HOME=/opt/homebrew/opt/openjdk@17`)
 
 ### Mobile Development
 
@@ -30,99 +33,46 @@ Complete setup guide for developers working on the Dawn Patrol Alarm project.
 - Android Studio with Android SDK
 - Android Emulator or physical Android device
 - USB debugging enabled for physical devices
+- `ANDROID_HOME` and `ANDROID_SDK_ROOT` environment variables set
 
-### API Accounts (Optional but Recommended)
+### API Accounts
 
-- **OpenWeatherMap**: Free API key for real weather data
-- **Ecowitt**: API credentials for Standley Lake monitoring
+- **Ecowitt**: API credentials for Standley Lake and Soda Lake monitoring (required)
+- **OpenWeatherMap**: API key for weather forecasts (required)
 
 ## Environment Setup
 
 ### 1. Clone and Install
 
 ```bash
-# Clone the repository
-git clone [repository-url]
-cd dp-react
-
-# Install dependencies
+git clone https://github.com/samqbush/dp-soda.git
+cd dp-soda
 npm install
 ```
 
 ### 2. Environment Configuration
 
 ```bash
-# Copy environment template
 cp .env.example .env
 ```
 
-Edit `.env` file with your API credentials:
+Edit `.env` with your API credentials:
 
 ```bash
-# OpenWeatherMap API (recommended for real data)
-OPENWEATHER_API_KEY=your_api_key_here
-
-# Ecowitt API (optional - for Standley Lake monitoring) 
 ECOWITT_APPLICATION_KEY=your_application_key_here
 ECOWITT_API_KEY=your_api_key_here
+OPENWEATHER_API_KEY=your_openweather_api_key_here
 ```
 
-**Note**: The app works without API keys using cached/mock data, but real API keys provide better accuracy.
+**Note**: The app requires valid API keys. Without them, data will not load and errors will be displayed.
 
 ### 3. Verify Setup
 
 ```bash
-# Start development server
 npm start
-
-# Alternative: start with tunnel for external device testing
-npx expo start --tunnel
 ```
 
 ## Development Workflow
-
-### Android Development Setup
-
-**⚠️ Important: Always ensure Android emulator is running before starting development**
-
-#### Quick Android Setup Check
-```bash
-# Check your Android development environment
-npm run android-setup
-```
-
-#### Safe Android Development (Recommended)
-```bash
-# Automatically starts emulator if needed, then runs the app
-npm run android-safe
-```
-
-**⚠️ VS Code Task Environment Issue:**  
-If you encounter Java Runtime errors when running the VS Code task, use the terminal directly:
-```bash
-# Run directly in terminal (bypasses VS Code environment issues)
-npx expo run:android
-```
-This works because your shell environment (with Java from sdkman) is properly loaded in the terminal but may not be inherited by VS Code tasks.
-
-#### Manual Android Development
-```bash
-# 1. Start emulator manually (if not already running)
-emulator -avd YourEmulatorName
-
-# 2. Verify device is connected
-adb devices
-
-# 3. Run the app
-npm run android
-```
-
-**Common Android Issues & Solutions:**
-- **"Unable to locate a Java Runtime"** → Run `npx expo run:android` directly in terminal instead of using VS Code tasks
-- **"No Android connected device found"** → Use `npm run android-safe` instead
-- **Emulator not detected** → Ensure `ANDROID_HOME` and `ANDROID_SDK_ROOT` are set
-- **ADB not found** → Add `$ANDROID_HOME/platform-tools` to PATH
-- **Emulator command not found** → Add `$ANDROID_HOME/emulator` to PATH
 
 ### Daily Development
 
@@ -133,219 +83,155 @@ npm run android
 
 2. **Choose your development platform**
    - Press `i` for iOS Simulator
-   - Press `a` for Android Emulator (ensure emulator is running first!)
-   - Scan QR code with Expo Go app on physical device
+   - Press `a` for Android Emulator
+   - Press `w` for web browser
+   - Scan QR code with Expo Go on a physical device
 
-3. **Live reload** - Changes automatically refresh the app
+3. **Live reload** — changes automatically refresh the app
+
+### Running on Android
+
+```bash
+# Run on connected emulator/device
+npm run android
+
+# If you get Java Runtime errors in VS Code tasks, run directly in terminal:
+npx expo run:android
+```
+
+**Common Android Issues:**
+- **"Unable to locate a Java Runtime"** → Ensure `JAVA_HOME` points to JDK 17
+- **Emulator not detected** → Verify `ANDROID_HOME` is set and emulator is running
+- **ADB not found** → Add `$ANDROID_HOME/platform-tools` to PATH
+
+### Running on iOS
+
+```bash
+npm run ios
+```
 
 ### Code Quality
 
 ```bash
-# Check for linting issues and compilation errors
+# Lint (ESLint + TypeScript + YAML workflow validation)
 npm run lint
 
-# Fix auto-fixable linting issues
-npm run lint:fix
-
-# Type checking (TypeScript)
+# Type checking only
 npx tsc --noEmit
 ```
 
 ### Testing
 
 ```bash
-# Run unit tests  
+# Run all unit tests
 npm test
 
 # Run tests with coverage
 npm run test:coverage
 
-# Run tests in watch mode during development
+# Run tests in watch mode
 npm run test:watch
+
+# Run a specific test file
+npm test -- __tests__/services/windAnalysis.test.ts
+```
+
+#### End-to-End Tests (Playwright)
+
+The dev server starts automatically when you run any E2E command. If one is already running, it will be reused.
+
+All E2E projects test the **web build** in a browser — the "ios" and "android" projects use mobile viewport emulation (iPhone 14, Pixel 7), not native apps.
+
+```bash
+# Primary command — run this before pushing UI changes
+npm run test:e2e              # All viewports (desktop, iPhone 14, Pixel 7), headless
+```
+
+Optional commands for targeted runs or debugging:
+
+```bash
+npm run test:e2e:web          # Desktop Chrome viewport only (fastest, good for quick checks)
+npm run test:e2e:ios          # iPhone 14 viewport only
+npm run test:e2e:android      # Pixel 7 viewport only
+npm run test:e2e:headed       # All viewports with a visible browser (for debugging failures)
 ```
 
 ## Project Structure
 
 ```
-dp-react/
-├── app/                    # Main application screens (Expo Router)
-│   ├── _layout.tsx         # Root layout and navigation
-│   ├── (tabs)/            # Tab-based navigation screens
-│   └── +not-found.tsx     # 404 error screen
-├── components/             # Reusable UI components
-│   ├── ui/                # Generic UI components  
-│   ├── WindChart.tsx      # Wind data visualization
-│   ├── WindDataDisplay.tsx # Wind data presentation
-│   └── ...                # Component files
-├── hooks/                  # Custom React hooks
-│   ├── useWindData.ts     # Wind data fetching
-│   └── ...                # Hook files (useWeatherData.ts removed)
-├── services/               # Business logic and API services
-│   ├── weatherService.ts  # Weather API integration
-│   ├── alarmAudioService.ts # Audio/notification handling
-│   └── ...                # Service files
-├── utils/                  # Helper functions and utilities
-├── config/                 # Configuration files
-├── assets/                 # Static assets (images, fonts, sounds)
-├── docs/                   # Documentation (you are here!)
-└── ...                    # Root configuration files
+dp-soda/
+├── app/                       # Screens (Expo Router file-based routing)
+│   ├── _layout.tsx            # Root layout and navigation
+│   ├── +not-found.tsx         # 404 screen
+│   └── (tabs)/                # Tab navigation
+│       ├── _layout.tsx        # Tab bar configuration
+│       ├── index.tsx          # Home/Soda Lake tab
+│       ├── standley-lake.tsx  # Standley Lake wind tab
+│       ├── boulder-res.tsx    # Boulder Reservoir wind tab
+│       ├── wind-guru.tsx      # Wind Guru predictions tab
+│       └── settings.tsx       # Settings tab
+├── components/                # Reusable UI components
+│   ├── ui/                    # Generic UI primitives
+│   ├── CustomWindChart.tsx    # SVG wind chart with scrolling
+│   ├── WindStationTab.tsx     # Shared wind station display
+│   ├── DayPredictionCard.tsx  # Wind prediction card
+│   ├── WeeklyForecast.tsx     # 7-day forecast display
+│   ├── ThresholdSlider.tsx    # Wind threshold config
+│   ├── ErrorBoundary.tsx      # Crash recovery wrapper
+│   └── ...                    # Other shared components
+├── hooks/                     # Custom React hooks
+│   ├── useStationWind.ts      # Base wind data hook
+│   ├── useStandleyLakeWind.ts # Standley Lake data
+│   ├── useSodaLakeWind.ts     # Soda Lake data
+│   ├── useBoulderResWind.ts   # Boulder Reservoir data
+│   ├── useWindThreshold.ts    # Threshold settings
+│   └── useColorScheme.ts      # Theme detection
+├── services/                  # Business logic and APIs
+│   ├── ecowittService.ts      # Ecowitt API integration
+│   ├── windService.ts         # Wind data processing
+│   ├── windThresholdService.ts # Threshold persistence
+│   ├── sunriseService.ts      # Sunrise/sunset times
+│   ├── storageService.ts      # AsyncStorage wrapper
+│   ├── appLogger.ts           # Logging utility
+│   └── fallbackData.ts        # Fallback data for errors
+├── config/                    # Configuration
+│   └── ecowittConfig.ts       # Station device configs
+├── scripts/                   # Dev/debug scripts
+│   ├── debug-dp-stations.mjs  # Station data debugging
+│   ├── debug-ecowitt-devices.mjs # Device connectivity
+│   ├── verify-noaa-data.mjs   # NOAA data quality check
+│   └── increment-version.mjs  # Version bump utility
+├── __tests__/                 # Test files (mirrors src structure)
+├── assets/                    # Static assets (images, fonts, sounds)
+├── docs/                      # Documentation
+└── .github/workflows/         # CI/CD pipeline
 ```
-
-### Key Directories Explained
-
-**`/app`** - Screen components using Expo Router
-- File-based routing system
-- Each file represents a screen or layout
-- Supports nested routes and tabs
-
-**`/components`** - Reusable UI components
-- Organized by functionality
-- Includes both generic and app-specific components
-- Android-specific fixes and wrappers
-
-**`/hooks`** - Custom React hooks
-- Data fetching and state management
-- Business logic abstraction
-- Reusable stateful logic
-
-**`/services`** - Core business logic
-- API integrations (OpenWeatherMap, Ecowitt)
-- Data processing and analysis
-- Audio and notification services
-- **Note**: Wind prediction services moved to server-based architecture
-
-## Recent Major Updates
-
-### Wind Guru Server Migration (June 30, 2025)
-The Wind Guru prediction system has been converted from a complex local prediction system to a server-based solution:
-
-**Migration Overview:**
-- **Removed Local Prediction Logic**: Eliminated 3000+ lines of complex katabatic analysis code
-- **Simplified Client**: Wind Guru tab now shows server migration status and coming features
-- **Enhanced Performance**: Server-based predictions will provide faster and more accurate results
-- **Code Reduction**: 87% reduction in Wind Guru related code (from ~3000+ lines to ~400 lines)
-
-**Removed Services:**
-- `services/katabaticAnalyzer.ts` (1165 lines) - Main prediction algorithm
-- `services/predictionStateManager.ts` (~400 lines) - Locked prediction state management
-- `services/predictionTrackingService.ts` (~500 lines) - Accuracy tracking and outcomes
-- `services/eveningWeatherRefreshService.ts` (~300 lines) - Auto 6PM data refresh
-- `services/freeHistoricalWeatherService.ts` (~275 lines) - Historical weather enhancement
-- `hooks/useKatabaticAnalyzer.ts` (~200 lines) - React hook for prediction analysis
-
-**Simplified Files:**
-- `app/(tabs)/wind-guru.tsx` - From 2057 lines to ~400 lines (80% reduction)
-- `hooks/useWeatherData.ts` - **REMOVED** (was simplified from 977 to 152 lines, then removed entirely)
-- `app/_layout.tsx` - Removed wind prediction service initialization
-
-**Previous System (Removed):**
-- ~~Local 5-factor hybrid MKI analysis~~
-- ~~Real-time prediction state management~~
-- ~~Historical verification tracking~~
-- ~~Evening weather refresh automation~~
-- ~~Complex atmospheric stability calculations~~
-- ~~Thermal cycle temperature analysis~~
-- ~~Wave pattern enhancement detection~~
-
-**New System (In Development):**
-- Server-based katabatic wind analysis
-- Enhanced machine learning models
-- Improved atmospheric pattern recognition
-- Multi-location comparative analysis
-- Centralized prediction logic for better maintainability
-
-**Benefits of Server Migration:**
-1. **Reduced Client Complexity**: Massive code reduction and simplified architecture
-2. **Better Performance**: No local processing overhead, instant server results
-3. **Enhanced Accuracy**: Access to more comprehensive weather datasets and ML models
-4. **Improved Maintainability**: Centralized logic, easier updates and debugging
-5. **Scalability**: Server can handle complex calculations and real-time data processing
-
-## Recent Improvements
-
-### Wind Data Chart Enhancements (Latest)
-
-**Key Improvements Made:**
-- ✅ **Eliminated data gaps** by implementing combined historical + real-time API approach
-- ✅ **Improved chart UX** with CustomWindChart component featuring:
-  - Professional time-based x-axis labeling (hourly with AM/PM, quarter-hour marks)
-  - Horizontal scrolling with sticky Y-axis labels
-  - Proper gap handling (line breaks for missing data)
-  - Dynamic width based on data range
-- ✅ **Streamlined refresh UX** - removed refresh button, now pull-to-refresh only
-- ✅ **Optimized performance** - auto-refresh only on first navigation to tabs
-- ✅ **Better data freshness** - shows current time coverage and last updated timestamp
-
-**Technical Changes:**
-- **ecowittService.ts**: Added `fetchEcowittCombinedWindDataForDevice()` combining historical and real-time APIs
-- **CustomWindChart.tsx**: SVG-based chart replacing legacy React Native Chart Kit implementation  
-- **Removed unused components**: VictoryWindChart, legacy WindChart
-- **Cleaned debug scripts**: Removed 20+ temporary investigation scripts
-
-**Data Coverage Solution:**
-- Historical API provides data from start of day up to ~10:20am
-- Real-time API provides current conditions and recent data
-- Combined approach eliminates the 7am-1pm data gap issue
-
-## Wind Data Gap Investigation (Resolved)
-
-### Issue
-Large gaps appeared in wind data charts between 7AM-1PM, despite Ecowitt web UI showing data for those periods.
-
-### Investigation Results
-Comprehensive API testing with multiple parameters, timezones, and cycle types revealed:
-
-**✅ Root Cause Confirmed**: Gaps exist in the raw Ecowitt API data itself, not in app processing.
-
-**Key Findings**:
-- API returns 130 total data points but with consistent gaps:
-  - GAP 1: 07:00 AM → 08:25 AM (85 minutes)
-  - GAP 2: 08:35 AM → 11:40 AM (185 minutes) ← Main visible gap
-  - GAP 3: 04:20 PM → 05:00 PM (40 minutes)
-- Same gaps appear across all test scenarios (different timezones, cycle types, parameters)
-- Even when requesting ONLY 7AM-1PM data, API returns the same internal gaps
-- Real-time API works but only provides current moment, not historical gap-filling
-
-**Conclusion**: The weather station itself had data collection/transmission issues during these periods. The Ecowitt web UI may show interpolated or cached data that the API doesn't provide.
-
-### Solution
-**Accepted as normal behavior** for historical weather APIs. The app correctly processes all available data.
-
-**Current Implementation**:
-- Uses `fetchEcowittCombinedWindDataForDevice()` for historical + real-time data
-- CustomWindChart properly displays gaps with line breaks (no false interpolation)
-- Professional chart with proper time labeling and horizontal scrolling
 
 ## Key Technologies
 
 ### Core Framework
-- **Expo** - React Native framework with managed workflow
-- **React Native** - Cross-platform mobile development
-- **TypeScript** - Type-safe JavaScript development
-- **Expo Router** - File-based navigation system
-
-### State Management  
-- **React Hooks** - Built-in state management
-- **Custom Reducers** - Complex state logic
-- **Context API** - Global state sharing
+- **Expo SDK 55** — React Native framework (managed workflow)
+- **React Native 0.83** — Cross-platform mobile
+- **React 19** — UI library
+- **TypeScript 5.9** — Type safety
+- **Expo Router** — File-based navigation
 
 ### UI/UX
-- **React Navigation v7** - Navigation library
-- **Expo Vector Icons** - Icon library
-- **Custom Themes** - Light/dark mode support
-- **Responsive Design** - Mobile-first approach
+- **React Navigation v7** — Navigation library
+- **React Native SVG** — Chart rendering
+- **Expo Vector Icons** — Icon library
+- **Light/Dark mode** — System theme support
 
 ### APIs & Data
-- **OpenWeatherMap API** - Real weather data
-- **Ecowitt API** - Standley Lake monitoring
-- **AsyncStorage** - Local data persistence
-- **Expo SecureStore** - Secure credential storage
+- **Ecowitt API** — Wind station data (Standley Lake, Soda Lake)
+- **OpenWeatherMap API** — Weather forecasts
+- **AsyncStorage** — Local data persistence
 
-### Development Tools
-- **ESLint** - Code linting and style enforcement
-- **Prettier** - Code formatting
-- **TypeScript** - Static type checking
-- **Jest** - Unit testing framework
+### Development & Testing
+- **ESLint** — Linting (with expo config)
+- **Jest 29** — Unit testing
+- **Playwright** — End-to-end testing
+- **Husky** — Git hooks (pre-commit)
 
 ## Development Guidelines
 
@@ -358,7 +244,6 @@ Comprehensive API testing with multiple parameters, timezones, and cycle types r
 
 2. **Component Structure**
    ```typescript
-   // Good component structure
    interface ComponentProps {
      // Define props with types
    }
@@ -368,9 +253,7 @@ Comprehensive API testing with multiple parameters, timezones, and cycle types r
      const [state, setState] = useState();
      
      // Event handlers
-     const handleAction = () => {
-       // Handler logic
-     };
+     const handleAction = () => {};
      
      // Render
      return (
@@ -386,23 +269,12 @@ Comprehensive API testing with multiple parameters, timezones, and cycle types r
 
 ### API Integration
 
-1. **Use the weatherService abstraction**
+1. **Use service abstractions** — never make API calls directly in components
    ```typescript
-   // Good - use the service
-   import { weatherService } from '@/services/weatherService';
-   
-   // Bad - direct API calls in components
+   import { ecowittService } from '@/services/ecowittService';
    ```
 
-2. **Handle errors gracefully**
-   ```typescript
-   try {
-     const data = await weatherService.getCurrentWeather();
-     // Handle success
-   } catch (error) {
-     // Handle error with user-friendly message
-   }
-   ```
+2. **Handle errors gracefully** — display user-friendly error messages, never mock data
 
 3. **Implement proper loading states**
    ```typescript
@@ -410,45 +282,56 @@ Comprehensive API testing with multiple parameters, timezones, and cycle types r
    const [error, setError] = useState<string | null>(null);
    ```
 
-### Android-Specific Considerations
+### Before Creating a PR
 
-1. **Use Android-safe wrappers** for crash-prone components
-2. **Test on physical devices** - emulators may not catch all issues
-3. **Implement proper error boundaries** for crash recovery
-4. **Use debugging components** when troubleshooting Android issues
+| Step | Command | When it runs |
+|------|---------|--------------|
+| Lint & type-check | `npm run lint` | ✅ Automatic on every commit (Husky pre-commit hook) |
+| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) |
+| Unit tests | `npm test` | Run manually — CI will catch failures, but faster to verify locally |
+| E2E tests | `npm run test:e2e` | Run manually — recommended for UI changes |
 
-### Build Process & Deployment
+### What CI Runs on Your PR
 
-**Dawn Patrol Alarm uses GitHub Actions for all production builds**:
-- ✅ **No local build setup required**
-- ✅ **Consistent build environment**
-- ✅ **Automated Android optimizations**
-- ✅ **Integrated testing and validation**
-- ✅ **Automatic version management**
+When you open a PR to `main`, GitHub Actions automatically runs:
+1. `npm run lint` — ESLint + TypeScript + YAML workflow validation
+2. `npm run test:coverage` — all unit tests with coverage report
 
-#### Local Development
-Use `npm start` for testing and development
+Full iOS and Android builds only run after merge to `main`.
 
-#### Production Builds
-All production builds are handled automatically via GitHub Actions workflow (`.github/workflows/build.yml`):
+### Git Workflow
 
-**Supported Platforms**:
-- **Android**: APK and AAB (Android App Bundle) builds
-- **iOS**: IPA builds for TestFlight distribution
+1. **Create feature branches** from `main`
+2. **Make small, focused commits** with clear messages
+3. **Run linting** before committing: `npm run lint` (enforced by Husky pre-commit hook)
+4. **Create pull requests** for code review
+5. **Merge after review** and CI checks pass
+6. **Production build** triggers automatically on merge to main
 
-**Build Triggers**:
+---
+
+## Build Process & Deployment
+
+**All production builds run via GitHub Actions** (`.github/workflows/build-and-release.yml`):
+- ✅ No local build setup required for releases
+- ✅ Consistent build environment (macOS for iOS, Ubuntu for Android)
+- ✅ Integrated linting, testing, and code signing
+- ✅ Automatic version increment
+- ✅ Artifacts published to GitHub Releases
+
+### Build Triggers
+
 - Push to `main` branch (automatic)
 - Manual trigger via GitHub Actions "Run workflow" button
 
-**Build Process**:
-1. Environment setup (Node.js, Expo CLI, Android SDK)
-2. Dependency installation with caching
-3. Code quality checks (ESLint, TypeScript, tests)
-4. Version increment (patch level)
-5. Platform-specific optimizations
-6. Artifact generation and distribution
+### Build Pipeline
 
-#### GitHub Repository Secrets
+1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage
+2. **iOS Build** (macOS) — Expo prebuild → Xcode archive → signed IPA
+3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
+4. **Release** — Creates GitHub Release with all artifacts
+
+### GitHub Repository Secrets
 
 Required secrets for the build process:
 
@@ -460,310 +343,151 @@ ANDROID_KEY_PASSWORD       # Key password
 ANDROID_KEYSTORE_PASSWORD  # Keystore password
 ```
 
+**Expo**:
+```
+EXPO_TOKEN                 # Expo authentication token for CI builds
+```
+
+**iOS Signing** (Team ID: FAF3YHR4P4):
+```
+IOS_DIST_CERTIFICATE_P12_BASE64       # Base64 encoded .p12 distribution certificate
+IOS_DIST_CERTIFICATE_PASSWORD         # Password for the .p12 file
+IOS_DIST_PROVISIONING_PROFILE_BASE64  # Base64 encoded .mobileprovision file
+IOS_DIST_CODE_SIGN_IDENTITY           # e.g. "Apple Distribution: Samuel James (FAF3YHR4P4)"
+```
+
 **API Keys**:
 ```
 OPENWEATHER_API_KEY        # OpenWeatherMap API key
-ECOWITT_APPLICATION_KEY    # Ecowitt app key (optional)
-ECOWITT_API_KEY           # Ecowitt API key (optional)
+ECOWITT_APPLICATION_KEY    # Ecowitt app key
+ECOWITT_API_KEY           # Ecowitt API key
 ```
 
-**Setting Up Secrets**:
-1. Go to GitHub repository → Settings → Secrets and variables → Actions
-2. Click "New repository secret"
-3. Add each required secret with the exact name and value
-
-#### Release Process
-
-1. **Prepare Release**: Ensure features are complete and tested
-2. **Trigger Build**: Push to main branch or manually trigger workflow
-3. **Monitor Build**: Watch GitHub Actions progress
-4. **Distribute**: Download artifacts and distribute via chosen channels
-
-#### Distribution
-
-**Android APK**:
-- Primary distribution via GitHub Releases
-- Direct APK download links
-- Manual installation requires "Unknown Sources" permission
-
-**iOS TestFlight** (if configured):
-- Automatic upload to TestFlight
-- Beta tester notifications
-- Internal testing (up to 100 testers, no review)
-- External testing (up to 10,000 testers, requires Beta App Review)
-
-#### Build Troubleshooting
-
-**Common Issues**:
-- "Invalid keystore" Error: Verify keystore base64 encoding and secrets
-- "API key missing" Warning: Non-critical, app uses fallback data
-- "Version conflict" Error: Manual version bump may be needed
-
-**Debug Commands**:
+**Setting Up Secrets via `gh` CLI**:
 ```bash
-# Test locally before pushing
-npm run lint
-npm run test
-
-# Environment debugging
-npm run debug-env          # Check environment variables
-npm run validate-keys      # Validate API keys  
-npm run test-apis          # Test API connectivity
+gh secret set SECRET_NAME --repo samqbush/dp-soda < secret_file.txt
+# or inline:
+gh secret set SECRET_NAME --repo samqbush/dp-soda --body "value"
 ```
 
-### Git Workflow
+### iOS Distribution Certificate Renewal
 
-1. **Create feature branches** from `main`
-2. **Make small, focused commits** with clear messages
-3. **Run linting** before committing: `npm run lint`
-4. **Create pull requests** for code review
-5. **Merge after review** and CI checks pass
-6. **Production build** triggers automatically on merge to main
+The iOS Distribution Certificate expires annually. Apple sends an email 30 days before expiry. Follow these steps to renew.
 
-### Debugging
+**Prerequisites**:
+- Apple Developer account access (Team ID: FAF3YHR4P4)
+- Keychain Access app (macOS)
+- `gh` CLI authenticated (`gh auth status`)
 
-1. **Use React Developer Tools** for component inspection
-2. **Enable remote debugging** in Expo DevTools
-3. **Use console.log** strategically (remove before production)
-4. **Utilize Android debugging components** for Android-specific issues
-5. **Check network requests** in browser dev tools
+**Step 1: Generate a new certificate in Apple Developer Portal**
 
-### Performance
+1. Sign in at https://developer.apple.com/account/resources/certificates/list
+2. Click the **+** button to create a new certificate
+3. Select **Apple Distribution** and click Continue
+4. Upload a Certificate Signing Request (CSR):
+   - Open **Keychain Access** → Certificate Assistant → Request a Certificate From a Certificate Authority
+   - Enter your email, select "Saved to disk", click Continue
+   - Upload the generated `.certSigningRequest` file
+5. Download the generated `.cer` file
 
-1. **Minimize API calls** - use caching where appropriate
-2. **Optimize images** - use appropriate formats and sizes
-3. **Lazy load components** when possible
-4. **Profile performance** using React DevTools Profiler
-5. **Test on lower-end devices** to ensure smooth experience
+**Step 2: Export as .p12 from Keychain Access**
 
-## Evening Weather Refresh Service
+1. Double-click the downloaded `.cer` file to install it in Keychain Access
+2. In Keychain Access, find the certificate under "My Certificates"
+3. Right-click → Export → choose `.p12` format
+4. Set a strong password (you'll need this for the secret)
+5. Save as `distribution.p12`
 
-The app includes an automatic evening weather refresh system that ensures accurate overnight wind predictions.
+**Step 3: Regenerate the Provisioning Profile**
 
-### Purpose
-The evening refresh service solves the issue where pressure change and temperature differential would show 0.0 values when the app transitions from afternoon to evening analysis mode at 6 PM.
+1. Go to https://developer.apple.com/account/resources/profiles/list
+2. Find your App Store distribution profile (or create a new one)
+3. Edit it and select the **new** distribution certificate
+4. Download the `.mobileprovision` file
 
-### How It Works
-1. **Automatic Scheduling**: Service schedules a background notification for 6 PM daily
-2. **Silent Refresh**: At 6 PM, weather data is automatically refreshed in the background
-3. **Fresh Data**: Ensures pressure trends and temperature differentials are calculated with current data
-4. **User Transparency**: Status is visible in the Wind Guru screen header
-
-### Key Files
-- `services/generalNotificationService.ts` - General purpose notification system
-- `services/eveningWeatherRefreshService.ts` - Main service implementation
-- `services/alarmNotificationService.ts` - Alarm-specific notifications (separate from general)
-- `app/(tabs)/wind-guru.tsx` - UI status display
-
-### Debug Commands
-```bash
-# Test the evening refresh service
-npm run debug-evening-refresh
-
-# Check current status and trigger manual refresh
-node scripts/debug-evening-refresh.mjs
-```
-
-### Configuration
-The service automatically initializes when the app starts and requires notification permissions to function properly. No additional configuration is needed.
-
-## Prediction Lifecycle Management
-
-The app implements a robust prediction lifecycle management system to ensure wind predictions are locked at appropriate times and maintain consistency throughout the prediction window.
-
-> **📋 For complete workflow details, see [Wind Guru Prediction Workflow](./wind-guru-prediction-workflow.md)**
-
-### Purpose
-The prediction lifecycle management solves timing issues where predictions would dramatically change after midnight due to forecast data transitions. It implements a structured approach to prediction reliability:
-
-### Lifecycle Stages
-1. **Preview (Morning-Evening)**: Predictions calculated normally, updated with fresh data
-2. **Evening Lock (6 PM)**: First lock point - prediction locked for evening review
-3. **Final Lock (11 PM)**: Second lock point - prediction locked for dawn execution
-4. **Active (Midnight-8 AM)**: Locked prediction used, no recalculation
-5. **Verification (8 AM)**: Compare predicted vs actual conditions
-
-### Key Features
-- **Automatic Locking**: Predictions automatically lock at 6 PM and 11 PM
-- **State Persistence**: Locked predictions saved and restored between app sessions
-- **Consistent Results**: Same prediction shown from evening through dawn
-- **Verification**: Post-event analysis to improve prediction accuracy
-
-### Key Files
-- `services/predictionStateManager.ts` - Core prediction lifecycle management
-- `services/katabaticAnalyzer.ts` - Integrated prediction analysis with state management
-
-### Testing
-```bash
-# Debug current prediction state and real wind data
-npm run debug-stations  # Shows real wind data for verification
-```
-
-### Configuration
-The prediction lifecycle system automatically initializes when first accessed and requires no manual configuration. It uses AsyncStorage for persistence and includes automatic cleanup of old predictions.
-
-## Getting Help
-
-- **Issues**: Create GitHub issues for bugs or feature requests  
-- **Architecture**: See [Architecture Guide](architecture.md) for system design
-- **Wind Prediction**: See [Wind Prediction Guide](wind-prediction-guide.md) for technical details
-
-## Next Steps
-
-Once you have the development environment set up:
-
-1. **Explore the codebase** - Start with `/app` directory for main screens
-2. **Review architecture** - Read [Architecture Guide](architecture.md)
-3. **Understand wind prediction** - See [Wind Prediction Guide](wind-prediction-guide.md)
-4. **Make your first change** - Try updating a component or adding a feature
-5. **Test thoroughly** - Ensure changes work on both iOS and Android
-6. **Deploy** - Push to main branch to trigger automated build and release
-
-## Ecowitt Sensor Investigation & Troubleshooting
-
-The app uses real weather data from Ecowitt weather stations at Standley Lake and Soda Lake. This section documents investigation findings and troubleshooting procedures.
-
-### Current Status (Last Updated: June 2025)
-
-**Standley Lake Station (GW2000B_V3.2.5)**:
-- ✅ **Excellent reliability**: 100% data coverage with no gaps
-- ✅ **All sensors operational**: Wind, temperature, humidity, pressure, rain, solar
-- ✅ **Consistent wind data**: Reliable source for wind predictions
-- 📍 **Location**: 39.870467, -105.151622
-
-**Soda Lake Station (GW3000B_V1.0.6)**:  
-- ⚠️ **Intermittent wind data**: ~52% coverage (151/288 daily readings have wind data)
-- ✅ **Sensors functional**: When connected, all sensors work properly
-- ✅ **Temperature/humidity reliable**: Consistent outdoor readings
-- 🔧 **Issue**: Periodic RF connectivity problems with wind sensor array
-- 📍 **Location**: 39.646115, -105.174958
-
-### Device Comparison
-
-| Feature | Standley (GW2000B) | Soda (GW3000B) |
-|---------|-------------------|----------------|
-| **Gateway Type** | Basic outdoor gateway | Advanced console with display |
-| **Indoor Sensors** | Via external sensors only | Built-in to console unit |
-| **Reliability** | Excellent (100%) | Good but intermittent wind |
-| **Sensor Array** | Haptic array, 2.6V battery | Haptic array, 3.18V battery |
-| **Connectivity** | Stable RF connection | Intermittent RF issues |
-
-### Common Issues & Solutions
-
-**Missing Wind Data**:
-- **Symptom**: Historical data shows gaps in wind readings
-- **Cause**: RF interference or signal strength issues 
-- **Solution**: Improve Soda Lake RF connectivity (antenna placement, signal strength)
-
-**Indoor Temperature Readings**:
-- **Normal Behavior**: GW3000B consoles measure indoor conditions where installed
-- **Explanation**: Gateway unit placed indoors provides indoor temp/humidity
-- **Not a Bug**: This is expected behavior for console-type devices
-
-**Battery Status**:
-- **Healthy Range**: 2.4V - 3.2V for sensor arrays
-- **Warning**: <2.4V may cause connectivity issues
-- **Critical**: <2.2V requires immediate battery replacement
-
-### Investigation Tools
-
-Use these debugging scripts to investigate sensor issues:
+**Step 4: Get the Code Sign Identity name**
 
 ```bash
-# Check individual station data and connectivity
-npm run debug-stations
-
-# Verify device connectivity and sensor status
-npm run debug-devices
-
-# Verify NOAA weather data quality  
-npm run verify-noaa
+security find-identity -v -p codesigning | grep "Apple Distribution"
 ```
 
-### Key Findings from Investigation
-
-1. **API Data Accuracy**: Ecowitt API returns correct data counts (288 5-minute intervals = 24 hours)
-2. **Sensor Connectivity**: Both stations show all sensors connected in real-time checks
-3. **Intermittent Issues**: Soda Lake wind sensor has periodic RF connectivity problems
-4. **Hardware Status**: All sensor batteries healthy, no hardware failures detected
-5. **Indoor Sensors**: Normal operation for GW3000B console units
-
-### Recommendations for App Development
-
-1. **Data Quality Focus**: Improve Soda Lake sensor connectivity for more reliable wind data
-2. **Data Validation**: Add checks for missing wind periods and implement graceful fallbacks
-3. **User Feedback**: Display data quality indicators and gaps clearly in UI
-4. **Monitoring**: Set up alerts for extended sensor outages at the primary location
-5. **RF Optimization**: Consider antenna placement and signal strength improvements
-
-### Technical Details
-
-**Compatible Sensor Arrays**:
-- WS85, WS90, WS80, WS68, WS69 (wind/weather arrays)
-- WH40 (rain gauge), WH57 (lightning detector)
-- WH45/WH46 (air quality), WN34L/S/D (temperature sensors)
-
-**RF Specifications**:
-- Frequency: 915MHz (US), 868MHz (EU), 433MHz (Asia)
-- Range: 100+ meters in open areas
-- Protocol: Proprietary Ecowitt wireless
-
-## API Migration History
-
-### Phase 1: Open-Meteo Migration (Completed June 21, 2025)
-
-Successfully migrated from OpenWeatherMap to Open-Meteo API to eliminate API blocking issues and costs.
-
-#### Objectives Achieved
-1. **Primary Weather API Switch**
-   - **From**: OpenWeatherMap (rate-limited, paid, blocked)
-   - **To**: Open-Meteo (unlimited, free, high-quality)
-   - **Result**: ✅ Eliminated API blocking issues
-
-2. **Aggressive Caching Implementation**
-   - **From**: 30-minute cache duration
-   - **To**: 6-hour cache duration (12x improvement)
-   - **Benefits**: 
-     - 🚀 Reduced API dependency
-     - ⚡ Faster app performance  
-     - 📶 Better offline capability
-     - 💰 Zero API costs
-
-#### Technical Implementation
-- **New Files Created**:
-  - `services/openMeteoWeatherService.ts` - Complete Open-Meteo integration
-  - `scripts/test-open-meteo-integration.mjs` - API validation script
-
-- **Files Modified**:
-  - `hooks/useWeatherData.ts` - Switched to Open-Meteo service
-  - `app/(tabs)/wind-guru.tsx` - Updated UI to show new data source
-  - `package.json` - Added test script
-
-#### Key Features
-- **No API Keys Required** - Open-Meteo is completely free
-- **Comprehensive Data** - Current weather + 7-day hourly forecasts
-- **High Quality Sources** - European reanalysis data (ERA5, ECMWF IFS)
-- **Smart Caching** - 6-hour cache with stale data fallback
-- **Error Recovery** - Graceful degradation with mock data
-
-#### Performance Results
+Output will look like:
 ```
-✅ Morrison API Response: 200
-   Current Temp: 33.2°C
-   Pressure: 985.4 hPa
-   Wind: 2.51 m/s
-   Forecast Hours: 168
-
-✅ Evergreen API Response: 200
-   Current Temp: 30.5°C
-   Pressure: 985.8 hPa
-
-🌡️ Temperature Differential: 2.7°C
-⚡ API Performance: ~159ms average
+1) ABC123... "Apple Distribution: Samuel James (FAF3YHR4P4)"
 ```
 
-#### Benefits Achieved
-- **Cost Elimination**: $0 API costs with Open-Meteo
-- **Reliability Improvement**: No limits, no blocks, unlimited requests
-- **Performance Enhancement**: 6-hour cache, 12x fewer API calls
-- **Development Velocity**: Zero configuration, works immediately
+**Step 5: Update GitHub secrets with `gh` CLI**
+
+```bash
+# Base64 encode the certificate and provisioning profile
+base64 -i distribution.p12 > cert_b64.txt
+base64 -i profile.mobileprovision > profile_b64.txt
+
+# Update all iOS signing secrets
+gh secret set IOS_DIST_CERTIFICATE_P12_BASE64 --repo samqbush/dp-soda < cert_b64.txt
+gh secret set IOS_DIST_CERTIFICATE_PASSWORD --repo samqbush/dp-soda --body "your-p12-password"
+gh secret set IOS_DIST_PROVISIONING_PROFILE_BASE64 --repo samqbush/dp-soda < profile_b64.txt
+gh secret set IOS_DIST_CODE_SIGN_IDENTITY --repo samqbush/dp-soda --body "Apple Distribution: Samuel James (FAF3YHR4P4)"
+
+# Clean up sensitive files
+rm -f distribution.p12 cert_b64.txt profile_b64.txt profile.mobileprovision
+```
+
+**Step 6: Verify the new certificate works**
+
+```bash
+gh workflow run "Build Dawn Patrol Alarm - Combined Release" --repo samqbush/dp-soda
+gh run watch --repo samqbush/dp-soda
+```
+
+**Notes**:
+- The old certificate can be revoked after confirming the new build succeeds
+- Provisioning profiles are tied to a specific certificate — always regenerate after cert renewal
+- The code sign identity string rarely changes unless you change your developer account name
+
+### Release & Distribution
+
+1. Push to `main` or manually trigger the workflow
+2. Monitor at: `https://github.com/samqbush/dp-soda/actions`
+3. On success, artifacts are attached to a GitHub Release
+
+**Android**: APK + AAB available as GitHub Release assets
+**iOS**: IPA available for manual upload to App Store Connect / TestFlight
+
+### Build Troubleshooting
+
+| Error | Solution |
+|-------|----------|
+| Invalid keystore | Verify `ANDROID_KEYSTORE_BASE64` encoding |
+| iOS signing failure | Check cert expiry, regenerate per steps above |
+| Version conflict | Run `npm run increment-version` locally and push |
+
+---
+
+## Ecowitt Sensor Troubleshooting
+
+The app uses real weather data from Ecowitt weather stations at Standley Lake and Soda Lake.
+
+### Station Status
+
+**Standley Lake (GW2000B_V3.2.5)**:
+- ✅ Excellent reliability: ~100% data coverage
+- 📍 Location: 39.870467, -105.151622
+
+**Soda Lake (GW3000B_V1.0.6)**:
+- ⚠️ Intermittent wind data (~52% coverage due to RF issues)
+- 📍 Location: 39.646115, -105.174958
+
+### Debug Scripts
+
+```bash
+npm run debug-stations       # Station data and wind readings
+npm run debug-devices        # Device connectivity and sensor status
+npm run verify-noaa          # NOAA data quality check
+```
+
+### Common Issues
+
+- **Missing wind data gaps** → Normal for Ecowitt API; the app handles gaps gracefully with line breaks in charts
+- **Indoor temperature on Soda Lake** → Expected behavior for GW3000B console units (measures where installed)
+- **Battery warning** → Sensor arrays need replacement below 2.4V

@@ -1,4 +1,4 @@
-// filepath: /Users/samquakenbush/Code/dp-react/utils/testWindData.ts
+// filepath: /Users/samquakenbush/Code/dp-react/__tests__/fixtures/testWindData.ts
 import { WindDataPoint } from '@/services/windService';
 
 /**

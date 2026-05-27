@@ -42,14 +42,14 @@ describe('useColorScheme Hook Tests', () => {
     });
 
     it('should return null when react-native returns null', () => {
-      mockReactNativeUseColorScheme.mockReturnValue(null);
+      mockReactNativeUseColorScheme.mockReturnValue(null as any);
       const result = useColorScheme();
       expect(result).toBe(null);
       expect(mockReactNativeUseColorScheme).toHaveBeenCalled();
     });
 
     it('should return undefined when react-native returns undefined', () => {
-      mockReactNativeUseColorScheme.mockReturnValue(undefined);
+      mockReactNativeUseColorScheme.mockReturnValue(undefined as any);
       const result = useColorScheme();
       expect(result).toBe(undefined);
       expect(mockReactNativeUseColorScheme).toHaveBeenCalled();
@@ -89,7 +89,7 @@ describe('useColorScheme Hook Tests', () => {
     });
 
     it('should handle null color scheme', async () => {
-      mockReactNativeUseColorScheme.mockReturnValue(null);
+      mockReactNativeUseColorScheme.mockReturnValue(null as any);
       
       const { result } = renderHook(() => useColorSchemeWeb());
       

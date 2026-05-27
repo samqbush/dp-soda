@@ -15,7 +15,7 @@ const initialLoadStatusCache = new Map<string, boolean>();
 export function getGlobalSessionId(): string {
   if (globalSessionId === null) {
     globalSessionId = Date.now().toString();
-    console.log(`📱 Created new global session ID: ${globalSessionId}`);
+    if (__DEV__) console.log(`📱 Created new global session ID: ${globalSessionId}`);
   }
   return globalSessionId;
 }
@@ -35,7 +35,7 @@ export function hasBeenInitiallyLoaded(tabName: string): boolean {
   const key = `initialLoad_${tabName}_${sessionId}`;
   
   const hasLoaded = initialLoadStatusCache.get(key) || false;
-  console.log(`🔍 In-memory load status for ${tabName}: ${hasLoaded}`);
+  if (__DEV__) console.log(`🔍 In-memory load status for ${tabName}: ${hasLoaded}`);
   return hasLoaded;
 }
 
@@ -46,9 +46,9 @@ export function markAsInitiallyLoaded(tabName: string): void {
   const sessionId = getGlobalSessionId();
   const key = `initialLoad_${tabName}_${sessionId}`;
   
-  console.log(`💾 Marking ${tabName} as initially loaded in memory`);
+  if (__DEV__) console.log(`💾 Marking ${tabName} as initially loaded in memory`);
   initialLoadStatusCache.set(key, true);
-  console.log(`✅ Stored in memory cache for ${tabName}`);
+  if (__DEV__) console.log(`✅ Stored in memory cache for ${tabName}`);
 }
 
 /**

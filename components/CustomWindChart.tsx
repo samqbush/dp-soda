@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, ScrollView, Dimensions, StyleSheet, PixelRatio } from 'react-native';
 import Svg, { Line, Circle, Text, Path } from 'react-native-svg';
 import { ThemedText } from '@/components/ThemedText';
@@ -37,6 +37,263 @@ export function CustomWindChart({
   const backgroundColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'tint');
 
+  // Font scale detection for responsive layout
+  const fontScale = PixelRatio.getFontScale();
+
+  // Filter data based on time window
+  const recentData = useMemo(() => {
+    if (!data || data.length < 2) return [];
+    
+    const defaultWindow: TimeWindow = { startHour: 3, endHour: 5 };
+    const activeWindow = timeWindow || defaultWindow;
+    
+    let filtered: WindDataPoint[];
+    if (timeWindow) {
+      filtered = filterWindDataByTimeWindow(data, activeWindow);
+    } else {
+      filtered = data.filter(point => {
+        const date = new Date(point.time);
+        const hours = date.getHours();
+        return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
+      }).slice(-48);
+    }
+    return filtered;
+  }, [data, timeWindow]);
+
+  // Memoize all expensive SVG calculations
+  const chartCalcs = useMemo(() => {
+    if (recentData.length < 2) return null;
+
+    // Chart dimensions with responsive Y-axis width
+    const screenWidth = Dimensions.get('window').width;
+    const _chartHeight = 360;
+    
+    const baseYAxisWidth = 50;
+    const _yAxisWidth = Math.max(baseYAxisWidth, baseYAxisWidth * fontScale * 1.2);
+    
+    const _padding = { top: 20, bottom: 60, left: _yAxisWidth, right: 20 };
+    
+    // Calculate chart width based on time span for proper label spacing
+    const timeSpanMs = new Date(recentData[recentData.length - 1].time).getTime() - new Date(recentData[0].time).getTime();
+    const timeSpanHours = timeSpanMs / (1000 * 60 * 60);
+    
+    const minChartWidth = screenWidth - 32;
+    let targetLabels: number;
+    let pixelsPerLabel: number;
+    
+    if (timeSpanHours <= 1) {
+      targetLabels = 4;
+      pixelsPerLabel = 90;
+    } else if (timeSpanHours <= 3) {
+      targetLabels = 6;
+      pixelsPerLabel = 80;
+    } else {
+      targetLabels = Math.min(8, Math.ceil(timeSpanHours));
+      pixelsPerLabel = 70;
+    }
+    
+    const _chartWidth = Math.max(minChartWidth, targetLabels * pixelsPerLabel);
+    const _plotWidth = _chartWidth - _padding.left - _padding.right;
+    const _plotHeight = _chartHeight - _padding.top - _padding.bottom;
+
+    // Process data and get values
+    const _speeds = recentData.map(point => {
+      const speed = typeof point.windSpeed === 'string' ? parseFloat(point.windSpeed) : point.windSpeed;
+      return isNaN(speed) ? 0 : Math.max(0, speed);
+    });
+    
+    const _gusts = recentData.map(point => {
+      const gust = typeof point.windGust === 'string' ? parseFloat(point.windGust) : point.windGust;
+      return isNaN(gust) ? 0 : Math.max(0, gust);
+    });
+
+    // Calculate scale
+    const maxValue = Math.max(..._speeds, ..._gusts, idealWindSpeed);
+    const _yMax = Math.ceil(maxValue / 5) * 5;
+    const _yScale = _plotHeight / _yMax;
+    const _xScale = _plotWidth / (recentData.length - 1);
+
+    // Format time labels
+    const formatTimeLabel = (time: Date) => {
+      const hour = time.getHours();
+      const minute = time.getMinutes();
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      if (minute === 0) {
+        return `${displayHour}${ampm}`;
+      }
+      return '';
+    };
+
+    // Generate label positions with smart spacing
+    const minLabelSpacing = 60;
+    const allPotentialLabels = recentData
+      .map((point, index) => {
+        const time = new Date(point.time);
+        const label = formatTimeLabel(time);
+        return {
+          x: _padding.left + index * _xScale,
+          y: _chartHeight - _padding.bottom + 20,
+          label: label || time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          index,
+          isHourMark: time.getMinutes() === 0 && label !== ''
+        };
+      });
+
+    // Smart label selection
+    const _labelData: {x: number, y: number, label: string, index: number}[] = [];
+    
+    allPotentialLabels.forEach((potential, i) => {
+      if (i === 0) {
+        _labelData.push(potential);
+        return;
+      }
+      if (potential.isHourMark) {
+        const lastLabel = _labelData[_labelData.length - 1];
+        if (potential.x - lastLabel.x >= minLabelSpacing) {
+          _labelData.push(potential);
+          return;
+        }
+      }
+      if (i === allPotentialLabels.length - 1) {
+        const lastLabel = _labelData[_labelData.length - 1];
+        if (potential.x - lastLabel.x >= minLabelSpacing && !potential.isHourMark) {
+          _labelData.push(potential);
+        }
+      }
+    });
+
+    // Helper function to create wind direction arrow path
+    const createArrowPath = (centerX: number, centerY: number, direction: number, size = 8): string => {
+      const windGoesDirection = (direction + 180) % 360;
+      const screenAngle = (90 - windGoesDirection) * Math.PI / 180;
+      
+      const cos = Math.cos(screenAngle);
+      const sin = Math.sin(screenAngle);
+      
+      const tipX = centerX + cos * size;
+      const tipY = centerY - sin * size;
+      
+      const leftX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
+      const leftY = centerY - sin * (-size * 0.6) + cos * (size * 0.4);
+      
+      const rightX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
+      const rightY = centerY - sin * (-size * 0.6) + cos * (-size * 0.4);
+      
+      return `M ${tipX} ${tipY} L ${leftX} ${leftY} M ${tipX} ${tipY} L ${rightX} ${rightY}`;
+    };
+
+    // Process wind direction data and calculate arrows
+    const _windArrows = recentData
+      .map((point, index) => {
+        const direction = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
+        if (isNaN(direction) || index % 3 !== 0) return null;
+        
+        const x = _padding.left + index * _xScale;
+        const speed = _speeds[index];
+        const y = Math.max(_padding.top + (_yMax - speed) * _yScale - 20, _padding.top + 10);
+        
+        return {
+          x,
+          y,
+          direction,
+          index,
+          arrowPath: createArrowPath(x, y, direction)
+        };
+      })
+      .filter(Boolean) as {x: number, y: number, direction: number, index: number, arrowPath: string}[];
+
+    // Helper function to detect significant time gaps
+    const hasSignificantGap = (currentTime: string, nextTime: string): boolean => {
+      const current = new Date(currentTime).getTime();
+      const next = new Date(nextTime).getTime();
+      const gapMs = next - current;
+      const gapHours = gapMs / (1000 * 60 * 60);
+      return gapHours > 1;
+    };
+
+    // Generate path segments for wind speed line (breaking on gaps)
+    const _windPathSegments: string[] = [];
+    let currentSegment = '';
+    
+    _speeds.forEach((speed, index) => {
+      const x = _padding.left + index * _xScale;
+      const y = _padding.top + (_yMax - speed) * _yScale;
+      
+      if (index === 0) {
+        currentSegment = `M ${x} ${y}`;
+      } else {
+        if (hasSignificantGap(recentData[index - 1].time, recentData[index].time)) {
+          if (currentSegment) {
+            _windPathSegments.push(currentSegment);
+          }
+          currentSegment = `M ${x} ${y}`;
+        } else {
+          currentSegment += ` L ${x} ${y}`;
+        }
+      }
+      
+      if (index === _speeds.length - 1 && currentSegment) {
+        _windPathSegments.push(currentSegment);
+      }
+    });
+
+    // Generate path segments for wind gust area (breaking on gaps)
+    const _gustPathSegments: string[] = [];
+    let currentGustSegment = '';
+    
+    _gusts.forEach((gust, index) => {
+      const x = _padding.left + index * _xScale;
+      const y = _padding.top + (_yMax - gust) * _yScale;
+      const baseY = _padding.top + _plotHeight;
+      
+      if (index === 0) {
+        currentGustSegment = `M ${x} ${baseY} L ${x} ${y}`;
+      } else {
+        if (hasSignificantGap(recentData[index - 1].time, recentData[index].time)) {
+          if (currentGustSegment) {
+            const prevX = _padding.left + (index - 1) * _xScale;
+            currentGustSegment += ` L ${prevX} ${baseY} Z`;
+            _gustPathSegments.push(currentGustSegment);
+          }
+          currentGustSegment = `M ${x} ${baseY} L ${x} ${y}`;
+        } else {
+          currentGustSegment += ` L ${x} ${y}`;
+        }
+      }
+      
+      if (index === _gusts.length - 1 && currentGustSegment) {
+        currentGustSegment += ` L ${x} ${baseY} Z`;
+        _gustPathSegments.push(currentGustSegment);
+      }
+    });
+
+    // Y-axis labels
+    const _yLabels = [];
+    for (let i = 0; i <= _yMax; i += 5) {
+      _yLabels.push({
+        value: i,
+        y: _padding.top + (_yMax - i) * _yScale
+      });
+    }
+
+    return {
+      chartWidth: _chartWidth,
+      chartHeight: _chartHeight,
+      yAxisWidth: _yAxisWidth,
+      padding: _padding,
+      yMax: _yMax,
+      yScale: _yScale,
+      xScale: _xScale,
+      speeds: _speeds,
+      labelData: _labelData,
+      windArrows: _windArrows,
+      windPathSegments: _windPathSegments,
+      gustPathSegments: _gustPathSegments,
+      yLabels: _yLabels,
+    };
+  }, [recentData, fontScale, idealWindSpeed]);
+
   if (!data || data.length < 2) {
     return (
       <ThemedView style={styles.container}>
@@ -50,22 +307,9 @@ export function CustomWindChart({
     );
   }
 
-  // Filter data based on time window
-  const defaultWindow: TimeWindow = { startHour: 3, endHour: 5 };
-  const activeWindow = timeWindow || defaultWindow;
-  
-  let recentData: WindDataPoint[];
-  if (timeWindow) {
-    recentData = filterWindDataByTimeWindow(data, activeWindow);
-  } else {
-    recentData = data.filter(point => {
-      const date = new Date(point.time);
-      const hours = date.getHours();
-      return hours >= activeWindow.startHour && hours <= activeWindow.endHour;
-    }).slice(-48);
-  }
-
-  if (recentData.length < 2) {
+  if (!chartCalcs) {
+    const defaultWindow: TimeWindow = { startHour: 3, endHour: 5 };
+    const activeWindow = timeWindow || defaultWindow;
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
@@ -78,266 +322,21 @@ export function CustomWindChart({
     );
   }
 
-  console.log('📊 Chart sizing data points:', recentData.length);
-
-  // Font scale detection for responsive layout
-  const fontScale = PixelRatio.getFontScale();
-  console.log('📱 Font scale detected:', fontScale);
-
-  // Chart dimensions with responsive Y-axis width
-  const screenWidth = Dimensions.get('window').width;
-  const chartHeight = 360;
-  
-  // Calculate responsive Y-axis container width based on font scaling
-  // Base width is 50px, but we need extra space when font scale > 1
-  const baseYAxisWidth = 50;
-  const yAxisWidth = Math.max(baseYAxisWidth, baseYAxisWidth * fontScale * 1.2);
-  
-  const padding = { top: 20, bottom: 60, left: yAxisWidth, right: 20 };
-  
-  // Calculate chart width based on time span for proper label spacing
-  const timeSpanMs = new Date(recentData[recentData.length - 1].time).getTime() - new Date(recentData[0].time).getTime();
-  const timeSpanHours = timeSpanMs / (1000 * 60 * 60);
-  
-  // Dynamic width calculation for proper label spacing
-  const minChartWidth = screenWidth - 32;
-  let targetLabels: number;
-  let pixelsPerLabel: number;
-  
-  if (timeSpanHours <= 1) {
-    targetLabels = 4; // 15-min intervals
-    pixelsPerLabel = 90;
-  } else if (timeSpanHours <= 3) {
-    targetLabels = 6; // 30-min intervals
-    pixelsPerLabel = 80;
-  } else {
-    targetLabels = Math.min(8, Math.ceil(timeSpanHours)); // 1-hour intervals max
-    pixelsPerLabel = 70;
-  }
-  
-  const calculatedWidth = Math.max(minChartWidth, targetLabels * pixelsPerLabel);
-  const chartWidth = calculatedWidth;
-  const plotWidth = chartWidth - padding.left - padding.right;
-  const plotHeight = chartHeight - padding.top - padding.bottom;
-
-  // Process data and get values
-  const speeds = recentData.map(point => {
-    const speed = typeof point.windSpeed === 'string' ? parseFloat(point.windSpeed) : point.windSpeed;
-    return isNaN(speed) ? 0 : Math.max(0, speed);
-  });
-  
-  const gusts = recentData.map(point => {
-    const gust = typeof point.windGust === 'string' ? parseFloat(point.windGust) : point.windGust;
-    return isNaN(gust) ? 0 : Math.max(0, gust);
-  });
-
-  // Process wind direction data
-  const directions = recentData.map(point => {
-    const direction = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
-    return isNaN(direction) ? null : direction;
-  });
-
-  console.log('🧭 Wind directions sample:', directions.slice(0, 5).map(d => d?.toFixed(0) + '°').join(', '));
-  
-  // Debug wind direction calculations for first few points
-  directions.slice(0, 3).forEach((dir, idx) => {
-    if (dir !== null) {
-      const windGoesDirection = (dir + 180) % 360;
-      console.log(`🧭 Point ${idx}: Wind from ${dir.toFixed(0)}° → Wind goes to ${windGoesDirection.toFixed(0)}°`);
-    }
-  });
-
-  // Calculate scale
-  const maxValue = Math.max(...speeds, ...gusts, idealWindSpeed);
-  const yMax = Math.ceil(maxValue / 5) * 5; // Round up to nearest 5
-  const yScale = plotHeight / yMax;
-  const xScale = plotWidth / (recentData.length - 1);
-
-  // Format time labels - Two-tier system: only show hour labels
-  const formatTimeLabel = (time: Date, index: number) => {
-    const hour = time.getHours();
-    const minute = time.getMinutes();
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-
-    // Only show hour labels (minute = 0) for cleaner display
-    // The 30-minute marks will be shown as small tick marks below
-    if (minute === 0) {
-      return `${displayHour}${ampm}`;
-    }
-    return '';
-  };
-
-  // Generate label positions with smart spacing
-  const minLabelSpacing = 60; // Minimum pixels between labels to prevent crowding
-  const allPotentialLabels = recentData
-    .map((point, index) => {
-      const time = new Date(point.time);
-      const label = formatTimeLabel(time, index);
-      return {
-        x: padding.left + index * xScale,
-        y: chartHeight - padding.bottom + 20,
-        label: label || time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        index,
-        isHourMark: time.getMinutes() === 0 && label !== '' // Prioritize clean hour marks
-      };
-    });
-
-  // Smart label selection: prioritize hour marks and maintain spacing
-  const labelData: {x: number, y: number, label: string, index: number}[] = [];
-  
-  allPotentialLabels.forEach((potential, i) => {
-    // Always include the first label
-    if (i === 0) {
-      labelData.push(potential);
-      return;
-    }
-    
-    // For hour marks, check if there's enough space from the last added label
-    if (potential.isHourMark) {
-      const lastLabel = labelData[labelData.length - 1];
-      if (potential.x - lastLabel.x >= minLabelSpacing) {
-        labelData.push(potential);
-        return;
-      }
-    }
-    
-    // For the last label, only add if it's far enough from the previous label and not an hour mark
-    if (i === allPotentialLabels.length - 1) {
-      const lastLabel = labelData[labelData.length - 1];
-      if (potential.x - lastLabel.x >= minLabelSpacing && !potential.isHourMark) {
-        labelData.push(potential);
-      }
-    }
-  });
-
-  console.log('📊 Chart labels:', labelData.map(l => l?.label).join(', '));
-
-  // Helper function to create wind direction arrow path
-  const createArrowPath = (centerX: number, centerY: number, direction: number, size = 8): string => {
-    // Convert meteorological direction (where wind comes from) to screen coordinates
-    // Meteorological: 0° = North (wind from north), 90° = East (wind from east), 180° = South, 270° = West
-    // Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
-    // Arrow should point TO where wind is going (opposite of where it comes from)
-    
-    // Convert: meteorological direction → direction wind goes → screen angle
-    const windGoesDirection = (direction + 180) % 360; // Where wind goes (opposite of where it comes from)
-    const screenAngle = (90 - windGoesDirection) * Math.PI / 180; // Convert to screen coordinates (90° - angle because screen Y is inverted)
-    
-    const cos = Math.cos(screenAngle);
-    const sin = Math.sin(screenAngle);
-    
-    // Arrow points: tip, left wing, right wing
-    const tipX = centerX + cos * size;
-    const tipY = centerY - sin * size; // Negative sin because screen Y is inverted
-    
-    const leftX = centerX + cos * (-size * 0.6) + sin * (size * 0.4);
-    const leftY = centerY - sin * (-size * 0.6) + cos * (size * 0.4);
-    
-    const rightX = centerX + cos * (-size * 0.6) + sin * (-size * 0.4);
-    const rightY = centerY - sin * (-size * 0.6) + cos * (-size * 0.4);
-    
-    return `M ${tipX} ${tipY} L ${leftX} ${leftY} M ${tipX} ${tipY} L ${rightX} ${rightY}`;
-  };
-
-  // Calculate wind direction arrow positions (show every 3rd point to avoid crowding)
-  const windArrows = directions
-    .map((direction, index) => {
-      if (direction === null || index % 3 !== 0) return null; // Show every 3rd arrow
-      
-      const x = padding.left + index * xScale;
-      const speed = speeds[index];
-      const y = padding.top + (yMax - speed) * yScale - 20; // Position above the speed line
-      
-      return {
-        x,
-        y: Math.max(y, padding.top + 10), // Ensure arrows don't go above chart area
-        direction,
-        index
-      };
-    })
-    .filter(Boolean);
-
-  // Helper function to detect significant time gaps
-  const hasSignificantGap = (currentTime: string, nextTime: string): boolean => {
-    const current = new Date(currentTime).getTime();
-    const next = new Date(nextTime).getTime();
-    const gapMs = next - current;
-    const gapHours = gapMs / (1000 * 60 * 60);
-    return gapHours > 1; // Gap larger than 1 hour (more sensitive)
-  };
-
-  // Generate path segments for wind speed line (breaking on gaps)
-  const windPathSegments: string[] = [];
-  let currentSegment = '';
-  
-  speeds.forEach((speed, index) => {
-    const x = padding.left + index * xScale;
-    const y = padding.top + (yMax - speed) * yScale;
-    
-    if (index === 0) {
-      currentSegment = `M ${x} ${y}`;
-    } else {
-      // Check for significant gap
-      if (hasSignificantGap(recentData[index - 1].time, recentData[index].time)) {
-        // End current segment and start new one
-        if (currentSegment) {
-          windPathSegments.push(currentSegment);
-        }
-        currentSegment = `M ${x} ${y}`;
-      } else {
-        currentSegment += ` L ${x} ${y}`;
-      }
-    }
-    
-    // Add the last segment
-    if (index === speeds.length - 1 && currentSegment) {
-      windPathSegments.push(currentSegment);
-    }
-  });
-
-  // Generate path segments for wind gust area (breaking on gaps)
-  const gustPathSegments: string[] = [];
-  let currentGustSegment = '';
-  
-  gusts.forEach((gust, index) => {
-    const x = padding.left + index * xScale;
-    const y = padding.top + (yMax - gust) * yScale;
-    const baseY = padding.top + plotHeight;
-    
-    if (index === 0) {
-      currentGustSegment = `M ${x} ${baseY} L ${x} ${y}`;
-    } else {
-      // Check for significant gap
-      if (hasSignificantGap(recentData[index - 1].time, recentData[index].time)) {
-        // Close current segment
-        if (currentGustSegment) {
-          const prevX = padding.left + (index - 1) * xScale;
-          currentGustSegment += ` L ${prevX} ${baseY} Z`;
-          gustPathSegments.push(currentGustSegment);
-        }
-        // Start new segment
-        currentGustSegment = `M ${x} ${baseY} L ${x} ${y}`;
-      } else {
-        currentGustSegment += ` L ${x} ${y}`;
-      }
-    }
-    
-    // Close the last segment
-    if (index === gusts.length - 1 && currentGustSegment) {
-      currentGustSegment += ` L ${x} ${baseY} Z`;
-      gustPathSegments.push(currentGustSegment);
-    }
-  });
-
-  // Y-axis labels
-  const yLabels = [];
-  for (let i = 0; i <= yMax; i += 5) {
-    yLabels.push({
-      value: i,
-      y: padding.top + (yMax - i) * yScale
-    });
-  }
+  const {
+    chartWidth,
+    chartHeight,
+    yAxisWidth,
+    padding,
+    yMax,
+    yScale,
+    xScale,
+    speeds,
+    labelData,
+    windArrows,
+    windPathSegments,
+    gustPathSegments,
+    yLabels,
+  } = chartCalcs;
 
   return (
     <ThemedView style={styles.container}>
@@ -447,10 +446,10 @@ export function CustomWindChart({
                 if (idealWindDirection && arrow) {
                   const windStatus = assessWindDirection(arrow.direction, idealWindDirection);
                   if (windStatus === 'perfect') {
-                    arrowColor = '#FFD700'; // Gold for perfect
+                    arrowColor = '#FFD700';
                     opacity = 0.9;
                   } else if (windStatus === 'good') {
-                    arrowColor = '#4CAF50'; // Green for good
+                    arrowColor = '#4CAF50';
                     opacity = 0.8;
                   }
                 }
@@ -458,7 +457,7 @@ export function CustomWindChart({
                 return (
                   <Path
                     key={`arrow-${index}`}
-                    d={createArrowPath(arrow!.x, arrow!.y, arrow!.direction)}
+                    d={arrow.arrowPath}
                     stroke={arrowColor}
                     strokeWidth={2}
                     strokeLinecap="round"

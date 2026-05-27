@@ -1,6 +1,8 @@
 name: Build Dawn Patrol Alarm - Combined Release
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -10,8 +12,57 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Lint and Test Job (runs once, shared by both platform builds)
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run lint and tests
+        run: |
+          npm run lint
+          npm run test:coverage
+
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps chrome
+
+      - name: 🌐 Run e2e tests
+        run: npm run test:e2e:web
+        env:
+          ECOWITT_APPLICATION_KEY: ${{ secrets.ECOWITT_APPLICATION_KEY }}
+          ECOWITT_API_KEY: ${{ secrets.ECOWITT_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+
+      - name: 📎 Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: 📊 Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
   # iOS Build Job
   ios-build:
+    needs: lint-and-test
     runs-on: macos-latest
     outputs:
       app-version: ${{ steps.get_version.outputs.version }}
@@ -45,18 +96,6 @@ jobs:
 
       - name: 🔍 Fix package versions
         run: npx expo install --fix
-
-      - name: 🧪 Run checks and tests
-        run: |
-          npm run lint
-          npm run test:coverage
-
-      - name: 📊 Upload iOS Coverage Reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-coverage-report
-          path: coverage/
-          retention-days: 7
 
       # Extract app version and bundle identifier from app.config.js
       - name: 🏷️ Extract app version and bundle ID from app.config.js
@@ -214,6 +253,7 @@ jobs:
 
   # Android Build Job
   android-build:
+    needs: lint-and-test
     runs-on: ubuntu-latest
     outputs:
       app-version: ${{ steps.get_version.outputs.version }}
@@ -247,18 +287,6 @@ jobs:
       - name: 🔍 Fix package versions
         run: npx expo install --fix
 
-      - name: 🧪 Run checks and tests
-        run: |
-          npm run lint
-          npm run test:coverage
-
-      - name: 📊 Upload Android Coverage Reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-coverage-report
-          path: coverage/
-          retention-days: 7
-          
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
         run: |
@@ -268,7 +296,7 @@ jobs:
         
       # Android build setup
       - name: ☕ Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -368,15 +396,26 @@ jobs:
       # Update gradle.properties for better build performance
       - name: ⚙️ Configure Gradle for production build
         run: |
-          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
           echo "org.gradle.parallel=true" >> android/gradle.properties
           echo "org.gradle.configureondemand=true" >> android/gradle.properties
-          echo "android.enableR8.fullMode=false" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.useFullClasspathForDexingTransform=true" >> android/gradle.properties
-          echo "android.enableR8=true" >> android/gradle.properties
-          echo "android.enableProguard=false" >> android/gradle.properties
+
+      - name: 🚫 Disable lintVital (OOM on RN library lint)
+        run: |
+          # Inject lint { checkReleaseBuilds false } into app/build.gradle
+          sed -i '/^android {/a\    lint { checkReleaseBuilds false }' android/app/build.gradle
+          # Use init script to disable lint for all subprojects (avoids afterEvaluate timing issue)
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+              plugins.withId("com.android.library") {
+                  android.lint.checkReleaseBuilds = false
+              }
+          }
+          EOF
 
       - name: 🔧 Add build metadata
         run: |
@@ -459,9 +498,9 @@ jobs:
           path: android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.apk
           retention-days: 1
 
-  # Unified Release Job (only for pull requests)
+  # Unified Release Job (only on push to main)
   create-release:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'push'
     needs: [ios-build, android-build]
     runs-on: ubuntu-latest
     steps:
@@ -501,7 +540,7 @@ jobs:
           cat > release_body.md << 'EOF'
           ## Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}
           
-          **Pre-Release Build from PR #${{ github.event.number }}**
+          **Release Build from merge to main**
           
           ### 📱 Available Downloads:
           - **iOS IPA**: For TestFlight and App Store distribution
@@ -509,10 +548,7 @@ jobs:
           - **Android APK**: For direct device installation and testing
           
           ### 🔧 Build Information:
-          - Built from PR: #${{ github.event.number }} - "${{ github.event.pull_request.title }}"
-          - Source branch: `${{ github.head_ref }}`
-          - Target branch: `${{ github.base_ref }}`
-          - Commit: ${{ github.event.pull_request.head.sha }}
+          - Commit: ${{ github.sha }}
           - Platforms: iOS + Android
           - Build type: Release (signed for distribution)
           - iOS Bundle ID: ${{ needs.ios-build.outputs.bundle-id }}
@@ -537,9 +573,6 @@ jobs:
           1. Download the `.apk` file
           2. Enable "Install from unknown sources" on your Android device
           3. Install the APK file
-          
-          ### ⚠️ Pre-Release Notice
-          This is a draft release created from a pull request. Review and test thoroughly before publishing.
           
           ---
           *This is an automated draft release created by GitHub Actions*
@@ -566,7 +599,7 @@ jobs:
           echo "- **Platforms**: iOS + Android" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Type**: Release (signed for distribution)" >> $GITHUB_STEP_SUMMARY
           echo "- **iOS Bundle ID**: ${{ needs.ios-build.outputs.bundle-id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Source**: PR #${{ github.event.number }} - \"${{ github.event.pull_request.title }}\"" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source**: Merge to main (${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
           echo "- **iOS IPA**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa\` (for TestFlight/App Store)" >> $GITHUB_STEP_SUMMARY
@@ -574,8 +607,7 @@ jobs:
           echo "- **Android APK**: \`dp-soda-${{ needs.ios-build.outputs.app-version }}.apk\` (for direct installation)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Test Coverage:" >> $GITHUB_STEP_SUMMARY
-          echo "- **iOS Coverage Report**: Available in artifacts (ios-coverage-report)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Android Coverage Report**: Available in artifacts (android-coverage-report)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage Report**: Available in artifacts (coverage-report)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Next Steps:" >> $GITHUB_STEP_SUMMARY
           echo "1. Review the draft release in the [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY

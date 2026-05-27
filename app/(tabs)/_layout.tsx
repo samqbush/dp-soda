@@ -10,13 +10,14 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAppSettings } from '@/contexts/SettingsContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const rawColorScheme = useColorScheme();
+  const colorScheme = (rawColorScheme === 'light' || rawColorScheme === 'dark') ? rawColorScheme : 'light';
   const { settings } = useAppSettings();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme].tint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
@@ -40,6 +41,13 @@ export default function TabLayout() {
         options={{
           title: 'Standley Lake',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="wind" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="boulder-res"
+        options={{
+          title: 'Boulder Res',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="drop.fill" color={color} />,
         }}
       />
       <Tabs.Screen

@@ -8,11 +8,11 @@ export class AppLogger {
   private static prefix = '[DP]';
 
   static info(message: string, ...args: any[]): void {
-    console.log(`${this.prefix} ℹ️  ${message}`, ...args);
+    if (__DEV__) console.log(`${this.prefix} ℹ️  ${message}`, ...args);
   }
 
   static success(message: string, ...args: any[]): void {
-    console.log(`${this.prefix} ✅ ${message}`, ...args);
+    if (__DEV__) console.log(`${this.prefix} ✅ ${message}`, ...args);
   }
 
   static warning(message: string, ...args: any[]): void {

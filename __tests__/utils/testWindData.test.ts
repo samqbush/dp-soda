@@ -4,7 +4,7 @@ import {
   generateInconsistentDirectionData,
   generateWrongDirectionData,
   generateFewGoodPointsData
-} from '@/utils/testWindData';
+} from '../fixtures/testWindData';
 import { WindDataPoint } from '@/services/windService';
 
 // Helper function to convert string|number to number

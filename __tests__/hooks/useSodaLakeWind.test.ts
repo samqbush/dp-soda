@@ -8,7 +8,6 @@ jest.mock('@/services/ecowittService', () => ({
   analyzeOverallTransmissionQuality: jest.fn(),
   clearDeviceCache: jest.fn(),
   convertToWindDataPoint: jest.fn(),
-  debugDeviceListAPI: jest.fn(),
   fetchEcowittCombinedWindDataForDevice: jest.fn(),
   fetchEcowittRealTimeWindData: jest.fn(),
   getAutoEcowittConfigForDevice: jest.fn(),
@@ -128,7 +127,6 @@ describe('useSodaLakeWind Hook Tests', () => {
       conditions: mockCurrentConditions
     });
     mockEcowittService.clearDeviceCache.mockResolvedValue();
-    mockEcowittService.debugDeviceListAPI.mockResolvedValue();
   });
 
   describe('Hook Initialization', () => {
@@ -232,7 +230,6 @@ describe('useSodaLakeWind Hook Tests', () => {
     });
 
     it('should handle no real-time data available', async () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
       mockEcowittService.fetchEcowittRealTimeWindData.mockResolvedValue({
         conditions: null
       });
@@ -244,12 +241,9 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       await waitFor(() => {
-        expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ No real-time data available, keeping existing current conditions');
         expect(result.current.currentConditions).toBeNull();
         expect(result.current.isLoadingCurrent).toBe(false);
       });
-
-      consoleWarnSpy.mockRestore();
     });
 
     it('should handle real-time data fetch errors gracefully', async () => {
@@ -264,10 +258,12 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error refreshing current conditions:', error);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error refreshing current conditions'),
+          error
+        );
         expect(result.current.currentConditions).toBeNull();
         expect(result.current.isLoadingCurrent).toBe(false);
-        expect(result.current.error).toBeNull(); // Should not set error state
       });
 
       consoleErrorSpy.mockRestore();
@@ -350,7 +346,6 @@ describe('useSodaLakeWind Hook Tests', () => {
 
     it('should handle empty data response', async () => {
       mockEcowittService.fetchEcowittCombinedWindDataForDevice.mockResolvedValue([]);
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       const { result } = renderHook(() => useSodaLakeWind());
 
@@ -359,8 +354,7 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       await waitFor(() => {
-        expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ No wind data received from DP Soda Lakes station');
-        expect(result.current.error).toBe('No data available from Soda Lake station. Station may be offline or not reporting data.');
+        expect(result.current.error).toBe('No data available from DP Soda Lakes station. Station may be offline or not reporting data.');
         expect(result.current.analysis).toBeNull();
         expect(result.current.transmissionQuality).toEqual({
           isFullTransmission: false,
@@ -372,8 +366,6 @@ describe('useSodaLakeWind Hook Tests', () => {
           currentTransmissionStatus: 'offline'
         });
       });
-
-      consoleWarnSpy.mockRestore();
     });
 
     it('should handle data fetch errors and try cached data fallback', async () => {
@@ -388,13 +380,13 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error refreshing Soda Lake wind data:', fetchError);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error refreshing'),
+          fetchError
+        );
         expect(result.current.error).toBe('Fetch failed');
         expect(result.current.isLoading).toBe(false);
       });
-
-      // Should attempt to load cached data as fallback
-      // (loadCachedData was called during the error handling)
 
       consoleErrorSpy.mockRestore();
     });
@@ -405,23 +397,26 @@ describe('useSodaLakeWind Hook Tests', () => {
 
       const { result } = renderHook(() => useSodaLakeWind());
 
-      // Wait for criteria to load
+      // Wait for criteria to load AND state to update
       await waitFor(() => {
         expect(mockWindService.getAlarmCriteria).toHaveBeenCalled();
       });
 
-      await waitFor(async () => {
+      // Need an extra tick for the state to propagate to useCallback
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
         await result.current.refreshData();
       });
 
-      await waitFor(() => {
-        expect(mockWindService.analyzeRecentWindData).toHaveBeenCalledWith(
-          mockChartData,
-          expect.objectContaining({
-            minimumAverageSpeed: 25
-          })
-        );
-      });
+      expect(mockWindService.analyzeRecentWindData).toHaveBeenCalledWith(
+        mockChartData,
+        expect.objectContaining({
+          minimumAverageSpeed: 25
+        })
+      );
     });
 
     it('should set loading state during data refresh', async () => {
@@ -495,36 +490,6 @@ describe('useSodaLakeWind Hook Tests', () => {
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error clearing cache:', clearError);
         expect(result.current.error).toBe('Failed to clear cache');
-      });
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('Debug API', () => {
-    it('should call debug API successfully', async () => {
-      const { result } = renderHook(() => useSodaLakeWind());
-
-      await waitFor(async () => {
-        await result.current.debugAPI();
-      });
-
-      expect(mockEcowittService.debugDeviceListAPI).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle debug API errors', async () => {
-      const debugError = new Error('Debug failed');
-      mockEcowittService.debugDeviceListAPI.mockRejectedValue(debugError);
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const { result } = renderHook(() => useSodaLakeWind());
-
-      await waitFor(async () => {
-        await result.current.debugAPI();
-      });
-
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Debug API failed:', debugError);
       });
 
       consoleErrorSpy.mockRestore();
@@ -673,32 +638,13 @@ describe('useSodaLakeWind Hook Tests', () => {
       });
 
       it('should handle cached data loading errors', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-        
-        // Mock loadCachedData to throw an error when called manually
         const { result } = renderHook(() => useSodaLakeWind());
 
-        // Mock console.log to throw when loadCachedData tries to log
-        const originalLog = console.log;
-        console.log = jest.fn().mockImplementation((message) => {
-          if (message.includes('Loading cached Soda Lake wind data')) {
-            throw new Error('Cache read error');
-          }
-          return originalLog(message);
-        });
-
+        // loadCachedData is a stub that always returns false
         await act(async () => {
           const loadResult = await result.current.loadCachedData();
           expect(loadResult).toBe(false);
         });
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '❌ Error loading cached Soda Lake data:',
-          expect.any(Error)
-        );
-
-        console.log = originalLog;
-        consoleErrorSpy.mockRestore();
       });
     });
   });

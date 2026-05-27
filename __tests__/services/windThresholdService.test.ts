@@ -228,7 +228,7 @@ describe('WindThresholdService Tests', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should not notify listeners when AsyncStorage save fails', async () => {
+    it('should still notify listeners when AsyncStorage save fails', async () => {
       const listener = jest.fn();
       windThresholdService.onThresholdChange(listener);
 
@@ -241,8 +241,8 @@ describe('WindThresholdService Tests', () => {
       // Threshold should be updated in memory
       expect(windThresholdService.getThreshold()).toBe(25);
       
-      // But listeners should not be called due to save failure
-      expect(listener).not.toHaveBeenCalled();
+      // Listeners are still notified since in-memory state changed
+      expect(listener).toHaveBeenCalledWith(25);
       
       consoleSpy.mockRestore();
     });

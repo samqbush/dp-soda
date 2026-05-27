@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { ThemedText } from './ThemedText';
@@ -15,7 +15,7 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
   const [localValue, setLocalValue] = useState(windThreshold);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const tintColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
@@ -30,8 +30,8 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
     setLocalValue(roundedValue);
 
     // Clear existing timeout to debounce saves
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
 
     // Hide previous "saved" indicator
@@ -42,7 +42,7 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
       setIsSaving(true);
       try {
         await setWindThreshold(roundedValue);
-        console.log(`✅ Auto-saved wind threshold = ${roundedValue} mph`);
+        if (__DEV__) console.log(`✅ Auto-saved wind threshold = ${roundedValue} mph`);
         
         // Show "saved" confirmation
         setShowSaved(true);
@@ -59,17 +59,17 @@ export function ThresholdSlider({ disabled = false }: ThresholdSliderProps) {
       }
     }, 500); // Wait 500ms after user stops sliding
 
-    setSaveTimeout(newTimeout);
+    saveTimeoutRef.current = newTimeout;
   };
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [saveTimeout]);
+  }, []);
 
   const getThresholdDescription = (value: number) => {
     if (value < 10) return 'Light Breeze - Canoe Club';

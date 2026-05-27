@@ -25,55 +25,53 @@ interface DayPredictionProps {
   isExpanded?: boolean;
 }
 
-export function DayPredictionCard({ 
-  dayOffset, 
-  targetDate, 
-  prediction, 
-  dataQuality, 
-  isPreliminary,
-  onPress,
-  isExpanded = false
-}: DayPredictionProps) {
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
-  const cardColor = useThemeColor({}, 'card');
+interface CardContentProps {
+  dayOffset: number;
+  targetDate: Date;
+  prediction: DayPredictionProps['prediction'];
+  dataQuality: string;
+  isPreliminary: boolean;
+  isExpanded: boolean;
+  textColor: string;
+  tintColor: string;
+}
 
-  // Helper functions
-  const getProbabilityColor = (probability: number): string => {
-    if (probability >= 75) return '#4CAF50'; // Green
-    if (probability >= 50) return '#FF9800'; // Orange
-    return '#F44336'; // Red
-  };
+function getProbabilityColor(probability: number): string {
+  if (probability >= 75) return '#4CAF50';
+  if (probability >= 50) return '#FF9800';
+  return '#F44336';
+}
 
-  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high'): string => {
-    switch (confidence) {
-      case 'high': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'low': return '#F44336';
-    }
-  };
+function getConfidenceColor(confidence: 'low' | 'medium' | 'high'): string {
+  switch (confidence) {
+    case 'high': return '#4CAF50';
+    case 'medium': return '#FF9800';
+    case 'low': return '#F44336';
+  }
+}
 
-  const getRecommendationText = (recommendation: 'go' | 'maybe' | 'skip'): string => {
-    switch (recommendation) {
-      case 'go': return 'GO! 🎯';
-      case 'maybe': return 'MAYBE 🤔';
-      case 'skip': return 'SKIP ❌';
-    }
-  };
+function getRecommendationText(recommendation: 'go' | 'maybe' | 'skip'): string {
+  switch (recommendation) {
+    case 'go': return 'GO! 🎯';
+    case 'maybe': return 'MAYBE 🤔';
+    case 'skip': return 'SKIP ❌';
+  }
+}
 
-  const getDayLabel = (dayOffset: number): string => {
-    if (dayOffset === 0) return 'Today';
-    if (dayOffset === 1) return 'Tomorrow';
-    const date = new Date();
-    date.setDate(date.getDate() + dayOffset);
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
-  };
+function getDayLabel(dayOffset: number): string {
+  if (dayOffset === 0) return 'Today';
+  if (dayOffset === 1) return 'Tomorrow';
+  const date = new Date();
+  date.setDate(date.getDate() + dayOffset);
+  return date.toLocaleDateString('en-US', { weekday: 'short' });
+}
 
-  const formatTempDiffF = (celsius: number): string => {
-    const fahrenheit = celsius * 9/5;
-    return `${fahrenheit.toFixed(1)}°F`;
-  };
+function formatTempDiffF(celsius: number): string {
+  const fahrenheit = celsius * 9/5;
+  return `${fahrenheit.toFixed(1)}°F`;
+}
 
+function CardContent({ dayOffset, targetDate, prediction, dataQuality, isPreliminary, isExpanded, textColor, tintColor }: CardContentProps) {
   const formatFactorCount = () => {
     const factors = prediction.factors;
     const metCount = [
@@ -82,11 +80,10 @@ export function DayPredictionCard({
       factors.pressureChange.meets,
       factors.temperatureDifferential.meets
     ].filter(Boolean).length;
-    
     return `${metCount}/4`;
   };
 
-  const CardContent = () => (
+  return (
     <>
       {/* Day Header */}
       <ThemedView style={styles.dayHeader}>
@@ -210,12 +207,28 @@ export function DayPredictionCard({
       )}
     </>
   );
+}
+
+export function DayPredictionCard({ 
+  dayOffset, 
+  targetDate, 
+  prediction, 
+  dataQuality, 
+  isPreliminary,
+  onPress,
+  isExpanded = false
+}: DayPredictionProps) {
+  const textColor = useThemeColor({}, 'text');
+  const tintColor = useThemeColor({}, 'tint');
+  const cardColor = useThemeColor({}, 'card');
+
+  const contentProps = { dayOffset, targetDate, prediction, dataQuality, isPreliminary, isExpanded, textColor, tintColor };
 
   if (onPress) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
         <ThemedView style={[styles.container, { backgroundColor: cardColor }]}>
-          <CardContent />
+          <CardContent {...contentProps} />
         </ThemedView>
       </TouchableOpacity>
     );
@@ -223,7 +236,7 @@ export function DayPredictionCard({
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: cardColor }]}>
-      <CardContent />
+      <CardContent {...contentProps} />
     </ThemedView>
   );
 }

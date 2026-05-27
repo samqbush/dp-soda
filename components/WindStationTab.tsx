@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -41,6 +41,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
     currentConditions,
     analysis,
     transmissionQuality,
+    sunriseData,
     isLoading,
     isLoadingCurrent,
     error,
@@ -66,10 +67,10 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
       try {
         const hasLoaded = hasBeenInitiallyLoaded(config.name);
         if (hasLoaded) {
-          console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
+          if (__DEV__) console.log(`✅ Found existing load status for ${config.name} - skipping initial load`);
           setHasInitiallyLoaded(true);
         } else {
-          console.log(`🆕 No existing load status found for ${config.name} - will load on focus`);
+          if (__DEV__) console.log(`🆕 No existing load status found for ${config.name} - will load on focus`);
         }
       } catch (error) {
         console.warn('Failed to check initial load status, will load data anyway:', error);
@@ -99,7 +100,7 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
     React.useCallback(() => {
       // Wait for the initial status check to complete before making loading decisions
       if (!isCheckingInitialStatus && !hasInitiallyLoaded) {
-        console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
+        if (__DEV__) console.log(`🏔️ ${config.name} tab focused for first time - loading data...`);
         refreshData(); // This calls refreshCurrentConditions() internally, no need for duplicate call
         handleMarkAsInitiallyLoaded();
       }
@@ -128,6 +129,48 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
   const currentHumidity = getCurrentHumidity(currentConditions, currentConditionsUpdated, windData);
   const dataStale = isDataStale(currentConditions, currentConditionsUpdated, windData);
   const freshnessMessage = getDataFreshnessMessage(currentConditions, currentConditionsUpdated, windData);
+
+  // Memoize wind direction status indicator (was IIFE in JSX)
+  const windDirectionIndicator = useMemo(() => {
+    const windStatus = currentWindDirection !== null ? assessWindDirection(currentWindDirection, config.idealWindDirection) : null;
+    const indicator = getWindDirectionIndicator(windStatus);
+    const statusText = getWindDirectionStatusText(windStatus);
+    return { indicator, statusText };
+  }, [currentWindDirection, config.idealWindDirection]);
+
+  // Memoize recent wind direction analysis (was IIFE in JSX)
+  const recentDirectionAnalysis = useMemo(() => {
+    if (!config.idealWindDirection) return null;
+    
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const recentPoints = chartData.filter(point => {
+      const pointTime = new Date(point.time);
+      return pointTime >= oneHourAgo;
+    });
+    
+    if (recentPoints.length === 0) return null;
+    
+    let sumSin = 0, sumCos = 0;
+    recentPoints.forEach(point => {
+      const dir = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
+      if (!isNaN(dir)) {
+        const radians = (dir * Math.PI) / 180;
+        sumSin += Math.sin(radians);
+        sumCos += Math.cos(radians);
+      }
+    });
+    
+    const avgDirection = Math.atan2(sumSin, sumCos) * 180 / Math.PI;
+    const normalizedDirection = avgDirection < 0 ? avgDirection + 360 : avgDirection;
+    const windStatus = assessWindDirection(normalizedDirection, config.idealWindDirection);
+    const indicator = getWindDirectionIndicator(windStatus);
+    const statusText = getWindDirectionStatusText(windStatus);
+    
+    if (!indicator) return null;
+    
+    return { normalizedDirection, indicator, statusText };
+  }, [chartData, config.idealWindDirection]);
 
   return (
     <ThemedView style={styles.container}>
@@ -203,18 +246,12 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
                 <ThemedText style={styles.conditionValue}>
                   {getWindDirectionText(currentWindDirection)} ({currentWindDirection?.toFixed(0) || '--'}°)
                 </ThemedText>
-                {(() => {
-                  const windStatus = currentWindDirection !== null ? assessWindDirection(currentWindDirection, config.idealWindDirection) : null;
-                  const indicator = getWindDirectionIndicator(windStatus);
-                  const statusText = getWindDirectionStatusText(windStatus);
-                  
-                  return indicator ? (
-                    <View style={styles.windDirectionIndicator}>
-                      <ThemedText style={styles.windIndicatorEmoji}>{indicator}</ThemedText>
-                      <ThemedText style={styles.windIndicatorText}>{statusText}</ThemedText>
-                    </View>
-                  ) : null;
-                })()}
+                {windDirectionIndicator.indicator ? (
+                  <View style={styles.windDirectionIndicator}>
+                    <ThemedText style={styles.windIndicatorEmoji}>{windDirectionIndicator.indicator}</ThemedText>
+                    <ThemedText style={styles.windIndicatorText}>{windDirectionIndicator.statusText}</ThemedText>
+                  </View>
+                ) : null}
               </View>
             </View>
             <View style={styles.conditionItem}>
@@ -229,6 +266,14 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
                 {formatLastUpdated(currentConditions, currentConditionsUpdated, windData)}
               </ThemedText>
             </View>
+            {sunriseData && (
+              <View style={styles.conditionItem}>
+                <ThemedText style={styles.conditionLabel}>Sunrise Today</ThemedText>
+                <ThemedText style={styles.conditionValue}>
+                  {sunriseData.formatted.sunrise}
+                </ThemedText>
+              </View>
+            )}
           </View>
           {/* Data freshness message */}
           <ThemedText style={styles.freshnessMessage}>
@@ -300,43 +345,13 @@ export default function WindStationTab({ data, config }: WindStationTabProps) {
             </View>
             
             {/* Wind Direction Status for Recent Analysis */}
-            {config.idealWindDirection && (() => {
-              // Calculate average direction from recent chart data (last hour)
-              const now = new Date();
-              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-              const recentPoints = chartData.filter(point => {
-                const pointTime = new Date(point.time);
-                return pointTime >= oneHourAgo;
-              });
-              
-              if (recentPoints.length > 0) {
-                // Calculate circular mean of wind directions
-                let sumSin = 0, sumCos = 0;
-                recentPoints.forEach(point => {
-                  const dir = typeof point.windDirection === 'string' ? parseFloat(point.windDirection) : point.windDirection;
-                  if (!isNaN(dir)) {
-                    const radians = (dir * Math.PI) / 180;
-                    sumSin += Math.sin(radians);
-                    sumCos += Math.cos(radians);
-                  }
-                });
-                
-                const avgDirection = Math.atan2(sumSin, sumCos) * 180 / Math.PI;
-                const normalizedDirection = avgDirection < 0 ? avgDirection + 360 : avgDirection;
-                const windStatus = assessWindDirection(normalizedDirection, config.idealWindDirection);
-                const indicator = getWindDirectionIndicator(windStatus);
-                const statusText = getWindDirectionStatusText(windStatus);
-                
-                return indicator ? (
-                  <View style={styles.analysisDirectionIndicator}>
-                    <ThemedText style={styles.analysisDirectionText}>
-                      Recent direction: {getWindDirectionText(normalizedDirection)} ({normalizedDirection.toFixed(0)}°) {indicator} {statusText}
-                    </ThemedText>
-                  </View>
-                ) : null;
-              }
-              return null;
-            })()}
+            {config.idealWindDirection && recentDirectionAnalysis && (
+              <View style={styles.analysisDirectionIndicator}>
+                <ThemedText style={styles.analysisDirectionText}>
+                  Recent direction: {getWindDirectionText(recentDirectionAnalysis.normalizedDirection)} ({recentDirectionAnalysis.normalizedDirection.toFixed(0)}°) {recentDirectionAnalysis.indicator} {recentDirectionAnalysis.statusText}
+                </ThemedText>
+              </View>
+            )}
             
             <ThemedText style={styles.analysisDescription}>
               {analysis.analysis}

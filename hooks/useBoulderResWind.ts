@@ -1,13 +1,13 @@
 import { useStationWind, type UseStationWindReturn } from './useStationWind';
 
-export interface UseStandleyLakeWindReturn extends UseStationWindReturn {
+export interface UseBoulderResWindReturn extends UseStationWindReturn {
   loadCachedData: () => Promise<boolean>;
 }
 
-export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
+export const useBoulderResWind = (): UseBoulderResWindReturn => {
   const stationWind = useStationWind({
-    deviceName: 'DP Standley West',
-    preferredDirection: 270, // West wind for Standley Lake
+    deviceName: 'DP Boulder Res',
+    preferredDirection: 270, // West wind for Boulder Reservoir
     defaultAlarmTime: '06:00'
   });
 
@@ -17,4 +17,4 @@ export const useStandleyLakeWind = (): UseStandleyLakeWindReturn => {
   };
 };
 
-export default useStandleyLakeWind;
+export default useBoulderResWind;
