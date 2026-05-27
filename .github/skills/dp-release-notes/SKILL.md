@@ -115,21 +115,30 @@ Guidelines:
 
 ## Output format
 
-Present both versions clearly separated. Use this structure:
+5. **Write to a file** — Save the release notes to `RELEASE_NOTES.md` in the project root.
+   This file is gitignored so it won't be committed. Overwrite it each time the skill runs.
+
+The file should contain both versions clearly separated, using this structure:
 
 ```
-## 📱 App Store Release Notes (v1.1.0)
+# Release Notes — Dawn Patrol v1.1.0
+
+## 📱 App Store Release Notes
 
 [user-friendly version here]
 
 ---
 
-## 🔧 Technical Release Notes (v1.1.0)
+## 🔧 Technical Release Notes
 
 [technical version here]
 ```
 
 Always use the actual version from `app.config.js` — never use a placeholder.
+
+After writing the file, confirm to the user that `RELEASE_NOTES.md` has been created/updated
+and remind them it's gitignored (won't be committed). Also display the full contents in the
+chat so they can review without opening the file.
 
 ## Important context
 
