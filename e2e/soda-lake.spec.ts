@@ -6,7 +6,7 @@ test.describe('Soda Lake Tab', () => {
   });
 
   test('displays wind data after loading', async ({ page }) => {
-    await expect(page.getByText(/mph/i)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/mph/i).first()).toBeVisible({ timeout: 30000 });
   });
 
   test('shows current conditions card', async ({ page }) => {

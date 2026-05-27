@@ -123,7 +123,7 @@ npx tsc --noEmit
 ### Testing
 
 ```bash
-# Run unit tests
+# Run all unit tests
 npm test
 
 # Run tests with coverage
@@ -132,15 +132,28 @@ npm run test:coverage
 # Run tests in watch mode
 npm run test:watch
 
-# Run specific test suites
-npm run test:wind
-npm run test:data
-npm run test:utils
+# Run a specific test file
+npm test -- __tests__/services/windAnalysis.test.ts
+```
 
-# End-to-end tests (Playwright)
-npm run test:e2e
-npm run test:e2e:web
-npm run test:e2e:headed
+#### End-to-End Tests (Playwright)
+
+The dev server starts automatically when you run any E2E command. If one is already running, it will be reused.
+
+All E2E projects test the **web build** in a browser — the "ios" and "android" projects use mobile viewport emulation (iPhone 14, Pixel 7), not native apps.
+
+```bash
+# Primary command — run this before pushing UI changes
+npm run test:e2e              # All viewports (desktop, iPhone 14, Pixel 7), headless
+```
+
+Optional commands for targeted runs or debugging:
+
+```bash
+npm run test:e2e:web          # Desktop Chrome viewport only (fastest, good for quick checks)
+npm run test:e2e:ios          # iPhone 14 viewport only
+npm run test:e2e:android      # Pixel 7 viewport only
+npm run test:e2e:headed       # All viewports with a visible browser (for debugging failures)
 ```
 
 ## Project Structure
@@ -268,6 +281,23 @@ dp-soda/
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState<string | null>(null);
    ```
+
+### Before Creating a PR
+
+| Step | Command | When it runs |
+|------|---------|--------------|
+| Lint & type-check | `npm run lint` | ✅ Automatic on every commit (Husky pre-commit hook) |
+| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) |
+| Unit tests | `npm test` | Run manually — CI will catch failures, but faster to verify locally |
+| E2E tests | `npm run test:e2e` | Run manually — recommended for UI changes |
+
+### What CI Runs on Your PR
+
+When you open a PR to `main`, GitHub Actions automatically runs:
+1. `npm run lint` — ESLint + TypeScript + YAML workflow validation
+2. `npm run test:coverage` — all unit tests with coverage report
+
+Full iOS and Android builds only run after merge to `main`.
 
 ### Git Workflow
 
