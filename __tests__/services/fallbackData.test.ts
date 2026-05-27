@@ -1,4 +1,4 @@
-import { getEmergencyFallbackData, EMERGENCY_FALLBACK_DATA } from '@/services/fallbackData';
+import { getEmergencyFallbackData } from '@/services/fallbackData';
 import fallbackDataDefault from '@/services/fallbackData';
 
 describe('Fallback Data Service', () => {
@@ -78,14 +78,6 @@ describe('Fallback Data Service', () => {
       const firstTime = new Date(data1[0].time).getTime();
       expect(now - firstTime).toBeLessThan(1000);
       expect(data2[0].time).toBeDefined();
-    });
-  });
-
-  describe('EMERGENCY_FALLBACK_DATA (deprecated)', () => {
-    it('should still export an array for backward compatibility', () => {
-      expect(EMERGENCY_FALLBACK_DATA).toBeDefined();
-      expect(Array.isArray(EMERGENCY_FALLBACK_DATA)).toBe(true);
-      expect(EMERGENCY_FALLBACK_DATA.length).toBeGreaterThan(0);
     });
   });
 

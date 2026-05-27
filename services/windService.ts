@@ -79,7 +79,7 @@ export const analyzeWindData = (
     // Data is already filtered by the caller
     alarmWindowData = data;
   } else {
-    // Filter data for the alarm window (3am-5am)
+    // Filter data for the alarm window (3:00–4:59 AM)
     alarmWindowData = data.filter(point => {
       const pointTime = new Date(point.time);
       const hour = pointTime.getHours();
