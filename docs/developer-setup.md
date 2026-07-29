@@ -286,8 +286,8 @@ dp-soda/
 
 | Step | Command | When it runs |
 |------|---------|--------------|
-| Lint & type-check | `npm run lint` | ✅ Automatic on every commit (Husky pre-commit hook) |
-| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) |
+| Lint & type-check | `npm run lint` | ✅ Automatic on every commit (Husky pre-commit hook) and on every PR |
+| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) and on every PR |
 | Unit tests | `npm test` | Run manually — CI will catch failures, but faster to verify locally |
 | E2E tests | `npm run test:e2e` | Run manually — recommended for UI changes |
 
@@ -335,7 +335,8 @@ Important details:
 - **Paths containing newlines are not supported** and fall through to the full
   checks.
 - To override deliberately, use `git commit --no-verify`. There is no
-  environment-variable bypass — CI, not the hook, is the enforcement boundary.
+  environment-variable bypass, and the version check now also runs on every pull
+  request, so `--no-verify` defers the check rather than skipping it.
 
 When adding a new documentation path, update **both** the `case` patterns in
 `.husky/pre-commit` and the `paths-ignore` lists in
@@ -348,10 +349,15 @@ POSIX `case` treats `*` as matching `/`, while GitHub Actions needs an explicit
 When you open a PR to `main`, GitHub Actions automatically runs:
 1. `npm run lint` — ESLint + TypeScript + YAML workflow validation
 2. `npm run test:coverage` — all unit tests with coverage report
+3. `npm run test-version` — confirms the app version was incremented relative to `main`
 
 Full iOS and Android builds only run after merge to `main`.
 
 Documentation-only PRs skip this workflow entirely.
+
+The version check is **pull-request only**. On a push to `main`, `origin/main` is
+the commit being built, so the script would compare the version against itself
+and always fail.
 
 ### Git Workflow
 
@@ -370,8 +376,18 @@ Documentation-only PRs skip this workflow entirely.
 - ✅ No local build setup required for releases
 - ✅ Consistent build environment (macOS for iOS, Ubuntu for Android)
 - ✅ Integrated linting, testing, and code signing
-- ✅ Automatic version increment
 - ✅ Artifacts published to GitHub Releases
+
+**Version increments are manual.** CI only *reads* `expo.version` out of
+`app.config.js`; nothing bumps it for you. Increment it before opening a release
+PR:
+
+```bash
+node scripts/increment-version.mjs patch   # or minor / major
+```
+
+This keeps `expo.version`, `expo.ios.buildNumber` and `expo.android.versionCode`
+in sync, which `npm run test-version` enforces on every PR.
 
 ### Build Triggers
 
@@ -382,10 +398,18 @@ Documentation-only PRs skip this workflow entirely.
 
 ### Build Pipeline
 
-1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage
+1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage, plus the
+   version-increment check on pull requests
 2. **iOS Build** (macOS) — Expo prebuild → Xcode archive → signed IPA
 3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
-4. **Release** — Creates GitHub Release with all artifacts
+4. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
+   artifacts attached
+
+The `create-release` job is gated on `if: github.event_name == 'push'`, so it
+runs **only when something lands on `main`**. A manual "Run workflow" instead
+runs `upload-artifacts`, which bundles the IPA/AAB/APK as a workflow artifact
+and creates no tag or release. The draft release is never published
+automatically — review it, then publish and upload to the stores by hand.
 
 ### GitHub Repository Secrets
 

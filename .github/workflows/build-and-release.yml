@@ -67,6 +67,15 @@ jobs:
           npm run lint
           npm run test:coverage
 
+      # Pull requests only. On a push to `main`, origin/main is the commit being
+      # built, so the script would compare the version against itself and always
+      # fail. Until now this check existed only in .husky/pre-commit, which is
+      # bypassable with --no-verify and absent for commits made via the GitHub
+      # web UI.
+      - name: 🔢 Validate version increment
+        if: github.event_name == 'pull_request'
+        run: npm run test-version
+
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chrome
 
