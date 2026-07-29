@@ -6,11 +6,49 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/*/b
 # Add node_modules/.bin to PATH for project-local executables
 export PATH="./node_modules/.bin:$PATH"
 
+# Note: husky v9 invokes this file via `sh -e`, so any failing command below
+# aborts the hook. Do not add `set -e` or `&&` chaining.
+
 # Skip pre-commit for users with GitHub web interface emails (users.noreply.github.com)
 # These users are committing from GitHub web and can't run local hooks
 CURRENT_EMAIL=$(git config user.email)
 if echo "$CURRENT_EMAIL" | grep -q "@users\.noreply\.github\.com"; then
   echo "Skipping pre-commit hooks for GitHub web user: $CURRENT_EMAIL"
+  exit 0
+fi
+
+# Documentation-only detection.
+#
+# --no-renames is required: with rename detection, --name-only reports only the
+# destination path, so `app/foo.ts -> docs/foo.md` would look like a doc change.
+# No --diff-filter is used: filtering to ACMR would drop deletions, so removing
+# a source file alongside a README edit would look like a doc change.
+STAGED_FILES=$(git diff --cached --name-only --no-renames)
+
+DOCS_ONLY=1
+HAS_STAGED=0
+
+while IFS= read -r staged_file; do
+  if [ -n "$staged_file" ]; then
+    HAS_STAGED=1
+    # POSIX `case` globs: `*` also matches `/`, so these cover nested paths.
+    case "$staged_file" in
+      README.md|CHANGELOG.md|LICENSE|.github/copilot-instructions.md) ;;
+      docs/*.md|.github/skills/*.md) ;;
+      *)
+        DOCS_ONLY=0
+        break
+        ;;
+    esac
+  fi
+done <<STAGED_FILE_LIST
+$STAGED_FILES
+STAGED_FILE_LIST
+
+# An empty index (for example a message-only `git commit --amend`) falls through
+# to the full checks rather than being treated as documentation.
+if [ "$HAS_STAGED" = "1" ] && [ "$DOCS_ONLY" = "1" ]; then
+  echo "📝 Documentation-only change — skipping lint and version checks"
   exit 0
 fi
 

@@ -291,6 +291,58 @@ dp-soda/
 | Unit tests | `npm test` | Run manually — CI will catch failures, but faster to verify locally |
 | E2E tests | `npm run test:e2e` | Run manually — recommended for UI changes |
 
+Both hook steps are **skipped automatically for documentation-only commits** — see below.
+
+### Committing Documentation Changes
+
+Documentation-only changes bypass both the pre-commit hook and the entire CI
+pipeline. Without this, every typo fix would run a full TypeScript type-check
+locally and a macOS + Android build in CI — and `npm run test-version` would
+*fail*, because docs changes have no version bump to validate.
+
+**Paths treated as documentation:**
+
+- `README.md`
+- `CHANGELOG.md`
+- `LICENSE`
+- `.github/copilot-instructions.md`
+- Any `.md` file under `docs/` (including nested)
+- Any `.md` file under `.github/skills/` (including nested)
+
+Anything else — including **non-markdown** files under `docs/` or
+`.github/skills/` — is treated as a code change.
+
+**Locally**, `.husky/pre-commit` inspects the staged file list. If *every*
+staged path is on the list above, it prints
+`📝 Documentation-only change — skipping lint and version checks` and exits
+immediately. Otherwise the full checks run.
+
+**In CI**, `.github/workflows/build-and-release.yml` uses `paths-ignore` on its
+`push` and `pull_request` triggers, so a docs-only change starts no jobs at all.
+This means **a documentation-only merge to `main` does not cut a release** —
+which is intended, since the app version is unchanged.
+
+Important details:
+
+- **Mixed commits always run the full checks.** If a commit touches both docs
+  and code, nothing is skipped. Split the commit if you want the fast path.
+- **Staged deletions and renames count as code.** Deleting a `.ts` file or
+  renaming code into `docs/` will correctly run the full checks.
+- **`git commit --amend` usually does not skip.** The hook compares the index
+  against `HEAD`, not against the amended commit's parent, so an amend that
+  stages only docs on top of a code commit still sees only the docs. Prefer a
+  fresh commit, or accept the full checks.
+- **Paths containing newlines are not supported** and fall through to the full
+  checks.
+- To override deliberately, use `git commit --no-verify`. There is no
+  environment-variable bypass — CI, not the hook, is the enforcement boundary.
+
+When adding a new documentation path, update **both** the `case` patterns in
+`.husky/pre-commit` and the `paths-ignore` lists in
+`.github/workflows/build-and-release.yml`. The two use different glob dialects:
+POSIX `case` treats `*` as matching `/`, while GitHub Actions needs an explicit
+`**` entry for nested paths.
+
 ### What CI Runs on Your PR
 
 When you open a PR to `main`, GitHub Actions automatically runs:
@@ -299,11 +351,13 @@ When you open a PR to `main`, GitHub Actions automatically runs:
 
 Full iOS and Android builds only run after merge to `main`.
 
+Documentation-only PRs skip this workflow entirely.
+
 ### Git Workflow
 
 1. **Create feature branches** from `main`
 2. **Make small, focused commits** with clear messages
-3. **Run linting** before committing: `npm run lint` (enforced by Husky pre-commit hook)
+3. **Run linting** before committing: `npm run lint` (enforced by Husky pre-commit hook, skipped for documentation-only commits)
 4. **Create pull requests** for code review
 5. **Merge after review** and CI checks pass
 6. **Production build** triggers automatically on merge to main
@@ -321,8 +375,10 @@ Full iOS and Android builds only run after merge to `main`.
 
 ### Build Triggers
 
-- Push to `main` branch (automatic)
-- Manual trigger via GitHub Actions "Run workflow" button
+- Push to `main` branch (automatic) — **except** documentation-only pushes, which
+  are filtered out by `paths-ignore`
+- Manual trigger via GitHub Actions "Run workflow" button (always runs, even for
+  docs-only changes)
 
 ### Build Pipeline
 
@@ -451,16 +507,19 @@ gh run watch --repo samqbush/dp-soda
 2. Monitor at: `https://github.com/samqbush/dp-soda/actions`
 3. On success, artifacts are attached to a GitHub Release
 
-**Android**: APK + AAB available as GitHub Release assets
+**Android**: APK + AAB available for upload Android Play store
+
 **iOS**: IPA available for manual upload to App Store Connect / TestFlight
 
-### Build Troubleshooting
+### Manual Release
+#### Android
+- https://play.google.com/console/u/0/developers & select app
+- Test and release > Testing > Closed testing > manage track > Create new release
 
-| Error | Solution |
-|-------|----------|
-| Invalid keystore | Verify `ANDROID_KEYSTORE_BASE64` encoding |
-| iOS signing failure | Check cert expiry, regenerate per steps above |
-| Version conflict | Run `npm run increment-version` locally and push |
+#### iOS
+- https://appstoreconnect.apple.com/apps & select app
+- TestFlight > update App Encyryption Documentation
+- Click + under iOS & add package for submission when ready for publishing
 
 ---
 

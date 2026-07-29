@@ -1,10 +1,42 @@
 name: Build Dawn Patrol Alarm - Combined Release
 
+# Documentation-only changes skip this workflow entirely. This is a correctness
+# fix as much as a cost saving: `create-release` runs `gh release create
+# "v$APP_VERSION"`, and a docs-only merge leaves the version unchanged, so the
+# job would fail on a duplicate tag after burning a macOS and an Android build.
+#
+# The paths-ignore list below must stay in sync with the doc allowlist in
+# .husky/pre-commit. The glob dialects differ: POSIX `case` treats `*` as
+# matching `/`, while GitHub Actions requires an explicit `**` for nested paths,
+# hence the doubled entries here.
+#
+# Caveat: if required status checks or a merge queue are added to `main`, a
+# workflow skipped by paths-ignore reports as pending and will block merges. The
+# remedy then is to drop paths-ignore in favour of an always-running classifier
+# job plus per-job `if:` conditions (and a `merge_group` trigger).
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'docs/*.md'
+      - 'docs/**/*.md'
+      - '.github/copilot-instructions.md'
+      - '.github/skills/*.md'
+      - '.github/skills/**/*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'docs/*.md'
+      - 'docs/**/*.md'
+      - '.github/copilot-instructions.md'
+      - '.github/skills/*.md'
+      - '.github/skills/**/*.md'
   workflow_dispatch:
 
 permissions:
