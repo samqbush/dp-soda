@@ -76,6 +76,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run test-version
 
+      # Apple allows 4000 characters in "What's New"; Google Play allows only 500.
+      # An overflowing block is silently truncated by the store, so it is caught here
+      # rather than discovered during submission.
+      - name: 📝 Validate store release notes
+        run: npm run check:release-notes
+
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chrome
 
@@ -577,12 +583,21 @@ jobs:
           APP_VERSION="${{ needs.ios-build.outputs.app-version }}"
           BUNDLE_ID="${{ needs.ios-build.outputs.bundle-id }}"
           
+          # Pull the newest CHANGELOG entry into the release body, so it's obvious what's in a
+          # build before downloading it to test.
+          #
+          # Note: CHANGELOG.md is in this workflow's paths-ignore list, so a changelog-only
+          # commit never triggers a build. The entry must land in the SAME merge as the code it
+          # describes, or this body will lag one version behind.
+          if node scripts/check-release-notes.mjs --print-entry > changelog_entry.md; then
+            echo "✅ Included newest CHANGELOG entry in the release body"
+          else
+            echo "⚠️ Could not read a CHANGELOG entry; falling back to build info only"
+            : > changelog_entry.md
+          fi
+
           # Create comprehensive release body content
-          cat > release_body.md << 'EOF'
-          ## Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}
-          
-          **Release Build from merge to main**
-          
+          cat > release_body_tail.md << 'EOF'
           ### 📱 Available Downloads:
           - **iOS IPA**: For TestFlight and App Store distribution
           - **Android AAB**: For Google Play Store submission
@@ -618,6 +633,18 @@ jobs:
           ---
           *This is an automated draft release created by GitHub Actions*
           EOF
+          
+          {
+            echo "## Dawn Patrol Alarm v${APP_VERSION}"
+            echo ""
+            echo "**Release Build from merge to main**"
+            echo ""
+            if [ -s changelog_entry.md ]; then
+              cat changelog_entry.md
+              echo ""
+            fi
+            cat release_body_tail.md
+          } > release_body.md
           
           # Create the unified draft release with all files
           gh release create "v${{ needs.ios-build.outputs.app-version }}" \

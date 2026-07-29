@@ -2,149 +2,167 @@
 name: dp-release-notes
 description: >
   Generate release notes for the Dawn Patrol wind monitoring app by analyzing git changes
-  between branches. Produces two versions: user-friendly notes for App Store / Play Store
-  submissions, and technical notes for pull request descriptions. Use this skill whenever
-  the user asks to generate release notes, write a changelog, prepare store listing updates,
-  summarize what changed for a release, create PR descriptions from commits, or says things
-  like "what's new in this version", "write the release notes", "prepare the app store update",
-  "summarize changes since main", or "draft the PR description for this release". Also trigger
-  when the user mentions version bumps, app store submissions, or preparing a release.
+  since the last documented release, and write them directly into CHANGELOG.md. Produces
+  copy-paste-ready App Store and Play Store blocks plus a technical record. Use this skill
+  whenever the user asks to generate release notes, write a changelog, prepare store listing
+  updates, summarize what changed for a release, create PR descriptions from commits, or says
+  things like "what's new in this version", "write the release notes", "prepare the app store
+  update", "summarize changes since main", or "draft the PR description for this release".
+  Also trigger when the user mentions version bumps, app store submissions, or preparing a
+  release.
 ---
 
 # Release Notes Generator
 
-You generate release notes for Dawn Patrol, a wind monitoring app for Colorado lakes that
-helps users decide whether conditions are right for water sports. Understanding the app's
-purpose matters — your release notes should frame changes in terms of how they help someone
-checking wind conditions before heading out.
+You generate release notes for Dawn Patrol, a wind monitoring app for Colorado lakes that helps
+users decide whether conditions are right for water sports. Understanding the app's purpose
+matters — frame every change in terms of how it helps someone checking wind conditions before
+heading out.
 
-## How it works
+Release notes live in **`CHANGELOG.md`**, which is the single source of truth. There is no
+separate release notes file.
 
-1. **Detect the version** by reading `app.config.js` and extracting the `version` field
-   (e.g., `version: "1.1.0"`). Also note the `ios.buildNumber` and `android.versionCode`
-   if relevant. Use this version in the release notes headers — never leave it as a
-   placeholder.
+## Step 1 — Detect the version
 
-2. **Gather the raw changes** by detecting the current branch and comparing against the
-   appropriate base branch. The branching strategy is:
-   - Feature branches merge into `dev`
-   - `dev` merges into `main` for releases
-   
-   So determine the base branch automatically:
-   - If on `dev` → compare against `main` (`git log --oneline main..HEAD`)
-   - If on a feature branch → compare against `dev` (`git log --oneline dev..HEAD`)
-   - If the user specifies a base branch, use that instead
-   
-   Run `git branch --show-current` first to detect which branch you're on.
+Read `app.config.js` and extract `version`, `ios.buildNumber` and `android.versionCode`.
 
-3. **Read the app context** from the project README.md to stay grounded in what the app
-   does and what its tabs/features are.
+`app.config.js` is the **only** source of version truth. `package.json`'s `version` field is
+stale and read by nothing — ignore it.
 
-3. **Categorize** each change into one of these buckets:
-   - 🆕 **New Features** — user-facing functionality that didn't exist before
-   - ✨ **Improvements** — enhancements to things users already had
-   - 🐛 **Bug Fixes** — things that were broken and are now fixed
-   - ⚡ **Performance & Reliability** — behind-the-scenes work that makes the app faster
-     or more stable (only include if meaningful to users — skip pure refactors)
+Never leave the version as a placeholder.
 
-4. **Produce two versions** of the notes:
+## Step 2 — Find the commit range
 
-### User-Friendly Version (App Store / Play Store)
+> **Do not diff against `main` or `dev`, and do not use git tags.**
+>
+> Tags do not exist in this repository and never will: every GitHub Release is deliberately left
+> as a **draft** (a private channel for downloading test builds), and drafts don't create tags.
+>
+> Branch-based diffs are also wrong. A release merge often lands on `main` before its notes are
+> written, so `main..HEAD` returns only the commits *after* the release and silently misses the
+> entire release. This exact bug caused v1.1.0's notes to be reconstructed by hand.
 
-This is what real people read when they see an app update notification. Write it so a
-non-technical person who just wants to know "should I update?" gets a clear answer.
+Anchor on the newest version already documented in `CHANGELOG.md`, and find the commit that
+introduced it:
 
-Here's the proven format from previous releases — follow this structure:
+```bash
+# 1. Newest version already in the changelog, e.g. "1.1.1"
+DOCUMENTED=$(grep -m1 '^## v' CHANGELOG.md | sed -E 's/^## v([0-9.]+).*/\1/')
 
+# 2. The commit that first set that version in app.config.js
+ANCHOR=$(git log --format=%H -S"version: \"$DOCUMENTED\"" -- app.config.js | tail -1)
+
+# 3. Everything since
+git log --oneline "$ANCHOR"..HEAD
 ```
-### 🎯 What's New
-- **Feature Name** — one-sentence benefit description
 
-### ✨ What's Better
-- **Improvement area** — what changed and why it matters
+`-S` counts occurrences of the literal string, so the commit that introduced
+`version: "1.1.1"` is the one where the count goes 0 → 1. `tail -1` selects the earliest
+(introducing) commit, since git logs newest-first.
 
+If `ANCHOR` comes back empty, tell the user and ask for an explicit base rather than guessing.
+
+Also read `README.md` to stay grounded in what the app does and what its tabs are.
+
+## Step 3 — Categorise
+
+Sort each change into:
+
+- 🎯 **New Features** — user-facing functionality that didn't exist before
+- ✨ **Improvements** — enhancements to things users already had
+- 🐛 **Fixes** — things that were broken and are now fixed
+- 🔧 **Technical** — everything else: refactors, dependencies, CI, tests, docs
+
+Developer-only work (test harnesses, CI, Gradle, skills, docs) goes in **Technical only** and
+must never appear in a store block.
+
+## Step 4 — Write the entry into CHANGELOG.md
+
+Prepend a new entry directly below the header block. Use this exact shape — the headings are
+parsed by `scripts/check-release-notes.mjs`, so don't improvise them:
+
+````markdown
+## vX.Y.Z — YYYY-MM-DD
+
+_iOS build N · Android versionCode N_
+
+### 📱 App Store — "What's New" (≤4000 chars)
+
+```text
+<plain text>
+```
+
+### 🤖 Play Store — release notes (≤500 chars)
+
+```text
+<condensed plain text>
+```
+
+### 🎯 New Features
+### ✨ Improvements
 ### 🐛 Fixes
-- Brief description of what was broken and that it's fixed
+### 🔧 Technical
+````
+
+Rules:
+
+- Heading must be `## vX.Y.Z — YYYY-MM-DD` (an em dash). The parser depends on it.
+- Omit empty categories rather than writing "N/A".
+- **Never write a character count into the heading.** It goes stale the moment anyone edits the
+  block, and a stale count is worse than none. The limit is checked, not recorded.
+- For a development-only version that won't be submitted to the stores, omit both store blocks
+  and say so explicitly in the entry. The checker understands this case.
+
+### The store blocks
+
+These are pasted by hand into App Store Connect and the Play Console, so they are **plain
+text**, not markdown:
+
+- No `#` headings, no `**bold**`, no backticks, no links.
+- Bullets are `•`.
+- **Apple allows 4000 characters. Google Play allows only 500 per language.** These are very
+  different budgets — write the Play block as a genuine condensation, not a truncation.
+- Lead with the single most exciting change. If there's a new tab or major feature, it goes
+  first and gets a plain-language explanation.
+- Describe what changed *for the user*, never the code. No file paths, no framework names, no
+  version numbers of dependencies. "A faster, smoother app" — not "upgraded to Expo SDK 55".
+- Present tense: "Wind charts now load faster", not "wind charts were optimized".
+- Group minor fixes into one "Various bug fixes and stability improvements" line.
+
+### The technical section
+
+- Include short commit hashes for traceability and PR numbers where available.
+- Note dependency, SDK and build configuration changes.
+- Include migration notes or breaking changes if any.
+
+## Step 5 — Verify
+
+Run the checker and fix anything it reports:
+
+```bash
+npm run check:release-notes
 ```
 
-Guidelines:
-- Lead with the most exciting or impactful change
-- Describe what changed *for the user*, not what changed in the code
-- Use plain language — no commit hashes, no file paths, no framework names
-- Keep it concise — aim for 3-8 bullet points total, not an exhaustive list
-- Group minor fixes into a single "Various bug fixes and stability improvements" line
-  rather than listing each one
-- Use bold for feature names followed by an em dash and the benefit
-- If there's a new tab or major feature, call it out prominently
-- Write in present tense ("Wind charts now load faster" not "Wind charts were optimized")
+It validates every store block against its limit and fails the build on overflow. This is the
+same check CI runs, so a clean run here means a clean run there.
 
-### Technical Version (Pull Request Description)
+## Step 6 — Report
 
-This goes into the PR body when merging dev → main for a release. It's for the developer
-(the user) to have a record of what went into the release.
-
-Here's the proven format from previous releases (e.g., v1.0.10 PR #29):
-
-```
-## 📋 Technical Release Notes
-
-### 🔧 Detailed Changes
-
-#### ✨ New Features
-- **Feature Name** (PR #XX)
-  - Detail about implementation
-  - Files changed or architectural notes
-
-#### 🐛 Bug Fixes
-- **Bug Description** (PR #XX)
-  - What was wrong
-  - How it was fixed
-
-#### 🧹 Maintenance
-- **Change area** (commit abc1234)
-  - What was updated and why
-```
-
-Guidelines:
-- Include commit hashes (short form) for traceability
-- Group by category using the emoji headers above
-- Reference PR numbers where available (format: `#123` or link to full URL)
-- Note any dependency updates, SDK changes, or build configuration changes
-- Include migration notes or breaking changes if any
-- Reference `Closes #XX` or `Fixes #XX` for any GitHub issues resolved
-
-## Output format
-
-5. **Write to a file** — Save the release notes to `RELEASE_NOTES.md` in the project root.
-   This file is gitignored so it won't be committed. Overwrite it each time the skill runs.
-
-The file should contain both versions clearly separated, using this structure:
-
-```
-# Release Notes — Dawn Patrol v1.1.0
-
-## 📱 App Store Release Notes
-
-[user-friendly version here]
-
----
-
-## 🔧 Technical Release Notes
-
-[technical version here]
-```
-
-Always use the actual version from `app.config.js` — never use a placeholder.
-
-After writing the file, confirm to the user that `RELEASE_NOTES.md` has been created/updated
-and remind them it's gitignored (won't be committed). Also display the full contents in the
-chat so they can review without opening the file.
+Show the user the full entry you added, confirm it's in `CHANGELOG.md`, and state both character
+counts against their limits. Remind them that `CHANGELOG.md` **is** the record — there is no
+scratch file to copy from.
 
 ## Important context
 
-- The app is built with Expo (React Native) and published manually to App Store and Play Store
-- Release builds are created via GitHub Actions workflows in `.github/workflows/`
-- The app monitors wind at Soda Lake, Standley Lake, and Boulder Reservoir using Ecowitt
-  weather stations
-- The "Wind Guru" feature is experimental and disabled by default
-- The user copies the user-friendly notes directly into store listings, so formatting matters
+- Expo (React Native), published **manually** to the App Store and Play Store.
+- Branching: feature branches → `dev` → `main` for releases.
+- GitHub Releases are intentionally kept as **drafts** so the public can't download builds; the
+  user publishes to the stores separately. Never suggest publishing a GitHub release.
+- CI (`.github/workflows/build-and-release.yml`) skips builds for documentation-only changes,
+  and `CHANGELOG.md` is on that ignore list. A changelog-only commit will therefore never
+  produce a build — the entry must land in the **same merge** as the code it describes, or the
+  draft release body will lag a version behind.
+- CI enforces a version increment on pull requests to `main` (`npm run test-version`). Any PR
+  touching files outside the ignore list needs a bump in `app.config.js`.
+- The app monitors Soda Lake, Standley Lake and Boulder Reservoir via Ecowitt weather stations.
+- The "Wind Guru" feature is experimental and disabled by default.
