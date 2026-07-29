@@ -1,0 +1,23 @@
+{
+  "skill_name": "dp-e2e-testing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just added a new 'About' section to the settings page that shows 'Dawn Patrol is a wind monitoring app for Colorado kiteboarding.' Can you write an e2e test for it?",
+      "expected_output": "A test added to e2e/settings.spec.ts that navigates to /settings and verifies the About text is visible, using correct patterns (fixture import, appropriate timeout, no strict mode issues)",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The e2e test for soda lake wind chart is failing sometimes. It says 'Today's Wind Speed' is not visible within 30 seconds. What should I do?",
+      "expected_output": "Diagnosis that the API data may be slow to load, suggestions to increase timeout, check if dev server is running, or check if the station is reporting data. Should NOT suggest mocking data (tests use live API).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to add a test that verifies you can enable Wind Guru in settings and then see the full Wind Guru page. Like a cross-tab flow test.",
+      "expected_output": "A test that navigates to settings, clicks the toggle with force:true, navigates to wind-guru, verifies content, then cleans up by toggling back off. Should handle state isolation properly.",
+      "files": []
+    }
+  ]
+}

@@ -1,9 +1,13 @@
 # GitHub Copilot Custom Instructions
+
+## Agent Guidelines
+- Be concise in your output.
+
 ## Development Guidelines
-- Never use mock data.  If data is not available, notify the user that we were unable to retrieve data and display a relevant error message.
+- Never use mock data. In runtime application code, if required external data cannot be retrieved, show the user a clear error message and avoid displaying fabricated data. In developer scripts or tests, fail clearly with an actionable error.
 
 ## Build and Test Instructions
-- Always fix all linting errors and warnings before submitting code.
+- Before completing a code change, run the relevant linter when possible and fix all lint errors and warnings introduced by the change. Report any pre-existing unrelated lint issues instead of modifying unrelated code without approval. If the linter cannot be run because dependencies or tooling are unavailable, state that explicitly and provide the exact command the user should run locally.
 - Install javascript libraries locally instead of globally with `-g`.
 - This application is built and released using GitHub Actions in .github/workflows
 - It is manually published to the Play Store and App Store using the release notes from GitHub Actions as the release notes for the app store releases.
