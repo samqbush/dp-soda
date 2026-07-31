@@ -633,9 +633,9 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       start_date: startOfDay,
       end_date: endOfDay,
       cycle_type: '5min', // 5-minute intervals for detailed data
-      temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
-      pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
-      wind_unit: '7', // mph (7 = mph, 6 = m/s) - Changed to mph to match our processing
+      temp_unitid: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
+      pressure_unitid: '3', // hPa (3 = hPa, 4 = inHg, 5 = mmHg)
+      wind_speed_unitid: '9', // mph (6 = m/s, 7 = km/h, 8 = knots, 9 = mph)
       call_back: 'wind', // Request wind data
     };
 
@@ -695,7 +695,7 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
         const timeString = date.toISOString();
         
         // Extract wind data from the response structure
-        // API now returns mph since we requested wind_unit: '7'
+        // API returns mph since we requested wind_speed_unitid: '9'
         const windSpeedMph = parseFloat(windData.wind_speed.list[timestamp] || '0');
         const windGustMph = parseFloat(windData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
         const windDirection = parseFloat(windData.wind_direction.list[timestamp] || '0');
@@ -763,9 +763,9 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
       start_date: startOfDay,
       end_date: endOfDay,
       cycle_type: '5min', // 5-minute intervals for detailed data
-      temp_unit: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
-      pressure_unit: '3', // hPa (3 = hPa, 1 = inHg)
-      wind_unit: '7', // mph (7 = mph, 6 = m/s) - Changed to mph to match our processing
+      temp_unitid: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
+      pressure_unitid: '3', // hPa (3 = hPa, 4 = inHg, 5 = mmHg)
+      wind_speed_unitid: '9', // mph (6 = m/s, 7 = km/h, 8 = knots, 9 = mph)
       call_back: 'wind,outdoor,indoor', // Request wind data + outdoor/indoor for transmission quality detection
     };
 
@@ -812,7 +812,7 @@ export async function fetchEcowittWindDataForDevice(deviceName: string): Promise
         const timeString = date.toISOString();
         
         // Extract wind data from the response structure
-        // API now returns mph since we requested wind_unit: '7'
+        // API returns mph since we requested wind_speed_unitid: '9'
         const windSpeedMph = parseFloat(windSpeedData.wind_speed.list[timestamp] || '0');
         const windGustMph = parseFloat(windSpeedData.wind_gust?.list?.[timestamp] || windSpeedMph.toString());
         const windDirection = parseFloat(windSpeedData.wind_direction.list[timestamp] || '0');
