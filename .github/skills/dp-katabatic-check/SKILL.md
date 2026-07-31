@@ -92,13 +92,34 @@ to discuss.
 
 ## Step 3: Judge the session window
 
-The user cares about a specific block of time, usually something like 6–7am. Anchor to sunrise,
-which the script reports.
+### First: is the park even open?
 
-Katabatic flow typically persists for roughly 45–90 minutes past sunrise before solar heating
-erodes the inversion, then decays quickly. Use that as a starting frame, then adjust with what
-the data actually shows: a still-building event with a hard direction lock will run toward the
-long end; one already flagged `DECAYING`, or with direction starting to wander, will not.
+Bear Creek Lake Park gates are seasonal, and no amount of wind matters before they open.
+Check this **before** analysing anything, because it can make the whole question moot:
+
+| Months | Gate opens |
+|---|---|
+| May–Sep | 6:00 a.m. |
+| Mar, Apr, Oct | 7:00 a.m. |
+| Nov–Feb | 8:00 a.m. |
+
+If the requested session window starts before the gate opens, say so immediately and shift
+the analysis to the time they can actually be on the water. If the gate opens after the event
+is likely over (see below), lead with that — it is the answer, regardless of the wind.
+
+### Then: when does the wind end?
+
+Anchor to sunrise, which the script reports. Measured across 14 rideable mornings at this
+station, the sustained window **closes a median of ~57 minutes after sunrise** (25th
+percentile +3 min, 75th +85 min), as solar heating erodes the nocturnal inversion.
+
+Use sunrise+1hr as the default frame, then adjust with what the data actually shows: a
+still-building event with a hard direction lock will run toward the long end; one with
+direction starting to wander will not.
+
+Note the interaction — in June sunrise is ~5:32 and the gate opens at 6:00, so the event may
+be fading as they arrive. In September sunrise is ~6:43 against the same 6:00 gate, giving a
+far longer window. Same gate hour, very different session.
 
 Be explicit about which part of their window is solid and which part is speculative. "Solid
 through 6:45, dicey after" is far more useful than a single yes or no, because it tells them

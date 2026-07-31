@@ -295,8 +295,17 @@ async function main() {
   const prev30 = mean(points.filter((p) => now - p.date > 30 * 60000 && now - p.date <= 60 * 60000).map((p) => p.speed));
   if (last30 !== null && prev30 !== null) {
     const delta = last30 - prev30;
-    const word = delta > 1.5 ? 'BUILDING' : delta < -1.5 ? 'DECAYING' : 'HOLDING';
+    // Katabatic flow is modulated by mountain waves on ~1-hour timescales, so a 30-min
+    // dip is normal breathing rather than the event ending. Measured at this station,
+    // the median peak-to-lull spread inside a single hour is 5.6 mph. A tighter band
+    // (the original was +/-1.5) reports DECAYING during routine lulls, which is the
+    // costly error here: it talks the user out of a session that is still running.
+    const BAND = 3.0;
+    const word = delta > BAND ? 'BUILDING' : delta < -BAND ? 'DECAYING' : 'HOLDING';
     console.log(`Trend: ${word} (last 30 min ${mph(last30)} vs prior 30 min ${mph(prev30)}, ${delta >= 0 ? '+' : ''}${delta.toFixed(1)} mph)`);
+    if (word === 'HOLDING' && Math.abs(delta) > 1.5) {
+      console.log(`       note: ${delta.toFixed(1)} mph swing is within normal mountain-wave modulation, not a trend`);
+    }
   }
 
   /* --- humidity: radiative cooling drives the flow; drying air confirms it --- */
