@@ -305,15 +305,27 @@ and for measuring skill on positives (recall) rather than overall accuracy.
 
 ## 5. Tier 1 — Q2, "will it hold?"
 
-Currently answered with a heuristic: katabatic typically persists 45–90 minutes past sunrise.
-This worked on 2026-07-30 (6am hour averaged 16.0, 7am fell to 11.3, dead by 8am) but is
-a rule of thumb, not a model.
+The old heuristic was "katabatic typically persists 45–90 minutes past sunrise." That has now
+been **replaced by a measurement** (§4.5): across 14 rideable mornings the sustained window
+closes a **median +57 min after sunrise** (25th +3, 75th +85). The rule of thumb was roughly
+right but the spread is wide, and the spread is the actionable part.
 
-**Known bug to fix regardless:** `katabatic-check.mjs` flags `DECAYING` on a ±1.5 mph swing.
-Poulos et al. (2007) mountain-wave/katabatic interaction predicts **1–3 m/s (2–7 mph)
-modulation on ~1-hour timescales as expected signal, not decay** (Appendix A.3). The current
-threshold will report death during normal wave modulation. Two further consequences from the
-same physics, both of which bear directly on how the check should be written:
+**`DECAYING` threshold — fixed, and the physics and the data agree.** The script previously
+flagged decay on a ±1.5 mph swing. Poulos et al. (2007) predicts **1–3 m/s (2–7 mph)
+modulation on ~1-hour timescales as expected signal, not decay** (Appendix A.3).
+
+Independently, the measured **median peak-to-lull spread inside a single hour at this station
+is 5.6 mph** — squarely inside the MKI band, from data rather than literature. Two independent
+lines agreeing is about as much confidence as this project is going to get, so the threshold is
+now **±3.0 mph**.
+
+This bug also announced itself during analysis: a first attempt to measure "when does the event
+die," defined as the first drop below 60% of the pre-dawn peak, returned nonsense — most
+mornings appeared to die ~59 minutes *before* sunrise. That was routine modulation tripping
+exactly the kind of tight threshold the script was using. Good illustration of why the error
+direction matters: the tight band talks the user out of a session that is still running.
+
+Two further consequences from the same physics, both of which bear on how the check is written:
 
 - There is a **second, microscale variability band at O(1 minute)** from wave breaking aloft.
   Any short-window trend computed on 5-minute data is partly sampling that band. Trend
@@ -323,9 +335,11 @@ same physics, both of which bear directly on how the check should be written:
   still running (Appendix A.4). Direction rotation over the course of a morning is expected.
 
 **Research tasks:**
-- [ ] From the archive, extract decay-time distribution relative to sunrise across all events
-- [ ] Test whether decay time correlates with event strength, onset time, or date/season
-- [ ] Re-derive the `DECAYING` threshold empirically instead of guessing
+- [x] ~~Extract decay-time distribution relative to sunrise~~ → §4.5, median +57 min (n=14)
+- [x] ~~Re-derive the `DECAYING` threshold empirically instead of guessing~~ → ±3.0 mph
+- [ ] Test whether decay time correlates with event strength, onset time, or date/season.
+      The +57 min figure is summer-only; seasonal dependence is the obvious next question and
+      matters directly for the shoulder-season hypothesis in §4.5.
 - [ ] Quantify: given it is X mph at 5:30, what is P(still ≥15 at 7:00)? This is directly
       the question being asked, and it is answerable from the archive alone with no forecast
 
@@ -415,6 +429,12 @@ The previous attempt most likely failed not because predictions were wrong, but 
       which suggests open water through December and from about March.
 - [ ] Does the +57 min "session end vs. sunrise" figure hold outside June–July? It is measured
       from summer only, and winter inversions may behave differently.
+- [ ] **Are Soda, Standley West and Boulder Res actually correlated?** Appendix A.4: adjacent
+      Front Range canyons behaved differently on the same night in ASCOT. If the correlation is
+      weak, the other two stations are not evidence about Soda and nothing should imply they
+      are. Answerable from the archive alone.
+- [ ] Do any labelled positives look like chinook rather than katabatic (Appendix A.1)? Check
+      whether overnight temperature trend separates them — katabatic cools, chinook warms.
 - [ ] After 30+ logged mornings: does the assistant's call beat "always drive out and look"?
       If not, the honest answer is that the tool is a convenience, not a predictor.
 
@@ -434,9 +454,8 @@ Answered since first draft:
 2. **Start the prediction log** (§3.2). Zero infrastructure. Nothing downstream can be
    validated without it, and it accumulates only in real time — it cannot be backfilled.
    This is now the top *time-sensitive* item, since the archiver no longer is.
-3. **Fix the `DECAYING` threshold** in `katabatic-check.mjs`. Live bug, independent of
-   everything else here — and §4.5's measurements confirm it: routine pre-dawn modulation
-   dips well below the current trigger, so the script will call death during a normal lull.
+3. ~~**Fix the `DECAYING` threshold**~~ — **done.** Widened ±1.5 → ±3.0 mph, confirmed by
+   both MKI's 1–3 m/s modulation band and a measured 5.6 mph median intra-hour spread (§5).
 4. **Build the archiver** (§4.4). Still worth doing as insurance against Ecowitt data loss,
    but at a normal priority rather than an emergency.
 5. **Tier 1 from the archive** (§5). Establishes the validation harness without needing any
@@ -444,3 +463,112 @@ Answered since first draft:
 6. **Only then consider Tier 2** (§6), and only if Tiers 0–1 leave a gap worth the effort.
 
 Explicitly **not** on this list: building an automated alarm. See §3 for why.
+
+---
+
+## Appendix A — Physics carried over from the `wind-guru` reference
+
+Condensed from `~/Code/wind-guru/docs/katabatic-winds-reference.md`, which is the fuller
+treatment (definitions, full literature table, ASCOT case-night detail). Repeated here so this
+document is self-contained and the same ground does not get re-covered. **Primary source for
+the Front Range material: Poulos, Bossert, McKee & Pielke Sr. 2007, *J. Atmos. Sci.* 64,
+1857–1879 — the "MKI" paper (Part I: Poulos et al. 2000, *JAS* 57, 1919–1936).** Treat it as
+authoritative; a co-author is a neighbour.
+
+### A.1 Definition — use the narrow one
+
+Two definitions of "katabatic" are in circulation and it is the biggest source of confusion:
+
+- **Broad/classical:** any downslope wind, including foehn/chinook.
+- **Narrow/modern operational:** only **cold, negatively buoyant, gravity-driven drainage
+  flow**. **Use this one.** Under it a chinook is *not* katabatic — it warms by adiabatic
+  compression and is dynamically, not buoyancy, driven.
+
+Formation chain: clear sky → longwave radiative cooling of the surface → slope-adjacent air
+cools → density rises → negative buoyancy → downslope acceleration → pooling in valley bottoms
+and on the plains. Required ingredients: elevated cold source, clear sky, dry air (limits
+longwave trapping), weak-or-reinforcing synoptic gradient, and a slope with a drainage path.
+
+Magnitude is set by the **temperature deficit of the drainage layer relative to free air at the
+same altitude** and by the **surface pressure-gradient force**. Depth of the cold layer ≈ depth
+of the katabatic layer. Onset after sunset, strongest pre-dawn, breaks down after sunrise as the
+slope warms and the flow reverses to anabatic — which is the physical basis of the measured
+"+57 min past sunrise" close in §4.5.
+
+### A.2 MKI — mountain waves change everything (the key finding)
+
+On the Front Range, terrain-forced mountain waves and katabatic drainage **coexist on most
+clear nights with westerly flow aloft**, and near the surface they are often "inseparable and
+indistinguishable." Two interaction mechanisms:
+
+**Turbulence/mixing.** Katabatic flow normally needs strong surface stratification
+(**dθ/dz > 10 K/km**). A mountain wave makes that stratification weaker and deeper, so the
+katabatic layer is **deeper but its temperature contrast is smaller** → **slower jet, sitting
+higher up**. Strong enough wave momentum **scours** the drainage layer off the upper slopes
+entirely, down to the wave separation point. **Higher Froude number → scouring reaches farther
+downslope.**
+
+**Why this is good news for Soda.** For **0.40 < Fr < 1.0** the upper slopes scour but flow
+below the separation point stays quiescent enough for katabatic flow to form. Even at Fr ≈ 1.0,
+low-elevation drainage can survive if surface cooling builds stratification strong enough to
+block wave penetration. Soda sits at the mountain–plains interface, i.e. **on the favourable
+side of the separation point** — upper-slope scouring does not imply a dead morning here.
+
+Case-night reference values: Fr = U/(NH) ≈ **0.45** with H = 2000 m (nonlinear wave regime);
+geostrophic flow **319° at 8.6 m/s**; stability in the 2–4 km MSL layer **1.6 → 1.0 K/km**
+overnight. Front Range terrain-wave vertical wavelength ≈ **4 km**.
+
+### A.3 Two variability timescales — expect them, do not call them decay
+
+Waves aloft perturb **surface pressure by O(1 hPa)**. Because katabatic flow is
+pressure-gradient driven, wave structure thousands of metres overhead modulates surface speed:
+
+| Band | Timescale | Amplitude | Cause |
+|---|---|---|---|
+| Meso-β | **O(1 hour)** | **1–3 m/s (2–7 mph)** | mountain-wave system evolution |
+| Microscale | **O(1 minute)** | — | wave breaking aloft |
+
+Poulos et al.'s own framing: "a far more variable stable nocturnal boundary layer in complex
+terrain than has been generally understood to exist." **Swings of 2–7 mph on the hour scale are
+expected signal, not instrument error and not the event dying.** This is the direct basis for
+the `DECAYING` threshold bug in §5.
+
+### A.4 Do not generalise across stations
+
+The ASCOT network found the timing of the overnight wind shift **highly variable canyon to
+canyon** — Eldorado and Coal Creek, a short distance apart, behaved differently on the same
+night, with low-level Coal Creek staying continuously westerly while BAO rotated easterly →
+westerly → N/NE by 0400 MST.
+
+**Consequence for the multi-station check (Soda / Standley West / Boulder Res):** these drain
+different canyons and **must not be assumed correlated**. Whether one leads or predicts another
+is an empirical question the archive can answer — and if the answer is "weakly," the other
+stations are not useful evidence about Soda and should not be presented as if they were.
+
+Corollary: flow aloft is **not** background detail. It sets katabatic depth, speed, and whether
+the flow exists at all on the upper slopes.
+
+### A.5 Quick-reference numbers
+
+| Quantity | Value | Source |
+|---|---|---|
+| Typical gentle/pure katabatic speed | 1–4 m/s (2–9 mph) | general |
+| Front Range near-surface, lowest 10 m, case night | 2–5 m/s | ASCOT 4 Sep 1993 |
+| Katabatic jet depth | ~400 m AGL | Banta et al. 1995 |
+| Stratification needed to support katabatic flow | dθ/dz > 10 K/km | Poulos et al. 2007 |
+| Case-night Froude number | ~0.45 | nonlinear wave regime |
+| Fr with upper-slope scouring but surviving low-level drainage | 0.40 < Fr < 1.0 | Poulos et al. 2007 |
+| Wave-induced surface pressure perturbation | O(1 hPa) | Poulos et al. 2007 |
+| Resulting katabatic speed modulation | 1–3 m/s over O(1 h) | Poulos et al. 2007 |
+| Microscale oscillation timescale | O(1 min) | wave breaking |
+| Front Range terrain wave vertical wavelength | ~4 km | Lee et al. 1989 |
+
+### A.6 Fetching the sources
+
+The AMS site **403s plain fetchers**. Use `curl -A "Mozilla/5.0 ..."` or the playwright-cli
+fallback. Same pattern as the Lakewood parks site in §4.5. Other directly on-topic references,
+should Tier 2 ever need them: **Coulter & Gudiksen 1995**, *J. Appl. Meteor.* 34, 1419–1429,
+"The dependence of canyon winds on surface cooling and external forcing in Colorado's Front
+Range"; **Banta et al. 1995**, *Theor. Appl. Climatol.* 52, 27–42 (canyon flows over the
+adjacent plains); **Durran 1990**, *Meteor. Monogr.* 45, 59–81 (mountain waves and downslope
+winds — the standard reference).
