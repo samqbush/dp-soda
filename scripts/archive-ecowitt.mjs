@@ -89,6 +89,30 @@ async function exists(path) {
   }
 }
 
+/**
+ * Is an already-archived day actually finished?
+ *
+ * A run that happens *during* a day writes that day's partial history — the scheduled workflow
+ * fires mid-morning, so it captures midnight-to-then and stops. Because the archiver skipped
+ * anything already on disk, that stub was then frozen forever and every later run walked past
+ * it. Measured 2026-07-31: `2026-07-31.json` held 138 of 288 rows, ending 11:25.
+ *
+ * That silently truncates exactly the window the research cares about, on the day the job runs.
+ * So completeness is judged by whether the fetch happened after the day was over, not by whether
+ * a file merely exists. Mid-flight captures are re-fetched once and then settle.
+ */
+async function isComplete(path, date) {
+  try {
+    const rec = JSON.parse(await readFile(path, 'utf8'));
+    if (!rec.fetched_at) return false;
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+    return new Date(rec.fetched_at) > endOfDay;
+  } catch {
+    // An unreadable or truncated file is not evidence of anything. Re-fetch it.
+    return false;
+  }
+}
+
 function parseDay(s) {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -115,7 +139,9 @@ function eachDay(from, to) {
 async function archiveDay(device, date, { force = false, dryRun = false } = {}) {
   const path = dayFilePath(device.name, date);
 
-  if (!force && (await exists(path))) return { day: isoDay(date), status: 'skipped-exists' };
+  if (!force && (await exists(path)) && (await isComplete(path, date))) {
+    return { day: isoDay(date), status: 'skipped-exists' };
+  }
 
   // Days before the device existed are not "missing data" — there was no station yet. Don't
   // request them, and don't let them pollute the unexplained-gap report.

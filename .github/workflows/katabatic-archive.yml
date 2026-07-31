@@ -16,9 +16,15 @@
 #
 #  1. Ecowitt only retains 5-minute history for ~90 days and downsamples older data to 4-hour
 #     rows, which are useless for a 30-minute sustained-wind label (§4.3a). Falling behind
-#     permanently degrades those days, so this runs weekly rather than monthly.
+#     permanently degrades those days.
+#  1b. Holfuy is far less forgiving, and it is what sets the cadence. Its public feed is a
+#     rolling ~5.9-day window with no backfill, and station 1295's archive API is closed to us
+#     ("No access" — the station owner controls that flag). A Holfuy day missed by a week is
+#     GONE, not merely coarsened. Hence daily rather than weekly. Daily also buys resolution:
+#     the feed carries ~1-minute rows for the most recent day or two and thins to 15-minute rows
+#     further back, and archive-holfuy.mjs merges by timestamp rather than overwriting.
 #  2. The meter goes dark every winter (§4.2, roughly Jan 6 – Feb 28). A workflow that fails
-#     every week for two months gets muted, and a muted workflow is a dead one. Shutdown days
+#     every day for two months gets muted, and a muted workflow is a dead one. Shutdown days
 #     are recorded as `unobserved` and exit cleanly — never as calm, never as an error.
 #  3. A rate-limited response arrives as HTTP 200 with a non-zero body code. The archiver
 #     detects this and skips the day rather than writing it as absence of wind.
@@ -33,9 +39,11 @@ name: 🌬️ Katabatic archive
 
 on:
   schedule:
-    # 14:00 UTC Monday = 07:00 MDT / 06:00 MST. Well after the morning event is over.
-    # Archives a trailing window rather than just "last week", so a skipped run self-heals.
-    - cron: '0 14 * * 1'
+    # 14:00 UTC daily = 08:00 MDT / 07:00 MST. Well after the morning event is over.
+    # Daily rather than weekly because of the Holfuy window (see header). The Ecowitt archiver
+    # issues no request for a day already on disk, so the extra runs are nearly free and a
+    # skipped day still self-heals from the trailing window.
+    - cron: '0 14 * * *'
   workflow_dispatch:
     inputs:
       days:
@@ -67,6 +75,15 @@ jobs:
 
       - name: 📦 Install dependencies
         run: npm ci
+
+      - name: 🏔️ Archive ridge stations (Holfuy)
+        # Deliberately placed BEFORE the credential gate. Holfuy needs no credentials, and its
+        # ~5.9-day window is the tightest deadline in this repo — a missing Ecowitt secret or an
+        # Ecowitt rate limit must not cost a ridge-top day that cannot be re-fetched from
+        # anywhere. `continue-on-error` is the same argument in reverse: a Holfuy outage must not
+        # stop the Ecowitt archive from running.
+        continue-on-error: true
+        run: node scripts/archive-holfuy.mjs
 
       - name: 🔑 Verify research credentials are present
         # Fail fast with a readable message rather than after npm ci and a partial fetch.
@@ -107,7 +124,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ecowitt-archive research/prediction-log.csv
+          git add data/ecowitt-archive data/holfuy-archive research/prediction-log.csv
 
           # No-op runs are normal, not failures: nothing new during the winter shutdown, or a
           # re-run over days already archived. Exit clean rather than committing an empty diff.

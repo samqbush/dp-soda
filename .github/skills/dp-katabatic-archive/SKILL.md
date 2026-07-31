@@ -23,8 +23,16 @@ still healthy, and what does it say?"*
 **The single most important thing to understand:** this archive is *perishable*. Ecowitt serves
 5-minute history for only about 90 days and downsamples anything past roughly a year to 4-hour
 rows, which are too coarse to detect a 30-minute sustained-wind event. Days not archived in time
-are permanently degraded, and Ecowitt is the only source that ever had them. **Falling behind
-destroys data.** That is the whole reason this runs weekly.
+are permanently degraded, and Ecowitt is the only source that ever had them.
+
+**The Holfuy half is worse, and it sets the cadence.** `data/holfuy-archive/` carries ridge-top
+stations Ecowitt cannot see — currently Lookout Mtn (Holfuy 1295, run by RMHPA), ~2,000 ft above
+Soda and upstream of the drainage. Holfuy publishes a rolling **~5.9-day** window with no
+backfill, and station 1295's archive API returns `{"error":"No access"}` because access is a flag
+the station owner controls. A Holfuy day missed by a week is not coarsened, it is **gone**. That
+is why this runs **daily**, not weekly. Daily also captures the feed's ~1-minute rows for the most
+recent day or two before they thin to 15-minute; days are merged by timestamp, never overwritten,
+so resolution only ever improves.
 
 ## Credentials — this will hard-fail without them
 
@@ -37,6 +45,8 @@ account it could exhaust the shared quota and break wind data on every installed
 
 If the user hits that error, **do not work around it** by setting the app keys or editing the
 check. Tell them to add a separate Ecowitt research token to `.env`.
+
+Holfuy needs no credentials at all, which is why it runs first and independently.
 
 ## The command
 
@@ -55,13 +65,21 @@ Flags:
 It is safe to re-run at any time. Already-archived days are skipped, so a repeat run costs
 almost nothing.
 
+To pull the ridge stations alone — useful when the user is about to lose the Holfuy window and
+you do not want to wait on an Ecowitt backfill:
+
+```bash
+node scripts/archive-holfuy.mjs
+```
+
 ## When to run it
 
-Weekly is the target cadence. Also run it whenever the user gets back from travel, or before any
-question that leans on the data ("what's the best month", "how often does September work").
+**Daily is the target cadence**, driven by the Holfuy window rather than by Ecowitt. Also run it
+whenever the user gets back from travel, or before any question that leans on the data ("what's
+the best month", "how often does September work").
 
-Do not run it more than once a day unless something failed — there is nothing new to fetch, and
-it burns API quota against a rate limit that matters (below).
+Re-running the same day is harmless but pointless for Ecowitt. It is *not* pointless for Holfuy
+if the user has been away — run it immediately in that case, before anything else.
 
 ## Reading the output
 
@@ -102,10 +120,26 @@ lower `--delay`.
 **Never invent data.** If a fetch fails, the day stays missing. Do not fill gaps with zeros,
 averages, or estimates. The entire value of this archive is that absence is recorded honestly.
 
-**A weekly GitHub Action also does this** (`.github/workflows/katabatic-archive.yml`, Mondays
-14:00 UTC). Note that GitHub only fires scheduled workflows on the **default branch** — while
-this work sits on a feature branch the cron does not run, so the local command is the real
-mechanism until it merges. Say so if the user assumes it is running automatically.
+**Holfuy data is not yet part of the backtest.** `data/holfuy-archive/` is pure collection —
+nothing labels or scores it, because there is not enough of it yet. Do not present Lookout Mtn
+numbers as validated; the honest line is "we started recording it on 2026-07-31 and have N days."
+Why it is worth collecting is measured, not assumed: over 12 months, as overnight (00:00–05:00)
+predictors of the 06:00–08:00 session, Soda's own meter scored AUC 0.729 while every accessible
+remote substitute was worse (Golden ridge PWS 0.627, Hwy 93 RWIS 0.587, Rooney Rd RWIS 0.551),
+and combining them helped nothing. Lookout is the one candidate never tested at scale, because it
+is the only true ridge-top station inside the drainage.
+
+**A day archived mid-morning used to be frozen half-written.** The archiver skipped anything
+already on disk, so the day the job ran was stored with only midnight-to-run-time rows and never
+completed. Completeness is now judged by whether `fetched_at` is later than the end of that local
+day, so partial days are re-fetched once and then settle. A day being re-fetched that looks like
+it was already there is this working as intended, not a bug.
+
+**A daily GitHub Action also does this** (`.github/workflows/katabatic-archive.yml`, 14:00 UTC).
+Note that GitHub only fires scheduled workflows on the **default branch** — while this work sits
+on a feature branch the cron does not run, so the local command is the real mechanism until it
+merges. Say so if the user assumes it is running automatically. **This now matters more than it
+did:** on a feature branch, every day nobody runs the command locally is a Holfuy day lost.
 
 The workflow commits and pushes on its own. When running locally, do not push anything unless
 asked; offer a commit as a checkpoint rather than doing it unprompted.

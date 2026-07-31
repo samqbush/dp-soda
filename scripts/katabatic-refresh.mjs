@@ -28,10 +28,16 @@ import { labelDay } from './lib/label.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
 const ARCHIVE = join(REPO_ROOT, 'data', 'ecowitt-archive');
+const HOLFUY_ARCHIVE = join(REPO_ROOT, 'data', 'holfuy-archive');
 
 // Ecowitt serves 5-minute rows for about this long, then coarsens. Past this, a day archived
 // late is permanently lower resolution than one archived on time.
 const FINE_RESOLUTION_DAYS = 90;
+
+// Holfuy's public feed is a hard rolling window with no backfill and no reachable archive
+// endpoint for station 1295, so the tolerance here is days rather than months. This is what
+// drives the daily cadence. See scripts/archive-holfuy.mjs.
+const HOLFUY_WINDOW_DAYS = 5;
 
 const STATIONS = ['dp-soda-lakes', 'dp-standley-west', 'dp-boulder-res'];
 
@@ -91,6 +97,29 @@ function daysBetween(isoDate, now) {
   return Math.round((today - new Date(y, m - 1, d)) / 86400000);
 }
 
+/** Days held and latest date for a Holfuy station. Nothing labels these yet — pure collection. */
+function surveyHolfuy(slug) {
+  const dir = join(HOLFUY_ARCHIVE, slug);
+  if (!existsSync(dir)) return { slug, days: 0, latest: null };
+
+  let days = 0;
+  let latest = null;
+  for (const month of readdirSync(dir)) {
+    for (const file of readdirSync(join(dir, month))) {
+      if (!file.endsWith('.json')) continue;
+      days++;
+      const date = file.replace(/\.json$/, '');
+      if (!latest || date > latest) latest = date;
+    }
+  }
+  return { slug, days, latest };
+}
+
+function holfuyStations() {
+  if (!existsSync(HOLFUY_ARCHIVE)) return [];
+  return readdirSync(HOLFUY_ARCHIVE);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const now = new Date();
@@ -100,6 +129,7 @@ async function main() {
   console.log('='.repeat(72));
 
   const before = STATIONS.map(surveyStation);
+  const holfuyBefore = holfuyStations().map(surveyHolfuy);
 
   console.log('\n## ARCHIVE STATUS\n');
   let worstLag = 0;
@@ -132,9 +162,39 @@ async function main() {
     console.log(`\n✅ ${worstLag} day(s) behind — comfortably inside the fine-resolution window.`);
   }
 
+  for (const h of holfuyBefore) {
+    if (!h.days) {
+      console.log(`${h.slug.padEnd(20)} empty  [holfuy]`);
+      continue;
+    }
+    const lag = daysBetween(h.latest, now);
+    console.log(
+      `${h.slug.padEnd(20)} ${String(h.days).padStart(4)} days   latest ${h.latest} (${lag}d ago)  [holfuy]`
+    );
+    // Not a "getting stale" warning. Past the window those days are simply gone — Holfuy serves
+    // a rolling ~5.9 days and offers no backfill on this station.
+    if (lag > HOLFUY_WINDOW_DAYS) {
+      console.log(
+        `\n🚨 ${h.slug} is ${lag} days behind and Holfuy only serves ~${HOLFUY_WINDOW_DAYS + 1} days.\n` +
+          `   The days in between are permanently unrecoverable. This needs a daily cadence.`
+      );
+    }
+  }
+
   if (args.check) {
     console.log('\n(--check: nothing fetched.)');
     return;
+  }
+
+  // Holfuy first, and deliberately so. Its window is ~5.9 days with no backfill, while Ecowitt
+  // tolerates months. If the Ecowitt credentials are missing or its API is rate limiting, that
+  // must not be allowed to cost a ridge-top day that can never be recovered.
+  console.log('\n## FETCHING RIDGE STATIONS (Holfuy)\n');
+  try {
+    await run('archive-holfuy.mjs');
+  } catch (err) {
+    console.log(`⚠️  Holfuy archive failed: ${err.message}`);
+    console.log('   Re-run within ~5 days or those days are lost for good.');
   }
 
   // Reach back further than the gap so a partially-archived day gets completed rather than left
@@ -148,6 +208,7 @@ async function main() {
   await run('score-backtest.mjs', ['--call-time', '06:30']);
 
   const after = STATIONS.map(surveyStation);
+  const holfuyAfter = holfuyStations().map(surveyHolfuy);
 
   console.log('\n' + '='.repeat(72));
   console.log('WHAT CHANGED');
@@ -167,6 +228,12 @@ async function main() {
     // Expected outcome most weeks in winter, and not a failure. §4.2: the meter is deliberately
     // switched off roughly Jan 6 - Feb 28, and those days are recorded as unobserved, never calm.
     console.log('No new days. Normal if already current, or during the winter shutdown (§4.2).');
+  }
+
+  for (const h of holfuyAfter) {
+    const prev = holfuyBefore.find((p) => p.slug === h.slug);
+    const newDays = h.days - (prev?.days ?? 0);
+    if (newDays) console.log(`${h.slug.padEnd(20)} +${newDays} day(s)  [holfuy]`);
   }
 
   const soda = after[0];
