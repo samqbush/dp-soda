@@ -1,0 +1,331 @@
+#!/usr/bin/env node
+
+/**
+ * Katabatic check — pulls the overnight wind record for a DP station and prints
+ * the raw signals needed to judge whether a katabatic (drainage) event is running.
+ *
+ * This script only reports facts. All interpretation and the go/no-go call live in
+ * SKILL.md, because the judgment depends on the user's session window and threshold.
+ *
+ * Usage:
+ *   node .github/skills/dp-katabatic-check/scripts/katabatic-check.mjs
+ *   node .github/skills/dp-katabatic-check/scripts/katabatic-check.mjs --station "DP Standley West" --threshold 12
+ *
+ * Flags:
+ *   --station <name>    Station to analyze (default "DP Soda Lakes"), case-insensitive substring match
+ *   --threshold <mph>   Sustained speed the user cares about (default 15)
+ *   --since <HH:MM>     Start of the overnight window to pull (default 00:00 local)
+ */
+
+import axios from 'axios';
+import { config } from 'dotenv';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
+config({ path: join(REPO_ROOT, '.env') });
+
+const BASE_URL = 'https://api.ecowitt.net/api/v3';
+
+// Morrison, CO — the drainage basin all the DP stations sit in.
+const SUNRISE_COORDS = { lat: 39.6547, lng: -105.1956 };
+
+// Ecowitt unit ids. The parameter names matter: `wind_unit` / `temp_unit` are silently
+// ignored by the API, which is what caused an old 2.237x over-reporting bug in the
+// debug scripts. Always use the *_unitid names.
+const UNITS = {
+  wind_speed_unitid: '9', // mph (6 = m/s, 7 = km/h, 8 = knots, 9 = mph)
+  temp_unitid: '2', // Fahrenheit (1 = Celsius, 2 = Fahrenheit)
+  pressure_unitid: '3', // hPa
+};
+
+// Soda Lakes is the only station with a configured ideal (katabatic) direction window.
+// Mirrors `app/(tabs)/index.tsx`. Keep in sync if that config changes.
+const IDEAL_DIRECTION = {
+  'DP Soda Lakes': { min: 270, max: 330, perfect: 297 },
+};
+
+function parseArgs(argv) {
+  const args = { station: 'DP Soda Lakes', threshold: 15, since: '00:00' };
+  for (let i = 0; i < argv.length; i++) {
+    const next = argv[i + 1];
+    if (argv[i] === '--station' && next) args.station = next;
+    if (argv[i] === '--threshold' && next) args.threshold = parseFloat(next);
+    if (argv[i] === '--since' && next) args.since = next;
+  }
+  return args;
+}
+
+function fmtEcowittDate(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+const fmtTime = (d) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+/* ---------- circular (compass) statistics ---------- */
+
+function circularMean(degrees) {
+  if (!degrees.length) return null;
+  let x = 0;
+  let y = 0;
+  for (const deg of degrees) {
+    const r = (deg * Math.PI) / 180;
+    x += Math.cos(r);
+    y += Math.sin(r);
+  }
+  return ((Math.atan2(y / degrees.length, x / degrees.length) * 180) / Math.PI + 360) % 360;
+}
+
+function angularDiff(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+function inRange(deg, min, max) {
+  return min <= max ? deg >= min && deg <= max : deg >= min || deg <= max;
+}
+
+function compassLabel(deg) {
+  const pts = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return pts[Math.round(deg / 22.5) % 16];
+}
+
+const mean = (nums) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null);
+
+/* ---------- data fetching ---------- */
+
+async function getDevices() {
+  const res = await axios.get(`${BASE_URL}/device/list`, {
+    params: {
+      application_key: process.env.ECOWITT_APPLICATION_KEY,
+      api_key: process.env.ECOWITT_API_KEY,
+    },
+    timeout: 15000,
+  });
+  if (res.data.code !== 0) throw new Error(`Ecowitt device list error: ${res.data.msg}`);
+  return res.data.data?.list || [];
+}
+
+async function getHistory(mac, start, end) {
+  const res = await axios.get(`${BASE_URL}/device/history`, {
+    params: {
+      application_key: process.env.ECOWITT_APPLICATION_KEY,
+      api_key: process.env.ECOWITT_API_KEY,
+      mac,
+      start_date: fmtEcowittDate(start),
+      end_date: fmtEcowittDate(end),
+      cycle_type: '5min',
+      call_back: 'wind,outdoor',
+      ...UNITS,
+    },
+    timeout: 20000,
+  });
+  if (res.data.code !== 0) throw new Error(`Ecowitt history error: ${res.data.msg}`);
+
+  const d = res.data.data || {};
+  const speed = d.wind?.wind_speed?.list || {};
+  const gust = d.wind?.wind_gust?.list || {};
+  const dir = d.wind?.wind_direction?.list || {};
+  const temp = d.outdoor?.temperature?.list || {};
+  const rh = d.outdoor?.humidity?.list || {};
+
+  return Object.keys(speed)
+    .map((ts) => ({
+      ts: parseInt(ts, 10),
+      date: new Date(parseInt(ts, 10) * 1000),
+      speed: parseFloat(speed[ts]),
+      gust: parseFloat(gust[ts] ?? speed[ts]),
+      dir: parseFloat(dir[ts]),
+      temp: temp[ts] !== undefined ? parseFloat(temp[ts]) : null,
+      rh: rh[ts] !== undefined ? parseFloat(rh[ts]) : null,
+    }))
+    .filter((p) => Number.isFinite(p.speed))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+async function getSunrise() {
+  try {
+    const res = await axios.get('https://api.sunrise-sunset.org/json', {
+      params: { lat: SUNRISE_COORDS.lat, lng: SUNRISE_COORDS.lng, formatted: 0 },
+      timeout: 8000,
+    });
+    return res.data?.status === 'OK' ? new Date(res.data.results.sunrise) : null;
+  } catch {
+    return null; // Non-fatal: sunrise is context, not a gate.
+  }
+}
+
+/* ---------- reporting ---------- */
+
+function hourlyRollup(points) {
+  const buckets = new Map();
+  for (const p of points) {
+    const h = p.date.getHours();
+    if (!buckets.has(h)) buckets.set(h, []);
+    buckets.get(h).push(p);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([hour, pts]) => ({
+      hour,
+      avg: mean(pts.map((p) => p.speed)),
+      peakGust: Math.max(...pts.map((p) => p.gust)),
+      dir: circularMean(pts.map((p) => p.dir)),
+      rh: mean(pts.map((p) => p.rh).filter(Number.isFinite)),
+      temp: mean(pts.map((p) => p.temp).filter(Number.isFinite)),
+    }));
+}
+
+function windowStats(points, threshold, ideal) {
+  if (!points.length) return null;
+  const speeds = points.map((p) => p.speed);
+  const dirs = points.map((p) => p.dir).filter(Number.isFinite);
+  const meanDir = circularMean(dirs);
+  return {
+    n: points.length,
+    avg: mean(speeds),
+    min: Math.min(...speeds),
+    max: Math.max(...speeds),
+    peakGust: Math.max(...points.map((p) => p.gust)),
+    meanDir,
+    // Consistency = share of readings pointing within 45° of the mean. A real drainage
+    // jet holds a tight bearing; a swinging direction means the flow is falling apart.
+    consistency: dirs.length ? (dirs.filter((d) => angularDiff(d, meanDir) <= 45).length / dirs.length) * 100 : null,
+    inIdealPct: ideal && dirs.length ? (dirs.filter((d) => inRange(d, ideal.min, ideal.max)).length / dirs.length) * 100 : null,
+    pctOverThreshold: (speeds.filter((s) => s >= threshold).length / speeds.length) * 100,
+  };
+}
+
+function pct(v) {
+  return v === null || v === undefined ? 'n/a' : `${v.toFixed(0)}%`;
+}
+function mph(v) {
+  return v === null || v === undefined ? 'n/a' : `${v.toFixed(1)}`;
+}
+function dirStr(v) {
+  return v === null || v === undefined ? 'n/a' : `${v.toFixed(0)}° ${compassLabel(v)}`;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
+  if (!process.env.ECOWITT_APPLICATION_KEY || !process.env.ECOWITT_API_KEY) {
+    console.error('❌ Missing ECOWITT_APPLICATION_KEY / ECOWITT_API_KEY.');
+    console.error(`   Expected them in ${join(REPO_ROOT, '.env')} (see .env.example).`);
+    process.exit(1);
+  }
+
+  const now = new Date();
+  const [sinceH, sinceM] = args.since.split(':').map(Number);
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sinceH || 0, sinceM || 0, 0);
+
+  const devices = await getDevices();
+  const dpDevices = devices.filter((d) => /^DP /i.test(d.name));
+  const target = devices.find((d) => d.name.toLowerCase().includes(args.station.toLowerCase()));
+
+  if (!target) {
+    console.error(`❌ No station matching "${args.station}". Available: ${devices.map((d) => d.name).join(', ')}`);
+    process.exit(1);
+  }
+
+  const ideal = IDEAL_DIRECTION[target.name];
+  const points = await getHistory(target.mac, start, now);
+
+  console.log('='.repeat(72));
+  console.log(`KATABATIC CHECK — ${target.name}`);
+  console.log(`Report generated ${now.toLocaleString('en-US')}`);
+  console.log('='.repeat(72));
+
+  if (!points.length) {
+    console.log('\n❌ NO DATA returned for today. Station is likely offline — do not guess at conditions.');
+    process.exit(0);
+  }
+
+  /* --- freshness: stale data is the single most dangerous failure mode --- */
+  const latest = points[points.length - 1];
+  const ageMin = Math.round((now - latest.date) / 60000);
+  console.log(`\n## DATA FRESHNESS`);
+  console.log(`Latest reading: ${fmtTime(latest.date)} (${ageMin} min ago) — ${points.length} points since ${fmtTime(start)}`);
+  if (ageMin > 30) console.log(`⚠️  STALE (${ageMin} min old). Treat every number below as unreliable and say so.`);
+
+  /* --- sunrise: katabatic flow decays once the slopes start heating --- */
+  const sunrise = await getSunrise();
+  if (sunrise) {
+    const rel = Math.round((now - sunrise) / 60000);
+    console.log(`Sunrise: ${fmtTime(sunrise)} (${rel >= 0 ? `${rel} min ago` : `in ${-rel} min`})`);
+  }
+
+  /* --- overnight shape: a real event builds, it doesn't just appear --- */
+  console.log(`\n## HOURLY TREND (avg mph / peak gust / mean dir)`);
+  for (const h of hourlyRollup(points)) {
+    const label = `${String(h.hour).padStart(2, '0')}:00`;
+    console.log(
+      `${label}  avg ${mph(h.avg).padStart(5)}  gust ${mph(h.peakGust).padStart(5)}  ${dirStr(h.dir).padEnd(10)}` +
+        `  ${h.temp !== null ? `${h.temp.toFixed(0)}°F` : ''}  ${h.rh !== null ? `RH ${h.rh.toFixed(0)}%` : ''}`
+    );
+  }
+
+  /* --- recent detail: what it is doing right now --- */
+  console.log(`\n## LAST 12 READINGS (5-min)`);
+  for (const p of points.slice(-12)) {
+    console.log(
+      `${fmtTime(p.date).padStart(8)}  spd ${mph(p.speed).padStart(5)}  gust ${mph(p.gust).padStart(5)}  ${dirStr(p.dir).padEnd(10)}` +
+        `  ${p.rh !== null ? `RH ${p.rh.toFixed(0)}%` : ''}`
+    );
+  }
+
+  /* --- windowed stats: last 30 and 60 minutes are what the session actually rides --- */
+  console.log(`\n## SIGNAL SUMMARY (threshold ${args.threshold} mph)`);
+  if (ideal) console.log(`Ideal katabatic direction for ${target.name}: ${ideal.min}°–${ideal.max}° (perfect ${ideal.perfect}°)`);
+  for (const mins of [30, 60, 120]) {
+    const cutoff = now.getTime() - mins * 60000;
+    const s = windowStats(points.filter((p) => p.date.getTime() >= cutoff), args.threshold, ideal);
+    if (!s) continue;
+    console.log(
+      `Last ${String(mins).padStart(3)} min: avg ${mph(s.avg)} (${mph(s.min)}–${mph(s.max)})  peak gust ${mph(s.peakGust)}  ` +
+        `dir ${dirStr(s.meanDir)}  consistency ${pct(s.consistency)}  ` +
+        `${ideal ? `in-ideal ${pct(s.inIdealPct)}  ` : ''}over-${args.threshold} ${pct(s.pctOverThreshold)}`
+    );
+  }
+
+  /* --- build pattern: is it still ramping, holding, or already decaying? --- */
+  const last30 = mean(points.filter((p) => now - p.date <= 30 * 60000).map((p) => p.speed));
+  const prev30 = mean(points.filter((p) => now - p.date > 30 * 60000 && now - p.date <= 60 * 60000).map((p) => p.speed));
+  if (last30 !== null && prev30 !== null) {
+    const delta = last30 - prev30;
+    const word = delta > 1.5 ? 'BUILDING' : delta < -1.5 ? 'DECAYING' : 'HOLDING';
+    console.log(`Trend: ${word} (last 30 min ${mph(last30)} vs prior 30 min ${mph(prev30)}, ${delta >= 0 ? '+' : ''}${delta.toFixed(1)} mph)`);
+  }
+
+  /* --- humidity: radiative cooling drives the flow; drying air confirms it --- */
+  const rhPts = points.filter((p) => Number.isFinite(p.rh));
+  if (rhPts.length > 1) {
+    console.log(`Humidity: ${rhPts[0].rh.toFixed(0)}% at ${fmtTime(rhPts[0].date)} → ${rhPts[rhPts.length - 1].rh.toFixed(0)}% now`);
+  }
+
+  /* --- neighbors: a local drainage jet should NOT show up basin-wide --- */
+  console.log(`\n## NEIGHBOR STATIONS (cross-check — drainage flow is local)`);
+  for (const dev of dpDevices) {
+    if (dev.mac === target.mac) continue;
+    try {
+      const np = await getHistory(dev.mac, new Date(now.getTime() - 60 * 60000), now);
+      const n = np[np.length - 1];
+      if (!n) {
+        console.log(`${dev.name.padEnd(20)} no recent data`);
+        continue;
+      }
+      console.log(`${dev.name.padEnd(20)} ${fmtTime(n.date)}  spd ${mph(n.speed)}  gust ${mph(n.gust)}  ${dirStr(n.dir)}`);
+    } catch (err) {
+      console.log(`${dev.name.padEnd(20)} error: ${err.message}`);
+    }
+  }
+
+  console.log(`\n${'='.repeat(72)}`);
+}
+
+main().catch((err) => {
+  console.error(`❌ Katabatic check failed: ${err.message}`);
+  process.exit(1);
+});

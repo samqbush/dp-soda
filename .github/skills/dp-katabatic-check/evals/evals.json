@@ -1,0 +1,43 @@
+{
+  "skill_name": "dp-katabatic-check",
+  "evals": [
+    {
+      "id": 0,
+      "name": "soda-go-no-go-with-threshold",
+      "prompt": "Can you check the dp soda meter and tell me if this is lining up for a katabatic wind event? I'm about to head to the lake and need it to stay over 15 mph for my session in the next hour.",
+      "expected_output": "Runs the bundled katabatic-check script against DP Soda Lakes with threshold 15, leads with a clear go/no-go verdict, shows recent readings, reasons about direction lock / build shape / neighbor contrast / sunrise, and assesses the specific session window. Must not fabricate readings.",
+      "files": [],
+      "assertions": [
+        "Reports actual wind speed numbers pulled from the live Ecowitt meter (not invented or forecast values)",
+        "States a clear go / no-go verdict rather than hedging without a recommendation",
+        "Discusses wind direction as part of the katabatic reasoning, not just speed",
+        "References the user's 15 mph threshold explicitly in the assessment",
+        "Cross-checks or mentions at least one other station, or sunrise timing, as supporting context"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "casual-should-i-go",
+      "prompt": "morning - is it worth driving out to soda right now or am i gonna get skunked",
+      "expected_output": "Recognizes this as a katabatic/conditions check despite casual phrasing and no explicit threshold. Pulls live meter data, gives a direct answer about whether to drive out.",
+      "files": [],
+      "assertions": [
+        "Pulls live meter data rather than answering from general weather knowledge",
+        "Gives a direct recommendation about whether the drive is worth it",
+        "Response is concise and leads with the answer rather than preamble"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "alternate-station-standley",
+      "prompt": "what's standley west looking like this morning? thinking about a session there instead of soda, I need at least 12 mph",
+      "expected_output": "Runs the check against DP Standley West (not Soda) with threshold 12, and gives a verdict for that station.",
+      "files": [],
+      "assertions": [
+        "Queries the DP Standley West station specifically rather than defaulting to Soda Lakes",
+        "Uses or references the user's 12 mph threshold rather than a default 15",
+        "Gives a verdict specific to Standley West"
+      ]
+    }
+  ]
+}
