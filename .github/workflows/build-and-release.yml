@@ -1,75 +1,26 @@
 name: Build Dawn Patrol Alarm - Combined Release
 
-# Documentation-only changes skip this workflow entirely. This is a correctness
-# fix as much as a cost saving: `create-release` runs `gh release create
-# "v$APP_VERSION"`, and a docs-only merge leaves the version unchanged, so the
-# job would fail on a duplicate tag after burning a macOS and an Android build.
+# Which changes are worth a build is decided by the `classify` job below, not by
+# `paths-ignore` on the triggers.
 #
-# The paths-ignore list below must stay in sync with the no-release allowlist in
-# .husky/pre-commit. The glob dialects differ: POSIX `case` treats `*` as
-# matching `/`, while GitHub Actions requires an explicit `**` for nested paths,
-# hence the doubled entries here.
+# That distinction is load-bearing. `main` is governed by a ruleset requiring the
+# `ios-build` and `android-build` checks, and GitHub reports a workflow skipped by
+# path filtering as *pending forever* — such a pull request can never merge. A job
+# skipped by an `if:` condition instead reports as successful and satisfies the
+# required check. So the workflow must always start, then decide internally.
 #
-# Note the two lists answer the same question — "can this change alter the
-# shipped app?" — which is why they must agree. The version-bump check exists
-# only because `create-release` tags from the app version; if a change cannot
-# trigger a release, requiring a version bump for it is pure friction.
-# `scripts/**` is deliberately NOT excluded wholesale: increment-version.mjs and
-# test-version-increment.mjs live there and are release-critical.
+# What it decides: `create-release` runs `gh release create "v$APP_VERSION"`, and a
+# change that leaves the version untouched would fail on a duplicate tag after
+# burning a macOS and an Android build. The weekly data commits from
+# katabatic-archive.yml are exactly that case.
 #
-# Caveat: if required status checks or a merge queue are added to `main`, a
-# workflow skipped by paths-ignore reports as pending and will block merges. The
-# remedy then is to drop paths-ignore in favour of an always-running classifier
-# job plus per-job `if:` conditions (and a `merge_group` trigger).
+# The rules live in scripts/classify-changes.mjs, shared with .husky/pre-commit so
+# there is one implementation rather than two lists in two glob dialects.
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'LICENSE'
-      - 'docs/*.md'
-      - 'docs/**/*.md'
-      - '.github/copilot-instructions.md'
-      - '.github/skills/*.md'
-      - '.github/skills/**/*.md'
-      # Katabatic wind research. None of this is compiled into the app — see the
-      # "Katabatic research pipeline" section of docs/developer-setup.md. The
-      # archive is also written to `main` weekly by katabatic-archive.yml, so
-      # without these entries every automated data commit would kick off a full
-      # macOS + Android build and then fail in `create-release` on a duplicate
-      # tag, because a data commit never changes the app version.
-      - 'research/**'
-      - 'data/ecowitt-archive/**'
-      - 'scripts/lib/**'
-      - 'scripts/archive-ecowitt.mjs'
-      - 'scripts/backtest-katabatic.mjs'
-      - 'scripts/score-backtest.mjs'
-      - 'scripts/katabatic-refresh.mjs'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'LICENSE'
-      - 'docs/*.md'
-      - 'docs/**/*.md'
-      - '.github/copilot-instructions.md'
-      - '.github/skills/*.md'
-      - '.github/skills/**/*.md'
-      # Katabatic wind research. None of this is compiled into the app — see the
-      # "Katabatic research pipeline" section of docs/developer-setup.md. The
-      # archive is also written to `main` weekly by katabatic-archive.yml, so
-      # without these entries every automated data commit would kick off a full
-      # macOS + Android build and then fail in `create-release` on a duplicate
-      # tag, because a data commit never changes the app version.
-      - 'research/**'
-      - 'data/ecowitt-archive/**'
-      - 'scripts/lib/**'
-      - 'scripts/archive-ecowitt.mjs'
-      - 'scripts/backtest-katabatic.mjs'
-      - 'scripts/score-backtest.mjs'
-      - 'scripts/katabatic-refresh.mjs'
   workflow_dispatch:
 
 permissions:
@@ -77,8 +28,59 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Always runs, so the required ios-build / android-build checks always reach a
+  # definitive state. Everything downstream hangs off its `app_changed` output.
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      app_changed: ${{ steps.filter.outputs.app_changed }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history: the diff below reaches back to the base/before commit.
+          fetch-depth: 0
+
+      - name: 🔍 Decide whether this change can alter the shipped app
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          # A manual run is an explicit request to build, whatever changed.
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "Manual run — building."
+            echo "app_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$EVENT" = "pull_request" ]; then
+            # Three dots: changes introduced by the branch, ignoring commits that
+            # merely landed on main since it was cut.
+            RANGE="$BASE_SHA...HEAD"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            # New branch or force push — no usable baseline, so build to be safe.
+            echo "No before-SHA — building to be safe."
+            echo "app_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            RANGE="$BEFORE..HEAD"
+          fi
+
+          echo "Diff range: $RANGE"
+          git diff --name-only --no-renames "$RANGE" | tee /tmp/changed.txt
+
+          RESULT=$(node scripts/classify-changes.mjs < /tmp/changed.txt)
+          echo "$RESULT"
+          echo "$RESULT" | grep '^app_changed=' >> "$GITHUB_OUTPUT"
+
   # Lint and Test Job (runs once, shared by both platform builds)
   lint-and-test:
+    needs: classify
+    if: needs.classify.outputs.app_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 📦 Checkout repository
@@ -142,7 +144,8 @@ jobs:
 
   # iOS Build Job
   ios-build:
-    needs: lint-and-test
+    needs: [classify, lint-and-test]
+    if: needs.classify.outputs.app_changed == 'true'
     runs-on: macos-latest
     outputs:
       app-version: ${{ steps.get_version.outputs.version }}
@@ -333,7 +336,8 @@ jobs:
 
   # Android Build Job
   android-build:
-    needs: lint-and-test
+    needs: [classify, lint-and-test]
+    if: needs.classify.outputs.app_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
       app-version: ${{ steps.get_version.outputs.version }}
@@ -580,8 +584,8 @@ jobs:
 
   # Unified Release Job (only on push to main)
   create-release:
-    if: github.event_name == 'push'
-    needs: [ios-build, android-build]
+    if: github.event_name == 'push' && needs.classify.outputs.app_changed == 'true'
+    needs: [classify, ios-build, android-build]
     runs-on: ubuntu-latest
     steps:
       - name: 📦 Checkout repository
@@ -619,8 +623,8 @@ jobs:
           # Pull the newest CHANGELOG entry into the release body, so it's obvious what's in a
           # build before downloading it to test.
           #
-          # Note: CHANGELOG.md is in this workflow's paths-ignore list, so a changelog-only
-          # commit never triggers a build. The entry must land in the SAME merge as the code it
+          # Note: a changelog-only commit is classified as no-release, so it never
+          # triggers a build. The entry must land in the SAME merge as the code it
           # describes, or this body will lag one version behind.
           if node scripts/check-release-notes.mjs --print-entry > changelog_entry.md; then
             echo "✅ Included newest CHANGELOG entry in the release body"
@@ -720,7 +724,7 @@ jobs:
   # Upload artifacts for workflow_dispatch runs
   upload-artifacts:
     if: github.event_name == 'workflow_dispatch'
-    needs: [ios-build, android-build]
+    needs: [classify, ios-build, android-build]
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Download iOS IPA
