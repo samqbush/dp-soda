@@ -436,6 +436,23 @@ Caveats that stand: winter rideability is a wind measurement only. Lake ice, a s
 watercraft season, and plain cold are independent blockers this data cannot see. And the +57 min
 decay figure remains June–July-derived; the shoulder months may behave differently.
 
+**The biggest caveat, stated plainly: every month above has exactly ONE year behind it.**
+
+| Month | Year(s) contributing usable days |
+|---|---|
+| Mar, Apr, May | 2026 only |
+| Jun, Jul | 2026 only (2025 lost to 240-min downsampling, §4.3a) |
+| Aug, Sep, Oct, Nov, Dec | 2025 only |
+| Jan | 2026 only, and just 5 days (§4.2 shutdown) |
+| Feb | none |
+
+The station was created 2025-06-09, so no month has yet been observed twice. **These rates are
+one-year samples, not climatology.** A single unusual September or a single quiet June moves its
+number a long way. The rank ordering is a strong hint — Sep/Mar/Oct on top, June at the bottom,
+consistent with the sunrise-versus-gate mechanism in §4.5 — but treat any individual percentage
+as ±10 points until a second year lands. The archiver running daily is what fixes this; by
+late 2026 the autumn months will have two years and can be compared directly.
+
 ### 4.6 Base rate: most mornings are not worth it
 
 Of 30 recent mornings with complete data, only **4 (~13%)** had a 6–7am mean at or above

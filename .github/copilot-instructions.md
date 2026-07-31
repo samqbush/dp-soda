@@ -1,7 +1,7 @@
 # GitHub Copilot Custom Instructions
 
 ## Agent Guidelines
-- Be concise in your output.
+- Be clear and concise in your responses. Avoid unnecessary jargon or overly complex explanations. Aim for clarity and simplicity.
 
 ## Development Guidelines
 - Never use mock data. In runtime application code, if required external data cannot be retrieved, show the user a clear error message and avoid displaying fabricated data. In developer scripts or tests, fail clearly with an actionable error.
