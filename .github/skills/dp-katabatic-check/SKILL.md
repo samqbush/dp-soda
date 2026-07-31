@@ -54,7 +54,7 @@ Useful flags:
 - `--since 20:00` — pull further back, e.g. to see the full overnight build
 - `--log` — append this call to `research/prediction-log.csv`. Worth doing on any morning you
   make a real call: it is what keeps the validation dataset honest. The outcome columns are left
-  blank and filled automatically later by the daily archive workflow — never fill them yourself.
+  blank and filled in later by the `dp-katabatic-archive` refresh — never fill them yourself.
 - `--note "..."` — optional free text for the one thing the meter cannot see: whether it was
   *actually* rideable (chop, ice, launch-relative direction). Use it only when the user tells
   you how it went. Never invent one.

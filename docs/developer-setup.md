@@ -550,7 +550,7 @@ gh run watch --repo samqbush/dp-soda
 ## Katabatic research pipeline
 
 Supports the wind-prediction research in `research/katabatic-prediction.md`. **Not part of the
-shipped app** — these are standalone Node scripts plus a scheduled workflow.
+shipped app** — these are standalone Node scripts, run locally on demand.
 
 ### Scripts
 
@@ -559,6 +559,7 @@ shipped app** — these are standalone Node scripts plus a scheduled workflow.
 | `scripts/archive-ecowitt.mjs` | Archives meter history to `data/ecowitt-archive/<station>/<YYYY-MM>/<YYYY-MM-DD>.json`. Idempotent. |
 | `scripts/backtest-katabatic.mjs` | Replays the deterministic call rule over every archived morning → `research/prediction-log.csv` |
 | `scripts/score-backtest.mjs` | Scores the rule against baselines (missed sessions vs. false alarms) |
+| `scripts/katabatic-refresh.mjs` | **Start here.** Runs all three above in order, plus staleness check and a what-changed diff |
 
 Shared logic lives in `scripts/lib/` (`ecowitt`, `label`, `call-rule`, `season`, `sunrise`,
 `prediction-log`). `call-rule.mjs` is imported by both the backtest and the live skill so the
@@ -573,10 +574,20 @@ npx jest __tests__/utils/katabaticBacktest.test.js        # 24 tests
 
 Requires `ECOWITT_APPLICATION_KEY` and `ECOWITT_API_KEY` in `.env` (same keys the app uses).
 
-### Automation
+### Weekly refresh
 
-`.github/workflows/katabatic-archive.yml` runs daily at 14:00 UTC, archives a trailing 7-day
-window, re-scores, and commits. It reuses the **existing** repo secrets — no new setup.
+One command does status, fetch, re-label, re-score, and a diff of what changed:
+
+```bash
+node scripts/katabatic-refresh.mjs          # the weekly ritual
+node scripts/katabatic-refresh.mjs --check  # status only, fetches nothing
+```
+
+Driven by the `dp-katabatic-archive` skill. **Deliberately not a CI job** — this is local
+research on an unpushed branch, so nothing auto-commits or pushes.
+
+Weekly is not arbitrary. Ecowitt serves 5-minute history for only ~90 days, so falling further
+behind than that permanently degrades the resolution of those days (see below).
 
 ### Gotchas worth knowing before you touch these
 

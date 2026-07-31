@@ -143,7 +143,7 @@ stands, for exactly the reasons given there. Automating *scoring* is not automat
       Carries the call-time features, the verdict, and the auto-derived outcome.
 - [x] ~~Decide where it lives~~ → `research/prediction-log.csv`, committed.
 - [x] ~~Have the skill emit a copy-pasteable log line~~ → superseded by something better: the
-      `--log` flag appends the row directly, and the daily workflow fills the outcome.
+      `--log` flag appends the row directly, and the weekly refresh fills the outcome.
 - [x] ~~Record outcomes even on mornings the call was "don't bother"~~ → now automatic, and this
       turned out to be the single biggest win. These rows were called *"the most valuable in the
       dataset"* because they are the only way to detect false negatives, yet they were precisely

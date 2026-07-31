@@ -58,7 +58,7 @@ function parseArgs(argv) {
     if (argv[i] === '--since' && next) args.since = next;
     // Appends this morning's call to research/prediction-log.csv in exactly the shape the
     // backtest writes, so live calls and replayed ones stay directly comparable. The outcome
-    // columns are left blank on purpose — the daily workflow fills them from the meter later.
+    // columns are left blank on purpose — the weekly refresh fills them from the meter later.
     if (argv[i] === '--log') args.log = true;
     // The one thing the meter genuinely cannot see: whether it was actually rideable (chop,
     // ice, launch-relative direction). Always optional; nothing in the pipeline blocks on it.
@@ -376,7 +376,7 @@ async function main() {
    * Same CSV shape the backtest emits, so a live morning and a replayed one are directly
    * comparable. Outcome columns (label, sustained_minutes, ...) are deliberately left blank:
    * at call time the morning has not happened yet, and guessing them would be fabricating the
-   * very ground truth the log exists to provide. The daily workflow fills them from the meter.
+   * very ground truth the log exists to provide. The weekly refresh fills them from the meter.
    */
   if (args.log) {
     const gate = gateOpenTime(now);
@@ -411,7 +411,7 @@ async function main() {
     const logPath = join(REPO_ROOT, 'research', 'prediction-log.csv');
     if (!existsSync(logPath)) writeFileSync(logPath, csvHeader() + '\n');
     appendFileSync(logPath, toCsvRow(row) + '\n');
-    console.log(`\n📝 Logged to research/prediction-log.csv (outcome auto-filled later by the daily workflow)`);
+    console.log(`\n📝 Logged to research/prediction-log.csv (outcome filled in by the next archive refresh)`);
   }
 }
 
