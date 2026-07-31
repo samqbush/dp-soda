@@ -129,9 +129,34 @@ how to spend their time.
 
 Lead with the verdict. They may only read the first line.
 
+### Know the limit of what you are doing — measured, not guessed
+
+A backtest over 311 archived mornings (`research/katabatic-prediction.md` §7.1) measured how
+often these signals miss a genuinely rideable morning, bucketed by how far ahead of gate-open
+the call is made:
+
+| Lead time from now to gate open | Missed rideable mornings |
+|---|---|
+| Gate already open | **0%** (n=37) |
+| 0–60 min ahead | 28% (n=36) |
+| 90+ min ahead | **50%** (n=18) |
+
+**This is a strong measurement and a weak forecast.** Reading a window you can already see is
+reliable; projecting 90 minutes forward is a coin flip. Let that govern how the call is worded:
+
+- **Gate open, or under ~60 min out** → make a real call. It is well supported.
+- **90+ minutes before gate open** (mostly Nov–Feb, 8:00 gate) → **do not talk them out of
+  going.** Say plainly it is too early to tell, give the current readings, and recommend
+  re-checking near gate-open. Half the sessions suppressed at that range are real ones, and per
+  §2 a missed session costs the whole morning while a wasted look costs five minutes.
+
+Never present a long-lead call with the same confidence as a short-lead one. Overstating
+certainty here is the single most costly failure mode this skill has.
+
 Structure that works well:
 
-1. **Verdict up front** — go / don't go / go now and hurry, in plain language.
+1. **Verdict up front** — go / don't go / go now and hurry / too early to tell, in plain
+   language.
 2. **Current numbers** — a small table of the most recent readings (time, avg, gust, direction).
    Concrete numbers let them sanity-check you.
 3. **Why you think it's real (or not)** — walk the signals that support the call. This is where
@@ -163,6 +188,10 @@ the direction swung to SSE. The window call was right and the caveat was warrant
 noting that hedging on a marginal threshold is not weakness, it's accuracy.
 
 ## Notes on the data source
+
+> Maintainer note (not needed to make a call): the gate-hours table, the sunrise+57min window
+> close, and the winter-shutdown dates below are **mirrored from `research/katabatic-prediction.md`**,
+> which owns them. Change them there too, or the two will drift.
 
 Wind readings come from Ecowitt via `services/ecowittService.ts`, which the app also uses. One
 sharp edge worth knowing if you ever write your own query: the Ecowitt API silently ignores

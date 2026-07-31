@@ -547,6 +547,53 @@ gh run watch --repo samqbush/dp-soda
 
 ---
 
+## Katabatic research pipeline
+
+Supports the wind-prediction research in `research/katabatic-prediction.md`. **Not part of the
+shipped app** — these are standalone Node scripts plus a scheduled workflow.
+
+### Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/archive-ecowitt.mjs` | Archives meter history to `data/ecowitt-archive/<station>/<YYYY-MM>/<YYYY-MM-DD>.json`. Idempotent. |
+| `scripts/backtest-katabatic.mjs` | Replays the deterministic call rule over every archived morning → `research/prediction-log.csv` |
+| `scripts/score-backtest.mjs` | Scores the rule against baselines (missed sessions vs. false alarms) |
+
+Shared logic lives in `scripts/lib/` (`ecowitt`, `label`, `call-rule`, `season`, `sunrise`,
+`prediction-log`). `call-rule.mjs` is imported by both the backtest and the live skill so the
+two can never drift apart.
+
+```bash
+node scripts/archive-ecowitt.mjs --days 7 --delay 1200   # incremental
+node scripts/backtest-katabatic.mjs --out research/prediction-log.csv
+node scripts/score-backtest.mjs --call-time 06:30
+npx jest __tests__/utils/katabaticBacktest.test.js        # 24 tests
+```
+
+Requires `ECOWITT_APPLICATION_KEY` and `ECOWITT_API_KEY` in `.env` (same keys the app uses).
+
+### Automation
+
+`.github/workflows/katabatic-archive.yml` runs daily at 14:00 UTC, archives a trailing 7-day
+window, re-scores, and commits. It reuses the **existing** repo secrets — no new setup.
+
+### Gotchas worth knowing before you touch these
+
+- **Rate limit.** Ecowitt caps request *rate*, and reports it as `code != 0` in a **200**
+  response, not an HTTP 429. Naively parsed, a rate-limited day looks like a station that
+  reported nothing — which would be archived as calm. Keep `--delay` at ~1200 ms. Rate-limited
+  days are deliberately not written, so a re-run picks them up.
+- **Resolution decay.** History older than ~12 months comes back at `240min` (4-hour) rows,
+  which cannot resolve the 30-minute sustained-wind label. `labelDay()` returns `null` for
+  those. This is why the archive must be kept current — the fine-grained data expires.
+- **Winter shutdown.** The meter is offline roughly Jan 6 – Feb 28. Those days are recorded as
+  `unobserved`, never as calm, and the workflow must exit cleanly (not fail) throughout, or 54
+  consecutive failure emails will get it muted.
+- **Never fabricate data.** A missing day is missing. Do not backfill zeros.
+
+---
+
 ## Ecowitt Sensor Troubleshooting
 
 The app uses real weather data from Ecowitt weather stations at Standley Lake and Soda Lake.

@@ -1,12 +1,12 @@
 module.exports = {
   preset: "react-native",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
-  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "mjs", "json", "node"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
   },
   transform: {
-    "^.+\\.(js|jsx|ts|tsx)$": ["babel-jest", { presets: ["babel-preset-expo"] }],
+    "^.+\\.(js|jsx|ts|tsx|mjs)$": ["babel-jest", { presets: ["babel-preset-expo"] }],
   },
   testMatch: [
     "**/__tests__/**/*.(test|spec).(ts|tsx|js)",

@@ -1,8 +1,30 @@
 # Morning Katabatic Prediction — Research Plan (Soda Lakes)
 
-**Status:** Research plan. Nothing here is built yet.
+**Status:** Research plan. Almost nothing here is built — the exceptions are marked 🔗 SHIPPED.
 **Scope:** Soda Lakes, morning drainage-wind events only. Afternoon/thermal wind is a
 different physical problem and is tracked separately in the `wind-guru` project.
+
+### 🔗 SHIPPED markers — read this before editing a marked number
+
+A few findings have graduated out of research and are now **operating knowledge duplicated in
+`.github/skills/dp-katabatic-check/SKILL.md`** (and in one case its bundled script). They are
+tagged 🔗 SHIPPED at the section that owns them.
+
+**This document remains the source of truth. If you revise a 🔗 SHIPPED number here, you must
+update SKILL.md in the same change, or the morning call will silently run on a stale value.**
+
+Currently mirrored:
+
+| Finding | Owned by | Mirrored in |
+|---|---|---|
+| Bear Creek gate-hours table | §4.5 | SKILL.md → Step 3, "is the park even open?" |
+| Session ends median sunrise **+57 min** (n=14, 25th +3 / 75th +85) | §4.5 | SKILL.md → Step 3, "when does the wind end?" |
+| Winter shutdown, dark 2026-01-06 → 2026-02-28, annual | §4.2 | SKILL.md → Notes; also detected by `scripts/katabatic-check.mjs` |
+| Meter sits on the NW point of Big Soda | §4.2 | SKILL.md → Notes |
+| `DECAYING` threshold **±3.0 mph** | §5 / A.3 | `scripts/katabatic-check.mjs` |
+
+The reverse direction is deliberate and should stay that way: the skill carries **conclusions
+only**, never derivations. Appendix A is not mirrored and should not be — see its scope note.
 
 ---
 
@@ -63,6 +85,10 @@ evidence of skill. It is n=1.
 
 ### 3.1 The loop is the validation harness
 
+> ⚠️ **SUPERSEDED 2026-07-31 — this section's central claim was wrong.** Read §3.4 before acting
+> on anything below. The manual loop is *not* the only source of labels, and treating it as such
+> would have cost a month of waiting for data that already existed.
+
 The existing manual workflow is not a limitation to engineer away — it is the **only source
 of labeled prediction/outcome pairs this project has ever had**:
 
@@ -74,20 +100,64 @@ of labeled prediction/outcome pairs this project has ever had**:
 Step 3 is the irreplaceable part. Automating steps 1–2 away would destroy the data source
 that any future automation would need in order to be trustworthy.
 
+### 3.4 Correction — the outcome is machine-observable
+
+**The label is computable from meter history, so outcomes do not need a human at all.**
+
+This was forced by a constraint the earlier drafts never accounted for: the user travels for
+work and this is a side hobby project. He will not hand-maintain a dataset, and any design that
+requires it is dead on arrival. Asked directly, he was unambiguous:
+
+> *"I am not going to manually verify every day for 30 days… I am not going to manually add data
+> all the time."*
+
+That constraint turned out to be liberating rather than limiting:
+
+1. **Outcomes auto-fill.** "Did it sustain ≥15 mph for ≥30 continuous minutes after gate-open"
+   is a pure function of archived readings. §5 already conceded Tier 1 *"needs only historical
+   meter data"* — the same is true of the label itself.
+2. **§3.3's 30-morning gate is satisfiable today.** ~420 station-days of Soda history already
+   exist. We replay them (§7.1) instead of waiting a month for 30 new ones.
+3. **The prediction log is no longer time-sensitive.** The claim that it "accumulates only in
+   real time — it cannot be backfilled" (§9 item 2) is false for every machine-derived column.
+
+**What genuinely cannot be auto-derived** is the nuance the meter cannot see: whether it was
+*actually* rideable — chop, launch-relative direction, lake ice, gear mismatch. The dawn patrol
+group chat was considered as a proxy and rejected by the user as too noisy to be worth wiring
+up. So this stays an *optional, opportunistic* note (`human_note` in the log) and **nothing in
+the pipeline may block on it.**
+
+**What this does NOT change:** the rejection of an automated alarm at the top of §3 still
+stands, for exactly the reasons given there. Automating *scoring* is not automating the
+*decision*. The human still makes the call.
+
+
 ### 3.2 Prediction log
 
+> 🔗 **SHIPPED** — schema in `scripts/lib/prediction-log.mjs`, written to
+> `research/prediction-log.csv` by `scripts/backtest-katabatic.mjs`. Populated by machine, not
+> by hand (§3.4).
+
 **Research tasks:**
-- [ ] Define a prediction log format. Minimum fields: date, time of call, meter state at call
-      time (avg/gust/direction/consistency), the call made, confidence, the threshold in use,
-      and **actual observed outcome** including whether the session was usable and for how long
-- [ ] Decide where it lives — a flat file in `research/` is fine to start; it needs to be
-      trivial to append to at 5:30am or it will not get filled in
-- [ ] Have the skill emit its call in a copy-pasteable log line to reduce friction
-- [ ] Record outcomes even on mornings the call was "don't bother" but the trip happened
-      anyway — **these are the most valuable rows in the dataset**, because they are the only
-      way to detect false negatives
+- [x] ~~Define a prediction log format~~ → `LOG_COLUMNS` in `scripts/lib/prediction-log.mjs`.
+      Carries the call-time features, the verdict, and the auto-derived outcome.
+- [x] ~~Decide where it lives~~ → `research/prediction-log.csv`, committed.
+- [x] ~~Have the skill emit a copy-pasteable log line~~ → superseded by something better: the
+      `--log` flag appends the row directly, and the daily workflow fills the outcome.
+- [x] ~~Record outcomes even on mornings the call was "don't bother"~~ → now automatic, and this
+      turned out to be the single biggest win. These rows were called *"the most valuable in the
+      dataset"* because they are the only way to detect false negatives, yet they were precisely
+      the ones a human would never remember to record. The machine records every morning
+      regardless of what the call was.
+
+One field could not be automated: `human_note`, for whether it was *actually* rideable. It is
+optional and nothing depends on it (§3.4).
 
 ### 3.3 Exit criteria
+
+> ⚠️ **The 30-morning wait no longer applies** — see §3.4. These questions are answerable now,
+> from ~420 archived station-days, and §7.1 answers them. The criteria themselves are unchanged
+> and still the right ones; only the assumption that they required a month of waiting was wrong.
 
 Only after roughly **30+ logged mornings** does it become possible to ask:
 
@@ -141,6 +211,10 @@ to store), but this is not a reason to rush.
 
 ### 4.2 The winter gap is a deliberate seasonal shutdown, not an outage
 
+> 🔗 **SHIPPED** — the dark-window dates and the meter's physical placement are mirrored in
+> `SKILL.md` ("Notes on the data source") and the dark-window detection lives in
+> `scripts/katabatic-check.mjs`. Revise them together.
+
 Monthly probe of the 15th, points/day:
 
 ```
@@ -193,12 +267,50 @@ existing history** — it does not need a season of new data collection.
 
 - [ ] Test the November hypothesis against Nov–Dec 2025 data. Cheapest open item on this list.
 
-### 4.3 Response size is capped
+### 4.3 Response size is capped — and so is the call rate
 
 A 7-day request at `5min` returned 336 points, not 2016. A 31-day request at `30min`
 returned 180, not 1488. Archive pulls must be **chunked per-day** and rate-limited.
 
 `cycle_type` accepts `5min` / `30min` / `auto`; `240min` errors with 40015.
+
+> 🔗 **SHIPPED** — both caps are handled in `scripts/archive-ecowitt.mjs`.
+
+**There is also an undocumented call-rate cap** (discovered 2026-07-31, during the first full
+backfill). At ~3 requests/second the API began returning:
+
+```
+The number of interface accesses reached the upper limit
+```
+
+Two things make this more dangerous than it looks:
+
+1. **It arrives as `code != 0` in a 200 response, not an HTTP 429.** A naive client reads the
+   body, finds no wind data, and concludes the station reported nothing — which would then be
+   archived as absence. Given §4.2, that is the exact failure this project must never make.
+   `isRateLimitMessage()` in `scripts/lib/ecowitt.mjs` separates the two, and rate-limited days
+   are **not written to the archive at all** so a later re-run retries them.
+2. **Retrying with exponential backoff does not help** — a rate cap needs a real cooldown, and
+   burning three fast retries against it just deepens the hole. The archiver waits ~65s, and if
+   still capped it stops cleanly; the archive is idempotent so a re-run resumes.
+
+Practical rate: **~1.2s between requests** completed a ~420-day station backfill without
+tripping the cap.
+
+### 4.3a Boulder Res has almost no history
+
+Device creation times, read from `device/list` on 2026-07-31:
+
+| Station | Created | Usable history |
+|---|---|---|
+| DP Standley West | 2025-05-19 | ~14 months |
+| DP Soda Lakes | 2025-06-09 | ~14 months |
+| **DP Boulder Res** | **2026-07-14** | **~2 weeks** |
+
+This materially weakens the station-correlation question in §8 — with a fortnight of overlap,
+Boulder Res cannot support any seasonal claim, and the neighbour-contrast signal in `SKILL.md`
+effectively rests on Standley West alone for anything before July 2026. Any correlation result
+involving Boulder Res should be reported with its `n` attached and treated as provisional.
 
 ### 4.4 Archiving is worth doing, but it is not an emergency
 
@@ -217,6 +329,11 @@ Two things remain true and justify doing it soon anyway, just without panic:
       Store whatever resolution the API returns; do not treat 30-minute rows as inferior.
 
 ### 4.5 Park access is a hard constraint — and it defines the season
+
+> 🔗 **SHIPPED** — the gate-hours table and the "+57 min after sunrise" session close are
+> mirrored in `SKILL.md` (Step 3). Both are load-bearing for the live go/no-go call; revise
+> them together. The seasonal-window table below and the shoulder-season hypotheses are
+> **not** shipped and should stay research until logged mornings test them.
 
 Verified against the City of Lakewood site (`lakewoodco.gov/Parks-Rec/Bear-Creek-Lake-Park`,
 retrieved 2026-07-31 — note the site 403s automated fetchers, so it needs a real browser):
@@ -304,6 +421,10 @@ and for measuring skill on positives (recall) rather than overall accuracy.
 ---
 
 ## 5. Tier 1 — Q2, "will it hold?"
+
+> 🔗 **SHIPPED (partially)** — the **±3.0 mph `DECAYING` threshold** is live in
+> `scripts/katabatic-check.mjs`, and "direction rotation is not by itself decay" is stated in
+> `SKILL.md` (Step 2, "Direction lock"). Everything else in this section is still open.
 
 The old heuristic was "katabatic typically persists 45–90 minutes past sunrise." That has now
 been **replaced by a measurement** (§4.5): across 14 rideable mornings the sustained window
@@ -402,8 +523,20 @@ The previous attempt most likely failed not because predictions were wrong, but 
 
 **Non-negotiable rules:**
 
-1. **Define one binary label.** Proposal: did Soda sustain ≥15 mph for ≥30 continuous minutes
-   between 05:00 and 08:00? Write it down and do not change it midway.
+1. **Define one binary label.** ~~Proposal: did Soda sustain ≥15 mph for ≥30 continuous minutes
+   between 05:00 and 08:00?~~ **Amended before use** — the fixed label is: *did Soda sustain
+   ≥15 mph for ≥30 continuous minutes, entirely after that month's gate-open time (§4.5) and
+   within sunrise+3h?* Two corrections to the original proposal, both load-bearing:
+   - **Gate at the front.** A fixed 05:00–08:00 window counts mornings the user physically
+     could not reach — Nov–Feb the gate does not open until 08:00. 78 archived mornings blew
+     well *before* the gate opened; scoring those as wins would flatter every downstream number.
+   - **sunrise+3h at the back.** Without a back edge the scan runs into the afternoon thermal,
+     a different physical phenomenon (tracked in the separate `wind-guru` project). This was
+     not theoretical: the first implementation reported a 46.4% base rate against §4.6's
+     documented ~13–20%, entirely from afternoon contamination.
+
+   Implemented once in `scripts/lib/label.mjs` and imported everywhere, so it cannot drift.
+   Unobserved days return `null`, never `false` (§4.2).
 2. **Establish the base rate first.** If good mornings are 40% of days, a 70%-accurate model
    is barely better than guessing. Compute this before any modelling.
 3. **Beat two dumb baselines or ship nothing:**
@@ -414,6 +547,99 @@ The previous attempt most likely failed not because predictions were wrong, but 
    false-alarm rate. Accuracy alone hides the failure that actually matters.
 6. **Be willing to conclude it does not work.** A documented "does not beat persistence" is a
    successful outcome of this research and prevents a third attempt at the same dead end.
+
+---
+
+## 7.1 RESULT — the backtest, and what it says we are actually predicting
+
+> 🔗 **SHIPPED** — `scripts/backtest-katabatic.mjs` (replay) and `scripts/score-backtest.mjs`
+> (scoring). Run date 2026-07-31. Reproduce with:
+> `node scripts/backtest-katabatic.mjs && node scripts/score-backtest.mjs --call-time 06:30`
+
+This section exists because of a direct challenge from the user, and it deserves to be recorded
+verbatim because it turned out to be correct:
+
+> *"I'm honestly not sure what we should do with this. I mean what are we actually predicting?
+> It seems to me you are just checking the dp-soda meter and looking at consistency, which is
+> what I am waking up and doing."*
+
+**He was right.** The measured answer is below.
+
+### Method
+
+The `SKILL.md` go/no-go logic was transcribed into a deterministic function
+(`scripts/lib/call-rule.mjs`) — **a transcription, not a fit**. No weight was tuned against the
+archive, so this first backtest is genuinely out-of-sample. It was replayed over 311 archived
+mornings at nine call times (05:00–07:00), scored against the gate-conditioned label (§7 rule 1,
+as amended), using **only readings available at the call time**. Leakage would make the rule look
+better than reality, so the barrier is a single function guarded by four explicit tests.
+
+### Headline (call time 06:30, n=307, base rate 29.6%)
+
+| Strategy | Missed sessions | False alarms | Precision |
+|---|---|---|---|
+| always go | **0.0%** | 100.0% | 29.6% |
+| never go | 100.0% | **0.0%** | n/a |
+| persistence (same as yesterday) | 56.8% | 24.3% | 42.2% |
+| **call rule v1** | **20.9%** | **29.2%** | **53.3%** |
+
+Against persistence the rule is dramatically better on the axis §2 says matters — 20.9% vs 56.8%
+missed — at a slightly worse false-alarm rate. Per §2's asymmetry (a miss costs a session, a
+false alarm costs a five-minute drive) the rule clearly dominates persistence in expected cost,
+even though the scorer's strict "better on both axes" test prints NO.
+
+### The finding that actually matters — skill collapses with lead time
+
+Restricting to rideable mornings and bucketing by how far ahead of the park gate the call was made:
+
+| Lead time from call to gate open | n | Missed sessions |
+|---|---|---|
+| Gate already open (call inside the window) | 37 | **0.0%** |
+| 0–60 min ahead | 36 | 27.8% |
+| 90+ min ahead | 18 | **50.0%** |
+
+Monotonic, and unambiguous:
+
+**The rule is a very good *measurement* and a poor *forecast*.** When it can observe the window
+it is judging, it misses nothing. Asked to project 90 minutes forward, it is a coin flip.
+
+That is the honest answer to *"what are we actually predicting?"* — **at present, largely
+nothing beyond what the meter already shows.** This is §1's own claim, now measured rather than
+asserted, and it confirms the user's suspicion exactly.
+
+### Same result, seen seasonally
+
+| Season | n | Rideable | Missed | False alarm |
+|---|---|---|---|---|
+| Warm (Apr–Sep) | 184 | 46 | **4.3%** | 30.4% |
+| Cool (Oct–Mar) | 123 | 45 | **37.8%** | 21.8% |
+
+This is not a different finding — it is the same one. Nov–Feb the gate opens at 08:00 (§4.5), so
+a 06:30 call is forced to forecast 90+ minutes ahead. Warm months open at 05:00–06:00, where the
+call sits inside the window. **Season is a proxy for lead time, not an independent effect.**
+
+Chinook contamination (§6.2) was checked first, per the label-poisoning concern: only 5 of 45
+cool-season positives show the >15 °F warming signature (2025-10-19, 2025-11-19, 2025-12-14,
+2026-03-07, 2026-03-12). Real, but far too few to explain 17 missed mornings. Lead time does.
+
+### What ships, and what does not
+
+Applying §7 rule 6 honestly — this is a **partial** pass, so only the part that earned it ships:
+
+- ✅ **Ship the call at zero/short lead** (gate open, or <60 min out). 0% missed at n=37.
+- ❌ **Do not ship a suppressing call at 90+ min lead.** At 50% missed it is worse than useless:
+  it would talk the user out of one session in two while sounding confident. Report *"too early
+  to tell — check again closer to gate open"* and let the meter decide.
+- ⏸️ **P(hold) (§5) is not yet justified.** It is the same 90-min-ahead extrapolation that just
+  failed. Revisit only with a signal that leads the wind rather than describing it.
+
+### What would actually add forecast skill
+
+The backtest says the ceiling on meter-only prediction has been reached — the remaining error is
+not in the rule's weights, it is in the absence of any variable that *leads* the surface wind.
+That means §5's Tier 2/3 (synoptic gradient, 700 mb flow, soil moisture) is no longer optional
+polish; it is the only route to answering Q2. Tuning `call-rule.mjs` further would be fitting
+noise on 91 positives (§4.7).
 
 ---
 
@@ -467,6 +693,14 @@ Explicitly **not** on this list: building an automated alarm. See §3 for why.
 ---
 
 ## Appendix A — Physics carried over from the `wind-guru` reference
+
+> **Scope note — deliberately not mirrored into the skill.** This appendix is the *derivation*
+> layer: it exists so the numbers elsewhere in this document can be justified and re-derived.
+> `SKILL.md` carries only the conclusions that change a morning call (±3.0 mph modulation band,
+> direction rotation ≠ decay, sunrise-driven breakdown) and should never absorb the reasoning
+> behind them — the skill is loaded while someone stands in their kitchen with gear in the car.
+> If a finding here starts changing live behaviour, promote the **one-line conclusion** and tag
+> the owning section 🔗 SHIPPED rather than copying the physics across.
 
 Condensed from `~/Code/wind-guru/docs/katabatic-winds-reference.md`, which is the fuller
 treatment (definitions, full literature table, ASCOT case-night detail). Repeated here so this
