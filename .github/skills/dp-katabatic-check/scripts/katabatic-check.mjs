@@ -239,7 +239,23 @@ async function main() {
   console.log('='.repeat(72));
 
   if (!points.length) {
-    console.log('\n❌ NO DATA returned for today. Station is likely offline — do not guess at conditions.');
+    // The Soda meter runs on the ski shop's wifi, which is switched off for the winter
+    // once Little Soda freezes. Observed dark 2026-01-06 through 2026-02-28. This is
+    // expected and recurring, so it should not be reported as a fault — and it coincides
+    // with the months the park gate (8am) opens after the event is over anyway.
+    const m = new Date().getMonth(); // 0 = Jan
+    if (target.name.includes('Soda') && (m === 0 || m === 1)) {
+      console.log(
+        '\n❄️  NO DATA — this is the expected winter shutdown, not a fault.\n' +
+          '   The Soda meter runs on the ski shop wifi, which goes off once Little Soda\n' +
+          '   freezes (observed dark Jan 6 – Feb 28). There is no way to check conditions\n' +
+          '   remotely until it comes back, typically around the start of March.\n' +
+          '   Note the park gate is 8:00am in Nov–Feb, by which point a katabatic event is\n' +
+          '   normally over, so these mornings are usually not sessionable regardless.'
+      );
+    } else {
+      console.log('\n❌ NO DATA returned for today. Station is likely offline — do not guess at conditions.');
+    }
     process.exit(0);
   }
 

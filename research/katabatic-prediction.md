@@ -139,7 +139,7 @@ is real, but it does not change the call.
 5-minute where it is free (it is the live feed's native resolution anyway, and costs nothing
 to store), but this is not a reason to rush.
 
-### 4.2 There are real gaps
+### 4.2 The winter gap is a deliberate seasonal shutdown, not an outage
 
 Monthly probe of the 15th, points/day:
 
@@ -150,14 +150,48 @@ Monthly probe of the 15th, points/day:
 2025-07:   6   2025-06:   0   (device created 2025-06-09)
 ```
 
-Jan–Feb 2026 is missing entirely — station outage, not retention.
+Day-by-day probe across 2025-11-01 → 2026-05-10 (191 days, retried to separate genuine
+empty responses from API errors) pins the boundaries precisely:
 
-**This matters far less than it first appears.** An earlier draft of this document called it
-"the most damaging possible place to lose data" because Dec–Feb is peak katabatic season.
-That was wrong, because it ignored park access — see §4.5. The park gate does not open until
-8 a.m. in Nov–Feb, and by 8 a.m. in December and January the event is reliably over. Those
-mornings are **unrideable regardless of what the wind did**, so the missing data has little
-decision value. It would matter for physics modelling, not for "should I go."
+| Month | Days with data | Median pts/day |
+|---|---|---|
+| 2025-11 | 29 / 30 | 48 |
+| 2025-12 | 30 / 30 | 48 |
+| **2026-01** | **3 / 29** | dark from Jan 6 |
+| **2026-02** | **0 / 27** | dark all month |
+| 2026-03 | 30 / 30 | 48 |
+| 2026-04 | 28 / 28 | 48 |
+| 2026-05 | 8 / 8 | 288 |
+
+> **Dark: 2026-01-06 → 2026-02-28 (~54 days). Data resumes 2026-03-01.**
+
+**Why.** The meter sits on the northwest point of Big Soda, between Big Soda and Little Soda,
+and it uses the ski shop's wifi. The shop shuts down once Little Soda freezes over, so the
+meter goes dark for the winter. **This is deliberate, recurring, and will happen every year.**
+
+Three consequences that matter more than the gap itself:
+
+1. **It is not recoverable from anywhere.** The data was never transmitted, so there is no
+   archive, no backfill, no alternate source. Stop looking. (This closes an earlier open
+   question that assumed a station fault might be recoverable.)
+2. **Absence of data must never be read as absence of wind.** Any archiver or model has to
+   treat the winter gap as *unobserved*, not as calm. Silently averaging zeros into a winter
+   baseline would produce exactly the kind of confidently-wrong output this project must avoid.
+   The archiver must also not alert on it as a failure.
+3. **The shutdown/restart dates are a free freeze/thaw proxy.** The meter going dark is a
+   reasonable proxy for "Little Soda has frozen," and its return for the thaw. That partially
+   answers the lake-ice open question in §4.5 without any new data source.
+
+**Decision impact is small.** An earlier draft called this "the most damaging possible place
+to lose data" because Dec–Feb is peak katabatic season. That was wrong — it ignored park
+access (§4.5). The gate does not open until 8 a.m. in Nov–Feb, and by 8 a.m. in Dec/Jan the
+event is reliably over, so those mornings are unrideable regardless of what the wind did.
+
+**And crucially, November and December are fully covered** (29/30 and 30/30 days). The §4.5
+hypothesis that November may still be sessionable is therefore **testable right now from
+existing history** — it does not need a season of new data collection.
+
+- [ ] Test the November hypothesis against Nov–Dec 2025 data. Cheapest open item on this list.
 
 ### 4.3 Response size is capped
 
@@ -277,9 +311,16 @@ a rule of thumb, not a model.
 
 **Known bug to fix regardless:** `katabatic-check.mjs` flags `DECAYING` on a ±1.5 mph swing.
 Poulos et al. (2007) mountain-wave/katabatic interaction predicts **1–3 m/s (2–7 mph)
-modulation on ~1-hour timescales as expected signal, not decay.** The current threshold will
-report death during normal wave modulation. See the physics reference in the `wind-guru`
-project.
+modulation on ~1-hour timescales as expected signal, not decay** (Appendix A.3). The current
+threshold will report death during normal wave modulation. Two further consequences from the
+same physics, both of which bear directly on how the check should be written:
+
+- There is a **second, microscale variability band at O(1 minute)** from wave breaking aloft.
+  Any short-window trend computed on 5-minute data is partly sampling that band. Trend
+  detection needs a window comfortably longer than an hour, not three consecutive points.
+- A **wind-direction shift is not by itself evidence of decay.** On the Poulos case night the
+  BAO direction ran easterly → westerly at onset → N/NE by 0400 MST while the drainage was
+  still running (Appendix A.4). Direction rotation over the course of a morning is expected.
 
 **Research tasks:**
 - [ ] From the archive, extract decay-time distribution relative to sunrise across all events
@@ -298,8 +339,8 @@ The only tier that is genuinely a forecasting problem, and the only one that nee
 
 ### 6.1 Candidate predictors
 
-Derived from `wind-guru/docs/katabatic-winds-reference.md`. Which of these matter is an
-**empirical question** — the point is to test, not assume:
+Derived from `wind-guru/docs/katabatic-winds-reference.md`, summarised in Appendix A. Which
+of these matter is an **empirical question** — the point is to test, not assume:
 
 - Overnight cloud cover (radiative cooling is the driver)
 - Surface dewpoint / RH (dry air limits longwave trapping)
@@ -315,6 +356,19 @@ Pure radiative drainage is **1–4 m/s (2–9 mph)**. The 15 mph threshold is we
 meaning these sessions are **synoptically reinforced or gap-amplified events**, not pure
 drainage. Flow aloft is therefore likely a first-order predictor, not background detail —
 and it is data this repo currently has no access to at all.
+
+**But do not assume "more wind aloft → more wind at Soda."** The relationship is non-monotonic
+(Appendix A.2). Stronger flow over the Divide drives mountain waves that *weaken* the surface
+jet by deepening the katabatic layer and shrinking its temperature deficit, and at high enough
+Froude number scour the drainage off the slopes entirely. Any predictor built on 700mb wind
+speed should be allowed a **non-linear or bucketed** response rather than a single sign.
+
+**Chinook contamination is a live labelling risk.** A strong westerly downslope event is *not*
+katabatic (Appendix A.1) but will produce a 15+ mph westerly reading at Soda that the binary
+label in §7 happily counts as a positive. In the Nov–Mar window especially, some fraction of
+labelled positives may be chinook, which has entirely different predictors. Worth checking
+whether positives separate cleanly on temperature trend — katabatic events cool overnight,
+chinooks warm sharply.
 
 ### 6.3 Data sources to research
 
@@ -351,19 +405,22 @@ The previous attempt most likely failed not because predictions were wrong, but 
 
 ## 8. Open questions
 
-- [ ] Is Soda's 2-month outage recoverable from any other source? (Low priority — §4.2:
-      those months are gated out anyway.)
 - [ ] Should the archive live in-app, or as a standalone job independent of app releases?
+      It must tolerate the annual winter shutdown (§4.2) without alerting or backfilling zeros.
 - [ ] **Do the shoulder months actually work?** §4.5 predicts Sep/Oct are the best of the
       year and Nov is still viable. This contradicts the current working assumption that the
       season ends when the gate moves to 8 a.m. Cheap to test, potentially adds months.
-- [ ] Does lake ice or a separate watercraft season close Nov–Mar independently of gate hours?
+- [ ] Does lake ice close the shoulder season independently of gate hours? Partially answered
+      by §4.2 — the meter's winter shutdown tracks Little Soda freezing (dark Jan 6 – Feb 28),
+      which suggests open water through December and from about March.
 - [ ] Does the +57 min "session end vs. sunrise" figure hold outside June–July? It is measured
       from summer only, and winter inversions may behave differently.
 - [ ] After 30+ logged mornings: does the assistant's call beat "always drive out and look"?
       If not, the honest answer is that the tool is a convenience, not a predictor.
 
 Answered since first draft:
+- ~~Is the winter gap recoverable from another source?~~ → §4.2: no. It is a deliberate
+  seasonal wifi shutdown; the data was never transmitted and does not exist anywhere.
 - ~~What is the actual base rate of good mornings?~~ → §4.6: ~13% for a 6–7am session.
 - ~~Does the 90-day 5-minute window block winter modelling?~~ → §4.1: no. The 30-minute
   archive is decision-equivalent (97% agreement).

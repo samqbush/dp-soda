@@ -173,3 +173,20 @@ The bundled script uses the correct names; prefer it over ad-hoc API calls.
 
 Credentials load from the repo's `.env` (`ECOWITT_APPLICATION_KEY`, `ECOWITT_API_KEY`). If they
 are missing the script exits with a clear message — relay that rather than working around it.
+
+### Where the Soda meter physically sits
+
+It is mounted on the **northwest point of Big Soda, between Big Soda and Little Soda**. That
+placement is why the direction reading is trustworthy for this call: drainage flow arriving
+from the W–NW reaches the meter before crossing the lake, so a clean 270–330° lock there
+really is the canyon flow rather than a lake-surface artifact.
+
+### The meter goes dark every winter — by design
+
+The station runs on the **ski shop's wifi**, and the shop shuts down once Little Soda freezes.
+Observed dark **2026-01-06 → 2026-02-28**, resuming 2026-03-01, and this repeats annually.
+
+If you get no data in January or February, that is expected, not a fault. Say so plainly and
+do not substitute a forecast — there is no way to know conditions remotely until it returns.
+Never read missing data as calm conditions. The bundled script already detects this case and
+prints the seasonal explanation.
