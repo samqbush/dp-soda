@@ -26,6 +26,18 @@ rows, which are too coarse to detect a 30-minute sustained-wind event. Days not 
 are permanently degraded, and Ecowitt is the only source that ever had them. **Falling behind
 destroys data.** That is the whole reason this runs weekly.
 
+## Credentials — this will hard-fail without them
+
+The archive scripts require `ECOWITT_RESEARCH_APPLICATION_KEY` and `ECOWITT_RESEARCH_API_KEY`
+in `.env`, and **deliberately refuse to run on the app's `ECOWITT_*` keys.**
+
+Ecowitt rate-limits per account, and the app keys are compiled into the shipped mobile build. A
+single backfill is several hundred requests and has tripped that cap before — on the app's
+account it could exhaust the shared quota and break wind data on every installed user's phone.
+
+If the user hits that error, **do not work around it** by setting the app keys or editing the
+check. Tell them to add a separate Ecowitt research token to `.env`.
+
 ## The command
 
 One command does everything — status, fetch, re-label, re-score, and a summary of what changed:
@@ -90,9 +102,13 @@ lower `--delay`.
 **Never invent data.** If a fetch fails, the day stays missing. Do not fill gaps with zeros,
 averages, or estimates. The entire value of this archive is that absence is recorded honestly.
 
-**This is local research on an unpushed branch.** There is no CI job and no automatic commit.
-Do not add one, and do not push anything unless the user asks. Committing the archive is
-optional — offer it as a checkpoint, do not do it unprompted.
+**A weekly GitHub Action also does this** (`.github/workflows/katabatic-archive.yml`, Mondays
+14:00 UTC). Note that GitHub only fires scheduled workflows on the **default branch** — while
+this work sits on a feature branch the cron does not run, so the local command is the real
+mechanism until it merges. Say so if the user assumes it is running automatically.
+
+The workflow commits and pushes on its own. When running locally, do not push anything unless
+asked; offer a commit as a checkpoint rather than doing it unprompted.
 
 ## Answering questions from the archive
 

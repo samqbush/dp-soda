@@ -24,7 +24,14 @@
 
 import { mkdir, writeFile, readFile, access } from 'fs/promises';
 import { join } from 'path';
-import { REPO_ROOT, getDpDevices, getHistory, sleep, EcowittError } from './lib/ecowitt.mjs';
+import {
+  REPO_ROOT,
+  getDpDevices,
+  getHistory,
+  sleep,
+  EcowittError,
+  assertResearchCredentials,
+} from './lib/ecowitt.mjs';
 import { classifyEmptyDay } from './lib/season.mjs';
 
 const ARCHIVE_ROOT = join(REPO_ROOT, 'data', 'ecowitt-archive');
@@ -152,6 +159,16 @@ async function archiveDay(device, date, { force = false, dryRun = false } = {}) 
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  // Gate before a single request goes out. This job is the heaviest Ecowitt consumer in the repo
+  // and Ecowitt rate-limits per account, so running it on the keys compiled into the shipped app
+  // risks taking wind data down for every installed app. Refuse rather than warn.
+  try {
+    assertResearchCredentials();
+  } catch (err) {
+    console.error(`❌ ${err.message}`);
+    process.exit(1);
+  }
 
   let devices;
   try {

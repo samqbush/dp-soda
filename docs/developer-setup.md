@@ -574,17 +574,36 @@ npx jest __tests__/utils/katabaticBacktest.test.js        # 24 tests
 
 Requires `ECOWITT_APPLICATION_KEY` and `ECOWITT_API_KEY` in `.env` (same keys the app uses).
 
+### Credentials — use a separate research token
+
+The archive scripts require `ECOWITT_RESEARCH_APPLICATION_KEY` and `ECOWITT_RESEARCH_API_KEY`,
+and **refuse to run on the app's `ECOWITT_*` keys.** This is a hard failure, not a warning.
+
+Ecowitt rate-limits per account. The app keys are compiled into the shipped mobile build, and a
+single archive backfill is several hundred requests — enough to trip the cap in practice.
+Running bulk archiving on those keys could exhaust the shared quota and **break wind data on
+every installed user's phone** to service a side research project.
+
+Add both to `.env` locally, and as repository secrets for CI.
+
 ### Weekly refresh
 
-One command does status, fetch, re-label, re-score, and a diff of what changed:
+Two ways to run it, same scripts underneath.
+
+**Automated (preferred):** `.github/workflows/katabatic-archive.yml` runs Mondays at 14:00 UTC,
+archives a trailing 14-day window, re-scores, and commits. It is passed *only* the
+`ECOWITT_RESEARCH_*` secrets, so it cannot fall back to the app keys.
+
+> ⚠️ GitHub only fires `schedule` events on the **default branch**. On a feature branch the cron
+> will not run — use the "Run workflow" button or the local command until it is merged.
+
+**Manual:** one command does status, fetch, re-label, re-score, and a diff of what changed.
+Driven by the `dp-katabatic-archive` skill.
 
 ```bash
 node scripts/katabatic-refresh.mjs          # the weekly ritual
 node scripts/katabatic-refresh.mjs --check  # status only, fetches nothing
 ```
-
-Driven by the `dp-katabatic-archive` skill. **Deliberately not a CI job** — this is local
-research on an unpushed branch, so nothing auto-commits or pushes.
 
 Weekly is not arbitrary. Ecowitt serves 5-minute history for only ~90 days, so falling further
 behind than that permanently degrades the resolution of those days (see below).

@@ -53,19 +53,69 @@ export function isRateLimitMessage(msg = '') {
   return /upper limit|frequency|too many|rate limit/i.test(msg);
 }
 
-export function assertCredentials() {
-  if (!process.env.ECOWITT_APPLICATION_KEY || !process.env.ECOWITT_API_KEY) {
-    throw new EcowittError(
-      `Missing ECOWITT_APPLICATION_KEY / ECOWITT_API_KEY. Expected them in ${join(REPO_ROOT, '.env')} (see .env.example).`
-    );
+/**
+ * Resolve which Ecowitt credentials to use.
+ *
+ * **This is a blast-radius control, not a convenience.** The `ECOWITT_*` keys are compiled into
+ * the shipped mobile app, and Ecowitt rate-limits per account. The research archiver is by far
+ * the heaviest consumer in this repo — a single backfill is several hundred requests and has
+ * already tripped the cap in practice. If it ran on the app's keys it could exhaust the shared
+ * quota and **break wind data for every installed app on every user's phone**, to service a
+ * side research project. That trade is never worth making.
+ *
+ * So: prefer a dedicated `ECOWITT_RESEARCH_*` pair. Fall back to the app keys only for local
+ * one-off use, and say loudly when that happens.
+ */
+export function resolveCredentials({ purpose = 'research' } = {}) {
+  const research = {
+    application_key: process.env.ECOWITT_RESEARCH_APPLICATION_KEY,
+    api_key: process.env.ECOWITT_RESEARCH_API_KEY,
+  };
+  if (research.application_key && research.api_key) {
+    return { ...research, source: 'research' };
   }
-}
 
-function creds() {
-  return {
+  const app = {
     application_key: process.env.ECOWITT_APPLICATION_KEY,
     api_key: process.env.ECOWITT_API_KEY,
   };
+  if (app.application_key && app.api_key) {
+    return { ...app, source: 'app' };
+  }
+  return { application_key: null, api_key: null, source: 'none', purpose };
+}
+
+/**
+ * Hard requirement for bulk jobs (the archiver, CI). Refuses to run heavy traffic on the app's
+ * keys at all — a warning is not enough when the downside is every user's app going dark.
+ */
+export function assertResearchCredentials() {
+  const c = resolveCredentials();
+  if (c.source === 'research') return c;
+  throw new EcowittError(
+    'Refusing to run a bulk archive job on the shipped app\'s Ecowitt keys.\n' +
+      '  Set ECOWITT_RESEARCH_APPLICATION_KEY and ECOWITT_RESEARCH_API_KEY to a separate\n' +
+      '  Ecowitt account/token used only for research.\n' +
+      '  Reason: Ecowitt rate-limits per account. Bulk archiving on the app keys can exhaust\n' +
+      '  the shared quota and break wind data for every installed app.\n' +
+      `  Expected in ${join(REPO_ROOT, '.env')} (see .env.example), or as CI secrets.`
+  );
+}
+
+export function assertCredentials() {
+  const c = resolveCredentials();
+  if (c.source === 'none') {
+    throw new EcowittError(
+      `Missing Ecowitt credentials. Set ECOWITT_RESEARCH_APPLICATION_KEY / ECOWITT_RESEARCH_API_KEY ` +
+        `(preferred) or ECOWITT_APPLICATION_KEY / ECOWITT_API_KEY in ${join(REPO_ROOT, '.env')} (see .env.example).`
+    );
+  }
+  return c;
+}
+
+function creds() {
+  const c = resolveCredentials();
+  return { application_key: c.application_key, api_key: c.api_key };
 }
 
 /** Ecowitt wants local wall-clock time in `YYYY-MM-DD HH:mm:ss`, not ISO/UTC. */

@@ -49,6 +49,20 @@ const IDEAL_DIRECTION = {
   'DP Soda Lakes': { min: 270, max: 330, perfect: 297 },
 };
 
+/**
+ * Prefer the dedicated research token when one is configured, falling back to the app keys.
+ *
+ * This script is light (a handful of requests per run), so the app keys are not dangerous here
+ * the way they are for the bulk archiver. But Ecowitt rate-limits per account and those keys
+ * ship inside the mobile app, so there is no reason to spend that quota when a research token
+ * is sitting right there.
+ */
+function ecowittCreds() {
+  const appKey = process.env.ECOWITT_RESEARCH_APPLICATION_KEY || process.env.ECOWITT_APPLICATION_KEY;
+  const apiKey = process.env.ECOWITT_RESEARCH_API_KEY || process.env.ECOWITT_API_KEY;
+  return { application_key: appKey, api_key: apiKey };
+}
+
 function parseArgs(argv) {
   const args = { station: 'DP Soda Lakes', threshold: 15, since: '00:00', log: false, note: null };
   for (let i = 0; i < argv.length; i++) {
@@ -109,8 +123,7 @@ const mean = (nums) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.len
 async function getDevices() {
   const res = await axios.get(`${BASE_URL}/device/list`, {
     params: {
-      application_key: process.env.ECOWITT_APPLICATION_KEY,
-      api_key: process.env.ECOWITT_API_KEY,
+      ...ecowittCreds(),
     },
     timeout: 15000,
   });
@@ -121,8 +134,7 @@ async function getDevices() {
 async function getHistory(mac, start, end) {
   const res = await axios.get(`${BASE_URL}/device/history`, {
     params: {
-      application_key: process.env.ECOWITT_APPLICATION_KEY,
-      api_key: process.env.ECOWITT_API_KEY,
+      ...ecowittCreds(),
       mac,
       start_date: fmtEcowittDate(start),
       end_date: fmtEcowittDate(end),
@@ -221,8 +233,9 @@ function dirStr(v) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  if (!process.env.ECOWITT_APPLICATION_KEY || !process.env.ECOWITT_API_KEY) {
-    console.error('❌ Missing ECOWITT_APPLICATION_KEY / ECOWITT_API_KEY.');
+  const { application_key: ak, api_key: pk } = ecowittCreds();
+  if (!ak || !pk) {
+    console.error('❌ Missing Ecowitt credentials (ECOWITT_RESEARCH_* or ECOWITT_*).');
     console.error(`   Expected them in ${join(REPO_ROOT, '.env')} (see .env.example).`);
     process.exit(1);
   }

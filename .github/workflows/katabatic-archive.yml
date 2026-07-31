@@ -1,0 +1,120 @@
+# Keeps the katabatic meter archive current without any manual work.
+#
+# Why this exists: the validation dataset in research/katabatic-prediction.md is only useful if
+# it keeps growing, and the owner of this repo travels for work and will not hand-maintain a
+# dataset. Everything here is machine-derived (see §3.4) — no human ever enters a row.
+#
+# ⚠️ CREDENTIALS — read before changing the `env:` block below.
+# This job runs on ECOWITT_RESEARCH_* secrets, which MUST be a different Ecowitt account from
+# the ECOWITT_* keys used everywhere else in this repo. Those app keys are compiled into the
+# shipped mobile app, and Ecowitt rate-limits per account. This job issues hundreds of requests
+# per run and has tripped that limit in practice — on the app's keys it could exhaust the shared
+# quota and take wind data down on every installed user's phone. Never "simplify" this by
+# pointing it at ECOWITT_APPLICATION_KEY / ECOWITT_API_KEY. The archiver hard-fails if you do.
+#
+# Three other failure modes this is designed around:
+#
+#  1. Ecowitt only retains 5-minute history for ~90 days and downsamples older data to 4-hour
+#     rows, which are useless for a 30-minute sustained-wind label (§4.3a). Falling behind
+#     permanently degrades those days, so this runs weekly rather than monthly.
+#  2. The meter goes dark every winter (§4.2, roughly Jan 6 – Feb 28). A workflow that fails
+#     every week for two months gets muted, and a muted workflow is a dead one. Shutdown days
+#     are recorded as `unobserved` and exit cleanly — never as calm, never as an error.
+#  3. A rate-limited response arrives as HTTP 200 with a non-zero body code. The archiver
+#     detects this and skips the day rather than writing it as absence of wind.
+
+name: 🌬️ Katabatic archive
+
+# ⚠️ SCHEDULING CAVEAT: GitHub only fires `schedule` events on the repository's DEFAULT branch.
+# While this work lives on a feature branch, the weekly cron will NOT run — the file has to be
+# merged to the default branch before the schedule takes effect. Until then, use the
+# "Run workflow" button (workflow_dispatch), which does work on any branch that has this file,
+# or run `node scripts/katabatic-refresh.mjs` locally via the dp-katabatic-archive skill.
+
+on:
+  schedule:
+    # 14:00 UTC Monday = 07:00 MDT / 06:00 MST. Well after the morning event is over.
+    # Archives a trailing window rather than just "last week", so a skipped run self-heals.
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many trailing days to archive'
+        required: false
+        default: '14'
+
+# Prevent two runs racing on the same branch.
+concurrency:
+  group: katabatic-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    name: Archive and re-score
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔑 Verify research credentials are present
+        # Fail fast with a readable message rather than after npm ci and a partial fetch.
+        env:
+          ECOWITT_RESEARCH_APPLICATION_KEY: ${{ secrets.ECOWITT_RESEARCH_APPLICATION_KEY }}
+          ECOWITT_RESEARCH_API_KEY: ${{ secrets.ECOWITT_RESEARCH_API_KEY }}
+        run: |
+          if [ -z "$ECOWITT_RESEARCH_APPLICATION_KEY" ] || [ -z "$ECOWITT_RESEARCH_API_KEY" ]; then
+            echo "::error::Missing ECOWITT_RESEARCH_* secrets. This job must NOT fall back to the"
+            echo "::error::app's ECOWITT_* keys — bulk archiving on them can exhaust the shared"
+            echo "::error::Ecowitt quota and break wind data for every installed app."
+            exit 1
+          fi
+          echo "Research credentials present."
+
+      - name: 🗄️ Archive recent meter history
+        env:
+          # Deliberately ONLY the research keys — the app keys are not exposed to this job at all,
+          # so it cannot accidentally fall back to them.
+          ECOWITT_RESEARCH_APPLICATION_KEY: ${{ secrets.ECOWITT_RESEARCH_APPLICATION_KEY }}
+          ECOWITT_RESEARCH_API_KEY: ${{ secrets.ECOWITT_RESEARCH_API_KEY }}
+        # The archiver is idempotent and re-runs a trailing window, so a missed week is picked up
+        # automatically. --delay stays above the undocumented Ecowitt rate cap (§4.3).
+        run: |
+          node scripts/archive-ecowitt.mjs \
+            --days "${{ github.event.inputs.days || 14 }}" \
+            --delay 1200
+
+      - name: 🔁 Re-run backtest and score
+        # Cheap (seconds, no network) and keeps the committed prediction log in step with the
+        # archive. If either script fails the run fails loudly — a silently stale log would be
+        # worse than no log.
+        run: |
+          node scripts/backtest-katabatic.mjs --out research/prediction-log.csv
+          node scripts/score-backtest.mjs --call-time 06:30 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: 💾 Commit any new data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ecowitt-archive research/prediction-log.csv
+
+          # No-op runs are normal, not failures: nothing new during the winter shutdown, or a
+          # re-run over days already archived. Exit clean rather than committing an empty diff.
+          if git diff --staged --quiet; then
+            echo "No new data to commit (expected during the winter shutdown — see §4.2)."
+            exit 0
+          fi
+
+          git commit -m "chore(data): archive katabatic meter history [skip ci]"
+          git push
