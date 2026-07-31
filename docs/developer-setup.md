@@ -591,11 +591,32 @@ Add both to `.env` locally, and as repository secrets for CI.
 Two ways to run it, same scripts underneath.
 
 **Automated (preferred):** `.github/workflows/katabatic-archive.yml` runs Mondays at 14:00 UTC,
-archives a trailing 14-day window, re-scores, and commits. It is passed *only* the
-`ECOWITT_RESEARCH_*` secrets, so it cannot fall back to the app keys.
+archives a trailing 14-day window, re-scores, and opens a pull request that auto-merges. It is
+passed *only* the `ECOWITT_RESEARCH_*` secrets, so it cannot fall back to the app keys.
+
+It opens a pull request rather than pushing to `main` because the `main` ruleset requires pull
+requests and has **no bypass actors** — nothing, including `github-actions[bot]`, can push
+directly.
+
+That PR is created with a **`KATABATIC_PR_TOKEN`** PAT rather than `GITHUB_TOKEN`. This is not
+optional: GitHub deliberately does not trigger workflow runs for events raised with
+`GITHUB_TOKEN`, so a PR opened with it would never run the required `ios-build` /
+`android-build` checks and could never merge.
+
+```bash
+# Fine-grained PAT on samqbush/dp-soda with Contents: read+write, Pull requests: read+write.
+gh secret set KATABATIC_PR_TOKEN
+gh api -X PATCH repos/samqbush/dp-soda -f allow_auto_merge=true   # required once
+```
+
+The PR merges itself once checks report. Because it touches only research paths, the `classify`
+job skips the builds — and a job skipped by an `if:` condition reports as *successful* to a
+required check, so nothing blocks. (A workflow skipped by `paths-ignore` would instead sit
+pending for ever, which is why that approach was abandoned.)
 
 > ⚠️ GitHub only fires `schedule` events on the **default branch**. On a feature branch the cron
-> will not run — use the "Run workflow" button or the local command until it is merged.
+> will not run, and `workflow_dispatch` will not offer a "Run workflow" button either — that also
+> reads the workflow list from the default branch. Use the local command until it is merged.
 
 **Manual:** one command does status, fetch, re-label, re-score, and a diff of what changed.
 Driven by the `dp-katabatic-archive` skill.

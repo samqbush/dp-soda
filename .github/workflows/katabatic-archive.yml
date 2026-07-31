@@ -27,9 +27,9 @@ name: 🌬️ Katabatic archive
 
 # ⚠️ SCHEDULING CAVEAT: GitHub only fires `schedule` events on the repository's DEFAULT branch.
 # While this work lives on a feature branch, the weekly cron will NOT run — the file has to be
-# merged to the default branch before the schedule takes effect. Until then, use the
-# "Run workflow" button (workflow_dispatch), which does work on any branch that has this file,
-# or run `node scripts/katabatic-refresh.mjs` locally via the dp-katabatic-archive skill.
+# merged to the default branch before the schedule takes effect. The "Run workflow" button will
+# not appear either, since the workflow list is also read from the default branch. Until then,
+# run `node scripts/katabatic-refresh.mjs` locally via the dp-katabatic-archive skill.
 
 on:
   schedule:
