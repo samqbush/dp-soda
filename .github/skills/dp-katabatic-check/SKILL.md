@@ -52,6 +52,12 @@ Useful flags:
 - `--station "DP Standley West"` — a different meter (default is `DP Soda Lakes`)
 - `--threshold 12` — the sustained speed the user actually needs (default 15)
 - `--since 20:00` — pull further back, e.g. to see the full overnight build
+- `--log` — append this call to `research/prediction-log.csv`. Worth doing on any morning you
+  make a real call: it is what keeps the validation dataset honest. The outcome columns are left
+  blank and filled automatically later by the daily archive workflow — never fill them yourself.
+- `--note "..."` — optional free text for the one thing the meter cannot see: whether it was
+  *actually* rideable (chop, ice, launch-relative direction). Use it only when the user tells
+  you how it went. Never invent one.
 
 Set `--threshold` to whatever number the user gave you. If they said "at least 15 mph", pass
 `--threshold 15` so the `over-N` percentages in the output answer their actual question rather
@@ -89,6 +95,14 @@ without it is on borrowed time.
 local drainage jet. If everything is blowing, reconsider — a synoptic event behaves differently
 and often *doesn't* die at sunrise. If everything is calm including the target, there's nothing
 to discuss.
+
+> ⚠️ **Use this to characterise the event, not to talk yourself out of one.** Measured over 308
+> paired Soda/Standley days (§8, station correlation): Soda-only mornings are indeed the norm —
+> 77 of 89 rideable Soda mornings had Standley flat, so the local-jet reading is sound. **But
+> the inference does not run backwards.** Standley *also* blowing does not argue against a
+> session: Soda was rideable on 75% of those mornings (12 of 16) versus 26% when Standley was
+> flat. A blowing neighbour raises the odds; it does not lower them. Let it change the expected
+> *decay* (a synoptic event may not die at sunrise) — never the go/no-go.
 
 ## Step 3: Judge the session window
 

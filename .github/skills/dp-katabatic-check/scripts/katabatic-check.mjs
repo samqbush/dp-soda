@@ -21,6 +21,9 @@ import axios from 'axios';
 import { config } from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { appendFileSync, existsSync, writeFileSync } from 'fs';
+import { buildLogRow, csvHeader, toCsvRow } from '../../../../scripts/lib/prediction-log.mjs';
+import { gateOpenTime } from '../../../../scripts/lib/season.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
@@ -47,12 +50,19 @@ const IDEAL_DIRECTION = {
 };
 
 function parseArgs(argv) {
-  const args = { station: 'DP Soda Lakes', threshold: 15, since: '00:00' };
+  const args = { station: 'DP Soda Lakes', threshold: 15, since: '00:00', log: false, note: null };
   for (let i = 0; i < argv.length; i++) {
     const next = argv[i + 1];
     if (argv[i] === '--station' && next) args.station = next;
     if (argv[i] === '--threshold' && next) args.threshold = parseFloat(next);
     if (argv[i] === '--since' && next) args.since = next;
+    // Appends this morning's call to research/prediction-log.csv in exactly the shape the
+    // backtest writes, so live calls and replayed ones stay directly comparable. The outcome
+    // columns are left blank on purpose — the daily workflow fills them from the meter later.
+    if (argv[i] === '--log') args.log = true;
+    // The one thing the meter genuinely cannot see: whether it was actually rideable (chop,
+    // ice, launch-relative direction). Always optional; nothing in the pipeline blocks on it.
+    if (argv[i] === '--note' && next) args.note = next;
   }
   return args;
 }
@@ -294,11 +304,15 @@ async function main() {
 
   /* --- windowed stats: last 30 and 60 minutes are what the session actually rides --- */
   console.log(`\n## SIGNAL SUMMARY (threshold ${args.threshold} mph)`);
+  let stats30 = null;
+  let stats60 = null;
   if (ideal) console.log(`Ideal katabatic direction for ${target.name}: ${ideal.min}°–${ideal.max}° (perfect ${ideal.perfect}°)`);
   for (const mins of [30, 60, 120]) {
     const cutoff = now.getTime() - mins * 60000;
     const s = windowStats(points.filter((p) => p.date.getTime() >= cutoff), args.threshold, ideal);
     if (!s) continue;
+    if (mins === 30) stats30 = s;
+    if (mins === 60) stats60 = s;
     console.log(
       `Last ${String(mins).padStart(3)} min: avg ${mph(s.avg)} (${mph(s.min)}–${mph(s.max)})  peak gust ${mph(s.peakGust)}  ` +
         `dir ${dirStr(s.meanDir)}  consistency ${pct(s.consistency)}  ` +
@@ -307,6 +321,8 @@ async function main() {
   }
 
   /* --- build pattern: is it still ramping, holding, or already decaying? --- */
+  let trendWord = null;
+  let trendDelta = null;
   const last30 = mean(points.filter((p) => now - p.date <= 30 * 60000).map((p) => p.speed));
   const prev30 = mean(points.filter((p) => now - p.date > 30 * 60000 && now - p.date <= 60 * 60000).map((p) => p.speed));
   if (last30 !== null && prev30 !== null) {
@@ -318,6 +334,8 @@ async function main() {
     // costly error here: it talks the user out of a session that is still running.
     const BAND = 3.0;
     const word = delta > BAND ? 'BUILDING' : delta < -BAND ? 'DECAYING' : 'HOLDING';
+    trendWord = word;
+    trendDelta = delta;
     console.log(`Trend: ${word} (last 30 min ${mph(last30)} vs prior 30 min ${mph(prev30)}, ${delta >= 0 ? '+' : ''}${delta.toFixed(1)} mph)`);
     if (word === 'HOLDING' && Math.abs(delta) > 1.5) {
       console.log(`       note: ${delta.toFixed(1)} mph swing is within normal mountain-wave modulation, not a trend`);
@@ -325,13 +343,16 @@ async function main() {
   }
 
   /* --- humidity: radiative cooling drives the flow; drying air confirms it --- */
+  let rhDelta = null;
   const rhPts = points.filter((p) => Number.isFinite(p.rh));
   if (rhPts.length > 1) {
     console.log(`Humidity: ${rhPts[0].rh.toFixed(0)}% at ${fmtTime(rhPts[0].date)} → ${rhPts[rhPts.length - 1].rh.toFixed(0)}% now`);
+    rhDelta = rhPts[rhPts.length - 1].rh - rhPts[0].rh;
   }
 
   /* --- neighbors: a local drainage jet should NOT show up basin-wide --- */
   console.log(`\n## NEIGHBOR STATIONS (cross-check — drainage flow is local)`);
+  let neighborMax = null;
   for (const dev of dpDevices) {
     if (dev.mac === target.mac) continue;
     try {
@@ -342,12 +363,56 @@ async function main() {
         continue;
       }
       console.log(`${dev.name.padEnd(20)} ${fmtTime(n.date)}  spd ${mph(n.speed)}  gust ${mph(n.gust)}  ${dirStr(n.dir)}`);
+      if (Number.isFinite(n.speed) && (neighborMax === null || n.speed > neighborMax)) neighborMax = n.speed;
     } catch (err) {
       console.log(`${dev.name.padEnd(20)} error: ${err.message}`);
     }
   }
 
   console.log(`\n${'='.repeat(72)}`);
+
+  /* --- optional: append this call to the prediction log ---
+   *
+   * Same CSV shape the backtest emits, so a live morning and a replayed one are directly
+   * comparable. Outcome columns (label, sustained_minutes, ...) are deliberately left blank:
+   * at call time the morning has not happened yet, and guessing them would be fabricating the
+   * very ground truth the log exists to provide. The daily workflow fills them from the meter.
+   */
+  if (args.log) {
+    const gate = gateOpenTime(now);
+    const row = buildLogRow({
+      source: 'live',
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+      callTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+      station: target.name,
+      threshold: args.threshold,
+      features: {
+        avg30: stats30?.avg,
+        avg60: stats60?.avg,
+        min30: stats30?.min,
+        max30: stats30?.max,
+        peakGust30: stats30?.peakGust,
+        pctOverThreshold30: stats30?.pctOverThreshold,
+        meanDir: stats30?.meanDir,
+        dirConsistency: stats30?.consistency,
+        inIdealPct: stats30?.inIdealPct,
+        trend: trendWord,
+        trendDelta,
+        rhDelta,
+        neighborMax,
+        minutesPastSunrise: sunrise ? Math.round((now - sunrise) / 60000) : null,
+        minutesUntilGate: Math.round((gate.getTime() - now.getTime()) / 60000),
+      },
+      call: null,
+      label: null,
+      humanNote: args.note,
+    });
+
+    const logPath = join(REPO_ROOT, 'research', 'prediction-log.csv');
+    if (!existsSync(logPath)) writeFileSync(logPath, csvHeader() + '\n');
+    appendFileSync(logPath, toCsvRow(row) + '\n');
+    console.log(`\n📝 Logged to research/prediction-log.csv (outcome auto-filled later by the daily workflow)`);
+  }
 }
 
 main().catch((err) => {

@@ -391,8 +391,50 @@ the inversion longer (extending the window), while a frozen or partly frozen lak
 practical realities of cold are separate blockers that have nothing to do with wind. Treat
 the shoulder-season rows as **hypotheses to test in the prediction log**, not conclusions.
 
-- [ ] Log a few Sep/Oct mornings against this table — cheapest possible test of the claim.
+- [x] ~~Log a few Sep/Oct mornings against this table~~ → tested in bulk, §4.5a
 - [ ] Confirm whether lake ice or a separate watercraft season closes Nov–Mar independently.
+
+### 4.5a CONFIRMED — both shoulder-season predictions were right
+
+> 🔗 Measured 2026-07-31 over 311 gate-conditioned, resolution-checked archive days
+> (`scripts/lib/label.mjs`). This is the whole population, not a sample.
+
+| Month | n | Rideable | Rate | Blew, but gate was shut |
+|---|---|---|---|---|
+| Jan | 5 | 0 | 0% | 3 |
+| Mar | 31 | 14 | **45%** | 6 |
+| Apr | 30 | 9 | 30% | 5 |
+| May | 31 | 8 | 26% | 7 |
+| Jun | 30 | 1 | **3%** | 7 |
+| Jul | 32 | 5 | 16% | 7 |
+| Aug | 31 | 8 | 26% | 10 |
+| Sep | 30 | 15 | **50%** | 4 |
+| Oct | 31 | 13 | **42%** | 10 |
+| Nov | 29 | 8 | 28% | 10 |
+| Dec | 31 | 10 | 32% | 9 |
+
+**Prediction 1 — "September and October look like the best months, not June" — confirmed, and
+more strongly than predicted.** Sep 50% and Oct 42% against **June 3%**. June is not merely
+mediocre, it is the worst month in the entire dataset: one rideable morning in thirty. The
+mechanism proposed in §4.5 (sunrise at 5:32 versus a 6:00 gate — the wind is dying as you rig)
+is exactly right.
+
+**Prediction 2 — "November may not be the end of the season" — confirmed.** November 28% and
+December 32%, comparable to May (26%) and August (26%). **The working assumption that the
+season ends in November was costing roughly two months of rideable mornings per year.**
+
+The best three months are **Sep, Mar, Oct** — all shoulder months. The intuition that this is a
+summer sport is backwards at this site.
+
+**The real cost is the gate, not the weather.** The right-hand column counts mornings that blew
+≥15 mph for ≥30 min *before the gate opened* — 78 mornings across the archive, concentrated in
+Aug/Oct/Nov (10 each) and Dec (9). In November, 10 mornings were lost to the 8 a.m. gate against
+8 that were catchable: **more than half of November's katabatic events happen behind a locked
+gate.** Anyone with legitimate early access would roughly double the November season.
+
+Caveats that stand: winter rideability is a wind measurement only. Lake ice, a separate
+watercraft season, and plain cold are independent blockers this data cannot see. And the +57 min
+decay figure remains June–July-derived; the shoulder months may behave differently.
 
 ### 4.6 Base rate: most mornings are not worth it
 
@@ -643,31 +685,77 @@ noise on 91 positives (§4.7).
 
 ---
 
+## 7.2 The label is slightly strict — a real morning says so
+
+Seeding the log with the only two independently-verified mornings this project has
+(`source=retrospective` in `research/prediction-log.csv`) produced an immediate and useful
+disagreement:
+
+| Date | Human call | Rule | Label | Sustained | Ground truth |
+|---|---|---|---|---|---|
+| 2026-07-30 | GO | GO | **false** | **25 min** | *"16.0 mph through the 6am hour, session was good"* |
+| 2026-07-31 | NO_GO | NO_GO | false | 0 min | Drove out at 6am, visually confirmed light, did not go out |
+
+The rule agreed with the human on both. But **2026-07-30 was a genuinely good session that the
+label scores as a negative**, purely because the sustained run was 25 minutes against a ≥30 min
+criterion.
+
+This is the first hard evidence for something §3.4 could only assert in the abstract: the meter
+label is a *proxy* for rideability, not rideability itself. Two implications:
+
+1. **The 29.6% base rate (§7.1) is probably an underestimate**, and the missed-session rates are
+   correspondingly pessimistic — some "misses" were mornings that were fine in practice.
+2. **Do not tune the 30-minute constant to fix this.** With one counter-example, changing it
+   would be fitting the label to a single anecdote — and §7 rule 1 exists precisely to stop the
+   label moving around mid-study. Leave it fixed, record the bias, and revisit only if several
+   more `human_note` rows point the same way.
+
+This is the intended use of the optional `human_note` column: it cannot be relied on to arrive,
+but when it does it calibrates the machine label. One row has already earned its place.
+
+---
+
 ## 8. Open questions
 
 - [ ] Should the archive live in-app, or as a standalone job independent of app releases?
       It must tolerate the annual winter shutdown (§4.2) without alerting or backfilling zeros.
-- [ ] **Do the shoulder months actually work?** §4.5 predicts Sep/Oct are the best of the
-      year and Nov is still viable. This contradicts the current working assumption that the
-      season ends when the gate moves to 8 a.m. Cheap to test, potentially adds months.
+- [x] ~~**Do the shoulder months actually work?**~~ → **§4.5a: yes, emphatically.** Sep 50%,
+      Mar 45%, Oct 42%, Nov 28%, Dec 32% — against **June 3%**, the worst month in the archive.
+      Both §4.5 predictions confirmed. The "season ends in November" assumption was costing
+      roughly two months of rideable mornings a year.
 - [ ] Does lake ice close the shoulder season independently of gate hours? Partially answered
       by §4.2 — the meter's winter shutdown tracks Little Soda freezing (dark Jan 6 – Feb 28),
       which suggests open water through December and from about March.
 - [ ] Does the +57 min "session end vs. sunrise" figure hold outside June–July? It is measured
       from summer only, and winter inversions may behave differently.
-- [ ] **Are Soda, Standley West and Boulder Res actually correlated?** Appendix A.4: adjacent
-      Front Range canyons behaved differently on the same night in ASCOT. If the correlation is
-      weak, the other two stations are not evidence about Soda and nothing should imply they
-      are. Answerable from the archive alone.
-- [ ] Do any labelled positives look like chinook rather than katabatic (Appendix A.1)? Check
-      whether overnight temperature trend separates them — katabatic cools, chinook warms.
-- [ ] After 30+ logged mornings: does the assistant's call beat "always drive out and look"?
-      If not, the honest answer is that the tool is a convenience, not a predictor.
+- [x] ~~**Are Soda, Standley West and Boulder Res actually correlated?**~~ → **Weakly, and the
+      direction is the opposite of what `SKILL.md` implied.** Over 308 paired Soda/Standley days:
+      phi = 0.24, 74% raw agreement. Soda was rideable on 89 mornings, Standley on only 16, and
+      just 12 overlapped — so **87% of Soda's events are Soda-only**, which does confirm the
+      local-drainage-jet reading. **But the inference does not reverse.** Conditioning the other
+      way: P(Soda rideable | Standley blowing) = **75%** (12/16) versus P(Soda rideable |
+      Standley flat) = **26%** (77/292). A blowing neighbour nearly triples the odds — it is a
+      *positive* indicator, not a warning. `SKILL.md`'s "if everything is blowing, reconsider"
+      was inverted and has been corrected to affect only the expected decay, never the go/no-go.
+      Boulder Res remains untestable (n=18, zero shared positives — see §4.3a).
+- [x] ~~Do any labelled positives look like chinook rather than katabatic (Appendix A.1)?~~ →
+      **Present but minor.** Only 5 of 45 cool-season positives show the >15 °F warming
+      signature (2025-10-19, 2025-11-19, 2025-12-14, 2026-03-07, 2026-03-12). Checked *before*
+      scoring, to rule out label poisoning as the cause of the cool-season degradation in §7.1 —
+      it is not; lead time is.
+- [x] ~~After 30+ logged mornings: does the assistant's call beat "always drive out and look"?~~
+      → **§7.1: it depends entirely on lead time, and the honest answer is close to "convenience,
+      not predictor."** With the gate already open it misses 0% while avoiding ~71% of wasted
+      trips — genuinely useful. At 90+ minutes of lead it misses 50%, i.e. nothing. Answered from
+      311 replayed archive mornings rather than 30 manually logged ones (§3.4).
 
 Answered since first draft:
 - ~~Is the winter gap recoverable from another source?~~ → §4.2: no. It is a deliberate
   seasonal wifi shutdown; the data was never transmitted and does not exist anywhere.
 - ~~What is the actual base rate of good mornings?~~ → §4.6: ~13% for a 6–7am session.
+  Superseded by the archive-wide measurement: **29.6%** of observed mornings under the fixed
+  gate-conditioned label (§7 rule 1). Higher than §4.6 because the label counts any 30-min
+  sustained run in the post-gate morning window, not just the 6–7am hour.
 - ~~Does the 90-day 5-minute window block winter modelling?~~ → §4.1: no. The 30-minute
   archive is decision-equivalent (97% agreement).
 

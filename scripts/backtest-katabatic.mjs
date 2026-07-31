@@ -137,7 +137,25 @@ async function main() {
   }
 
   await mkdir(join(args.out, '..'), { recursive: true });
-  await writeFile(args.out, csvHeader() + rows.map(toCsvRow).join(''));
+
+  // Preserve live rows. The backtest regenerates every `backtest` row from scratch each run, but
+  // `live` rows are appended by katabatic-check.mjs at call time and can never be reconstructed —
+  // they record what the meter showed at the moment a real decision was made. A plain overwrite
+  // here would silently destroy them on the very first scheduled run, which is exactly the kind
+  // of unrecoverable data loss §4.2 exists to prevent.
+  let preserved = [];
+  try {
+    const existing = await readFile(args.out, 'utf8');
+    preserved = existing
+      .split('\n')
+      .filter((line) => line.trim() && !line.startsWith('source,') && !line.startsWith('backtest,'))
+      .map((line) => line + '\n');
+  } catch {
+    // No prior log — first run.
+  }
+
+  await writeFile(args.out, csvHeader() + rows.map(toCsvRow).join('') + preserved.join(''));
+  if (preserved.length) console.log(`Preserved ${preserved.length} live row(s) from previous runs.`);
 
   const positives = dayLabels.filter((l) => l.label).length;
   const missedByGate = dayLabels.filter((l) => l.missedDueToGate).length;
