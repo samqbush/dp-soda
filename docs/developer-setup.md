@@ -608,6 +608,26 @@ node scripts/katabatic-refresh.mjs --check  # status only, fetches nothing
 Weekly is not arbitrary. Ecowitt serves 5-minute history for only ~90 days, so falling further
 behind than that permanently degrades the resolution of those days (see below).
 
+### CI treats research as non-shipping
+
+Research paths are excluded from the release pipeline, in two places that **must stay in sync**:
+
+| Where | Effect |
+|---|---|
+| `paths-ignore` in `.github/workflows/build-and-release.yml` | No app build or release |
+| the allowlist in `.husky/pre-commit` | No version-bump requirement |
+
+Excluded: `research/**`, `data/ecowitt-archive/**`, `scripts/lib/**`, and the four katabatic
+scripts. **Not** `scripts/**` wholesale — `increment-version.mjs` and
+`test-version-increment.mjs` live there and are release-critical.
+
+This is load-bearing, not tidiness. The weekly workflow commits to `main`; without the
+exclusions each data commit would start a macOS + Android build and then fail in
+`create-release` on a duplicate tag, because archiving wind data never changes the app version.
+
+The pre-commit hook draws one further distinction: research **scripts** are still linted, they
+just don't require a version bump. Only prose and data skip lint entirely.
+
 ### Gotchas worth knowing before you touch these
 
 - **Rate limit.** Ecowitt caps request *rate*, and reports it as `code != 0` in a **200**

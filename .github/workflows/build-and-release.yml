@@ -5,10 +5,17 @@ name: Build Dawn Patrol Alarm - Combined Release
 # "v$APP_VERSION"`, and a docs-only merge leaves the version unchanged, so the
 # job would fail on a duplicate tag after burning a macOS and an Android build.
 #
-# The paths-ignore list below must stay in sync with the doc allowlist in
+# The paths-ignore list below must stay in sync with the no-release allowlist in
 # .husky/pre-commit. The glob dialects differ: POSIX `case` treats `*` as
 # matching `/`, while GitHub Actions requires an explicit `**` for nested paths,
 # hence the doubled entries here.
+#
+# Note the two lists answer the same question — "can this change alter the
+# shipped app?" — which is why they must agree. The version-bump check exists
+# only because `create-release` tags from the app version; if a change cannot
+# trigger a release, requiring a version bump for it is pure friction.
+# `scripts/**` is deliberately NOT excluded wholesale: increment-version.mjs and
+# test-version-increment.mjs live there and are release-critical.
 #
 # Caveat: if required status checks or a merge queue are added to `main`, a
 # workflow skipped by paths-ignore reports as pending and will block merges. The
@@ -26,6 +33,19 @@ on:
       - '.github/copilot-instructions.md'
       - '.github/skills/*.md'
       - '.github/skills/**/*.md'
+      # Katabatic wind research. None of this is compiled into the app — see the
+      # "Katabatic research pipeline" section of docs/developer-setup.md. The
+      # archive is also written to `main` weekly by katabatic-archive.yml, so
+      # without these entries every automated data commit would kick off a full
+      # macOS + Android build and then fail in `create-release` on a duplicate
+      # tag, because a data commit never changes the app version.
+      - 'research/**'
+      - 'data/ecowitt-archive/**'
+      - 'scripts/lib/**'
+      - 'scripts/archive-ecowitt.mjs'
+      - 'scripts/backtest-katabatic.mjs'
+      - 'scripts/score-backtest.mjs'
+      - 'scripts/katabatic-refresh.mjs'
   pull_request:
     branches: [main]
     paths-ignore:
@@ -37,6 +57,19 @@ on:
       - '.github/copilot-instructions.md'
       - '.github/skills/*.md'
       - '.github/skills/**/*.md'
+      # Katabatic wind research. None of this is compiled into the app — see the
+      # "Katabatic research pipeline" section of docs/developer-setup.md. The
+      # archive is also written to `main` weekly by katabatic-archive.yml, so
+      # without these entries every automated data commit would kick off a full
+      # macOS + Android build and then fail in `create-release` on a duplicate
+      # tag, because a data commit never changes the app version.
+      - 'research/**'
+      - 'data/ecowitt-archive/**'
+      - 'scripts/lib/**'
+      - 'scripts/archive-ecowitt.mjs'
+      - 'scripts/backtest-katabatic.mjs'
+      - 'scripts/score-backtest.mjs'
+      - 'scripts/katabatic-refresh.mjs'
   workflow_dispatch:
 
 permissions:

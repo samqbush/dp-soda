@@ -17,7 +17,21 @@ if echo "$CURRENT_EMAIL" | grep -q "@users\.noreply\.github\.com"; then
   exit 0
 fi
 
-# Documentation-only detection.
+# Change classification.
+#
+# Two independent questions, deliberately not conflated:
+#
+#   NO_RELEASE  - can this change alter the shipped app? If not, no version bump
+#                 is needed. The version check exists only because create-release
+#                 tags from the app version, so demanding a bump for a change that
+#                 can never produce a release is pure friction. This list must stay
+#                 in sync with paths-ignore in .github/workflows/build-and-release.yml.
+#   NO_LINT     - is there anything here a linter can even read? Markdown, JSON data
+#                 and CSV are not lintable by this toolchain.
+#
+# Research scripts land in NO_RELEASE but NOT in NO_LINT: they are real code and
+# must be linted, they just cannot trigger a release. Folding the two together
+# would mean either linting archive data or shipping unlinted scripts.
 #
 # --no-renames is required: with rename detection, --name-only reports only the
 # destination path, so `app/foo.ts -> docs/foo.md` would look like a doc change.
@@ -25,7 +39,8 @@ fi
 # a source file alongside a README edit would look like a doc change.
 STAGED_FILES=$(git diff --cached --name-only --no-renames)
 
-DOCS_ONLY=1
+NO_RELEASE=1
+NO_LINT=1
 HAS_STAGED=0
 
 while IFS= read -r staged_file; do
@@ -33,10 +48,18 @@ while IFS= read -r staged_file; do
     HAS_STAGED=1
     # POSIX `case` globs: `*` also matches `/`, so these cover nested paths.
     case "$staged_file" in
+      # Documentation and prose.
       README.md|CHANGELOG.md|LICENSE|.github/copilot-instructions.md) ;;
       docs/*.md|.github/skills/*.md) ;;
+      # Katabatic research data and notes — not code, not shipped.
+      research/*|data/ecowitt-archive/*) ;;
+      # Katabatic research code — not shipped, but still lintable.
+      scripts/lib/*|scripts/archive-ecowitt.mjs|scripts/backtest-katabatic.mjs|scripts/score-backtest.mjs|scripts/katabatic-refresh.mjs)
+        NO_LINT=0
+        ;;
       *)
-        DOCS_ONLY=0
+        NO_RELEASE=0
+        NO_LINT=0
         break
         ;;
     esac
@@ -46,11 +69,17 @@ $STAGED_FILES
 STAGED_FILE_LIST
 
 # An empty index (for example a message-only `git commit --amend`) falls through
-# to the full checks rather than being treated as documentation.
-if [ "$HAS_STAGED" = "1" ] && [ "$DOCS_ONLY" = "1" ]; then
-  echo "📝 Documentation-only change — skipping lint and version checks"
+# to the full checks rather than being treated as a no-release change.
+if [ "$HAS_STAGED" = "1" ] && [ "$NO_RELEASE" = "1" ] && [ "$NO_LINT" = "1" ]; then
+  echo "📝 Docs/data-only change — skipping lint and version checks"
   exit 0
 fi
 
-npm run lint 
+npm run lint
+
+if [ "$HAS_STAGED" = "1" ] && [ "$NO_RELEASE" = "1" ]; then
+  echo "🔬 Research-only change — linted, skipping version check (cannot trigger a release)"
+  exit 0
+fi
+
 npm run test-version
