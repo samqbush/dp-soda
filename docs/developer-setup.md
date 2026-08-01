@@ -557,9 +557,10 @@ shipped app** — these are standalone Node scripts, run locally on demand.
 | Script | Purpose |
 |---|---|
 | `scripts/archive-ecowitt.mjs` | Archives meter history to `data/ecowitt-archive/<station>/<YYYY-MM>/<YYYY-MM-DD>.json`. Idempotent. |
+| `scripts/archive-holfuy.mjs` | Archives ridge-top Holfuy stations to `data/holfuy-archive/`. No credentials needed. |
 | `scripts/backtest-katabatic.mjs` | Replays the deterministic call rule over every archived morning → `research/prediction-log.csv` |
 | `scripts/score-backtest.mjs` | Scores the rule against baselines (missed sessions vs. false alarms) |
-| `scripts/katabatic-refresh.mjs` | **Start here.** Runs all three above in order, plus staleness check and a what-changed diff |
+| `scripts/katabatic-refresh.mjs` | **Start here.** Runs all of the above in order, plus staleness check and a what-changed diff |
 
 Shared logic lives in `scripts/lib/` (`ecowitt`, `label`, `call-rule`, `season`, `sunrise`,
 `prediction-log`). `call-rule.mjs` is imported by both the backtest and the live skill so the
@@ -572,7 +573,9 @@ node scripts/score-backtest.mjs --call-time 06:30
 npx jest __tests__/utils/katabaticBacktest.test.js        # 24 tests
 ```
 
-Requires `ECOWITT_APPLICATION_KEY` and `ECOWITT_API_KEY` in `.env` (same keys the app uses).
+The archiving scripts require the **research** Ecowitt keys described in the next section, not
+the app's. The offline scripts (`backtest`, `score`) need no credentials at all — they read the
+committed archive.
 
 ### Credentials — use a separate research token
 
@@ -584,70 +587,47 @@ single archive backfill is several hundred requests — enough to trip the cap i
 Running bulk archiving on those keys could exhaust the shared quota and **break wind data on
 every installed user's phone** to service a side research project.
 
-Add both to `.env` locally, and as repository secrets for CI.
+Add both to `.env` locally. No CI secrets are needed — see below.
 
-### Weekly refresh
+### Refreshing the archive
 
-Two ways to run it, same scripts underneath.
-
-**Automated (preferred):** `.github/workflows/katabatic-archive.yml` runs Mondays at 14:00 UTC,
-archives a trailing 14-day window, re-scores, and opens a pull request that auto-merges. It is
-passed *only* the `ECOWITT_RESEARCH_*` secrets, so it cannot fall back to the app keys.
-
-It opens a pull request rather than pushing to `main` because the `main` ruleset requires pull
-requests and has **no bypass actors** — nothing, including `github-actions[bot]`, can push
-directly.
-
-That PR is created with a **`KATABATIC_PR_TOKEN`** PAT rather than `GITHUB_TOKEN`. This is not
-optional: GitHub deliberately does not trigger workflow runs for events raised with
-`GITHUB_TOKEN`, so a PR opened with it would never run the required `ios-build` /
-`android-build` checks and could never merge.
+**This is a manual, local workflow driven by the `dp-katabatic-archive` skill. There is no
+automation, by design.**
 
 ```bash
-# Fine-grained PAT on samqbush/dp-soda with Contents: read+write, Pull requests: read+write.
-gh secret set KATABATIC_PR_TOKEN
-gh api -X PATCH repos/samqbush/dp-soda -f allow_auto_merge=true   # required once
-```
-
-The PR merges itself once checks report. Because it touches only research paths, the `classify`
-job skips the builds — and a job skipped by an `if:` condition reports as *successful* to a
-required check, so nothing blocks. (A workflow skipped by `paths-ignore` would instead sit
-pending for ever, which is why that approach was abandoned.)
-
-> ⚠️ GitHub only fires `schedule` events on the **default branch**. On a feature branch the cron
-> will not run, and `workflow_dispatch` will not offer a "Run workflow" button either — that also
-> reads the workflow list from the default branch. Use the local command until it is merged.
-
-**Manual:** one command does status, fetch, re-label, re-score, and a diff of what changed.
-Driven by the `dp-katabatic-archive` skill.
-
-```bash
-node scripts/katabatic-refresh.mjs          # the weekly ritual
+node scripts/katabatic-refresh.mjs          # status, fetch, re-label, re-score, diff
 node scripts/katabatic-refresh.mjs --check  # status only, fetches nothing
+node scripts/archive-holfuy.mjs             # ridge stations only, no credentials needed
 ```
 
-Weekly is not arbitrary. Ecowitt serves 5-minute history for only ~90 days, so falling further
-behind than that permanently degrades the resolution of those days (see below).
+A scheduled workflow (`katabatic-archive.yml`) was built and then removed. The reason is worth
+recording so it isn't rebuilt by mistake:
 
-### CI treats research as non-shipping
+**GitHub only fires `schedule` events on the default branch.** This research — including the
+whole `data/` archive — deliberately lives on the `katabatic-research` branch and is *not*
+merged to `main`, to keep several thousand data files out of the app's history. A cron on a
+non-default branch never runs, so automation and branch-only data are mutually exclusive. The
+branch-only constraint won.
 
-Research paths are excluded from the release pipeline, in two places that **must stay in sync**:
+Everything that existed only to support that workflow was removed with it: the `classify` job in
+`build-and-release.yml`, `scripts/classify-changes.mjs`, the `NO_RELEASE`/`NO_LINT` split in
+`.husky/pre-commit`, and the `KATABATIC_PR_TOKEN` secret. Those were real surgery on a
+release-critical pipeline to stop bot data commits from triggering app builds on `main`. With
+nothing landing on `main`, the problem they solved no longer exists.
 
-| Where | Effect |
-|---|---|
-| `paths-ignore` in `.github/workflows/build-and-release.yml` | No app build or release |
-| the allowlist in `.husky/pre-commit` | No version-bump requirement |
+**Cadence is daily, and the binding constraint is Holfuy, not Ecowitt.** Holfuy publishes a
+rolling ~5.9-day window with no backfill: a day missed by a week is *gone*, not coarsened.
+Ecowitt is more forgiving — it serves 5-minute history for ~90 days and downsamples past that —
+but falling behind still permanently degrades resolution. Going manual means archive integrity
+now depends on actually running the command.
 
-Excluded: `research/**`, `data/ecowitt-archive/**`, `scripts/lib/**`, and the four katabatic
-scripts. **Not** `scripts/**` wholesale — `increment-version.mjs` and
-`test-version-increment.mjs` live there and are release-critical.
+### Working on this branch
 
-This is load-bearing, not tidiness. The weekly workflow commits to `main`; without the
-exclusions each data commit would start a macOS + Android build and then fail in
-`create-release` on a duplicate tag, because archiving wind data never changes the app version.
+The archive is committed to `katabatic-research` and stays there. Do not merge it to `main`.
 
-The pre-commit hook draws one further distinction: research **scripts** are still linted, they
-just don't require a version bump. Only prose and data skip lint entirely.
+The pre-commit hook on this branch is `main`'s unmodified version, so a data commit runs the
+full `npm run lint` and `npm run test-version`. That is slower than it needs to be, but it keeps
+the hook identical to the shipping one.
 
 ### Gotchas worth knowing before you touch these
 
@@ -659,8 +639,8 @@ just don't require a version bump. Only prose and data skip lint entirely.
   which cannot resolve the 30-minute sustained-wind label. `labelDay()` returns `null` for
   those. This is why the archive must be kept current — the fine-grained data expires.
 - **Winter shutdown.** The meter is offline roughly Jan 6 – Feb 28. Those days are recorded as
-  `unobserved`, never as calm, and the workflow must exit cleanly (not fail) throughout, or 54
-  consecutive failure emails will get it muted.
+  `unobserved`, never as calm, and `katabatic-refresh.mjs` must exit cleanly (not fail)
+  throughout — a two-month stretch of red exit codes trains you to ignore the one that matters.
 - **Never fabricate data.** A missing day is missing. Do not backfill zeros.
 
 ---

@@ -740,6 +740,10 @@ but when it does it calibrates the machine label. One row has already earned its
       Mar 45%, Oct 42%, Nov 28%, Dec 32% — against **June 3%**, the worst month in the archive.
       Both §4.5 predictions confirmed. The "season ends in November" assumption was costing
       roughly two months of rideable mornings a year.
+- [ ] **Does ridge-top flow at Lookout Mtn lead the valley jet?** → §8.1. Collection started
+      2026-07-25; n=7 as of 2026-08-01, nothing scored. This is the one untested candidate for
+      extending lead time past the ~60 min horizon where §7.1 shows the rule collapsing. Not
+      answerable before spring 2027.
 - [ ] Does lake ice close the shoulder season independently of gate hours? Partially answered
       by §4.2 — the meter's winter shutdown tracks Little Soda freezing (dark Jan 6 – Feb 28),
       which suggests open water through December and from about March.
@@ -775,6 +779,57 @@ Answered since first draft:
   sustained run in the post-gate morning window, not just the 6–7am hour.
 - ~~Does the 90-day 5-minute window block winter modelling?~~ → §4.1: no. The 30-minute
   archive is decision-equivalent (97% agreement).
+
+---
+
+## 8.1 Lookout Mtn (Holfuy 1295) — ridge-top hypothesis, NOT yet scored
+
+**Status: collection only. There is no Lookout-based rule, threshold, or direction window.
+Nothing in the backtest reads this data.** This section exists so that question has a
+documented home instead of relying on memory.
+
+**Why it is being collected** (this part *is* measured, §4.3a): over 12 months, as overnight
+(00:00–05:00) predictors of the 06:00–08:00 session, Soda's own meter scored AUC 0.729 while
+every accessible remote substitute was worse — Golden ridge PWS 0.627, Hwy 93 RWIS 0.587,
+Rooney Rd RWIS 0.551 — and combining them added nothing. Lookout Mtn is the one candidate never
+tested at scale: it sits ~2,000 ft above Soda at 39.7392, -105.2419, upstream in the drainage,
+and is the only true ridge-top station inside it. The hypothesis is that ridge flow leads the
+valley jet and could extend usable lead time past the ~60-minute horizon where §7.1 shows the
+current rule collapsing to a coin flip. **That is a hypothesis, not a finding.**
+
+**Collection started 2026-07-25** via `scripts/archive-holfuy.mjs`. Holfuy publishes a rolling
+~5.9-day window with no backfill and station 1295's archive API returns `{"error":"No access"}`,
+so missed days are permanently gone — this is what forces the *daily* archive cadence.
+
+**Everything observed so far** (Lookout 00:00–05:00 vs. Soda's gate-conditioned label), as of
+2026-08-01, n=7 usable mornings, 2 rideable:
+
+| Date | LO avg mph | LO mean dir | Soda label |
+|---|---|---|---|
+| 2026-07-26 | 21.4 | 257° | rideable |
+| 2026-07-27 | 20.1 | 265° | flat |
+| 2026-07-28 | 19.1 | 254° | flat |
+| 2026-07-29 | 21.1 | 293° | rideable |
+| 2026-07-30 | 17.5 | 259° | flat |
+| 2026-07-31 | 8.6 | 338° | flat |
+| 2026-08-01 | 20.5 | 255° | flat |
+
+(2026-07-25 archived but holds no 00:00–05:00 rows.)
+
+**Read this as nothing.** Lookout blew 17–21 mph on six of seven mornings including four duds,
+so a naive "ridge is blowing → go" rule would fire 6 times and be right twice — worse than the
+29.5% base rate is not the point; n=7 simply cannot separate anything. The single suggestive
+cell is 2026-07-31, where Lookout was genuinely calm and Soda was flat, and that is n=1.
+
+**Before this can be scored** it needs, at minimum, a full shoulder season (§4.5a: Sep/Mar/Oct
+carry the rideable mornings) and enough positives to survive the §7 rule 4 monthly jackknife.
+Realistically that is spring 2027. Until then the honest answer to "what does Lookout say?" is
+**"we are still collecting, and nothing is validated."**
+
+**Do not** hand-fit a threshold to the table above and put it in `SKILL.md`. Per §7 rule 6,
+shipping a number that reads as insight but is not is worse than shipping nothing — and per §2
+the asymmetric cost means a bad ridge rule that suppresses mornings is the most expensive
+possible mistake.
 
 ---
 

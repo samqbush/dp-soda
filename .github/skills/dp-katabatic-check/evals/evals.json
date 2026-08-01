@@ -38,6 +38,20 @@
         "Uses or references the user's 12 mph threshold rather than a default 15",
         "Gives a verdict specific to Standley West"
       ]
+    },
+    {
+      "id": 3,
+      "name": "marginal-at-threshold-reads-over-n-trajectory",
+      "prompt": "Check the soda meter \u2014 is it going to hold over 15 for a 6 to 7 session this morning?",
+      "expected_output": "Runs the bundled script with threshold 15. If the sustained average is within ~1.5 mph of the 15 mph threshold, the response must not rely on the script's BUILDING/HOLDING/DECAYING word alone \u2014 it must read the over-N percentage trajectory across recent slices and say plainly whether the share of readings above threshold is rising or falling. A declining over-N must be described as fading even when the trend word reads HOLDING. Per the asymmetric cost function, a declining over-N must sharpen the advice (arrive at gate-open, expect the tail, don't count on the back half) rather than suppress the go. Must not fabricate readings.",
+      "files": [],
+      "assertions": [
+        "Cites the over-N / percent-above-threshold figure, not only the average speed and the trend word",
+        "If the average sits within roughly 1.5 mph of the threshold, explicitly characterizes the event as marginal rather than implying comfort",
+        "Does not treat a HOLDING trend label as proof the event is stable when the over-N percentage is declining",
+        "Still gives an actionable go/no-go rather than suppressing the morning purely because the event is marginal",
+        "Assesses the session window against sunrise and the seasonal park gate hour"
+      ]
     }
   ]
 }

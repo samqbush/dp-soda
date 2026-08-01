@@ -49,6 +49,13 @@ const IDEAL_DIRECTION = {
   'DP Soda Lakes': { min: 270, max: 330, perfect: 297 },
 };
 
+// Ecowitt's history endpoint is unreliable for short windows: a 60-minute request returns zero
+// rows even when data only ~10 minutes old exists, while a wider window returns it fine. So
+// neighbours are read over the same wide window as the target rather than a short trailing one.
+// This bound then rejects a genuinely offline station, and sits well above the ~10 min the feed
+// normally trails real time.
+const NEIGHBOR_MAX_AGE_MIN = 90;
+
 /**
  * Prefer the dedicated research token when one is configured, falling back to the app keys.
  *
@@ -369,14 +376,25 @@ async function main() {
   for (const dev of dpDevices) {
     if (dev.mac === target.mac) continue;
     try {
-      const np = await getHistory(dev.mac, new Date(now.getTime() - 60 * 60000), now);
+      // Same window as the target station. Ecowitt's history endpoint returns zero rows for a
+      // short trailing window (a 60-minute request comes back empty even when data ~10 minutes
+      // old exists), which silently reported every neighbour as "no recent data" and left
+      // neighborMax null. A wide window returns the same recent rows reliably.
+      const np = await getHistory(dev.mac, start, now);
       const n = np[np.length - 1];
       if (!n) {
         console.log(`${dev.name.padEnd(20)} no recent data`);
         continue;
       }
-      console.log(`${dev.name.padEnd(20)} ${fmtTime(n.date)}  spd ${mph(n.speed)}  gust ${mph(n.gust)}  ${dirStr(n.dir)}`);
-      if (Number.isFinite(n.speed) && (neighborMax === null || n.speed > neighborMax)) neighborMax = n.speed;
+      // The reading is only a usable cross-check if it is roughly contemporaneous with the
+      // target's latest reading; a hours-old point says nothing about what is happening now.
+      const ageMin = (now.getTime() - n.date.getTime()) / 60000;
+      const stale = ageMin > NEIGHBOR_MAX_AGE_MIN;
+      console.log(
+        `${dev.name.padEnd(20)} ${fmtTime(n.date)}  spd ${mph(n.speed)}  gust ${mph(n.gust)}  ${dirStr(n.dir)}` +
+          (stale ? `  (stale — ${Math.round(ageMin)} min old, not used as a cross-check)` : '')
+      );
+      if (!stale && Number.isFinite(n.speed) && (neighborMax === null || n.speed > neighborMax)) neighborMax = n.speed;
     } catch (err) {
       console.log(`${dev.name.padEnd(20)} error: ${err.message}`);
     }

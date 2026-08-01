@@ -17,21 +17,7 @@ if echo "$CURRENT_EMAIL" | grep -q "@users\.noreply\.github\.com"; then
   exit 0
 fi
 
-# Change classification.
-#
-# Two independent questions, deliberately not conflated:
-#
-#   NO_RELEASE  - can this change alter the shipped app? If not, no version bump
-#                 is needed. The version check exists only because create-release
-#                 tags from the app version, so demanding a bump for a change that
-#                 can never produce a release is pure friction.
-#   NO_LINT     - is there anything here a linter can even read? Markdown, JSON data
-#                 and CSV are not lintable by this toolchain.
-#
-# The rules live in scripts/classify-changes.mjs, shared with the `classify` job in
-# .github/workflows/build-and-release.yml. Keeping one implementation is the point:
-# this used to be a hand-maintained list here and a second copy as paths-ignore in
-# the workflow, in two different glob dialects.
+# Documentation-only detection.
 #
 # --no-renames is required: with rename detection, --name-only reports only the
 # destination path, so `app/foo.ts -> docs/foo.md` would look like a doc change.
@@ -39,26 +25,32 @@ fi
 # a source file alongside a README edit would look like a doc change.
 STAGED_FILES=$(git diff --cached --name-only --no-renames)
 
-# If node is unavailable for any reason, fall through to the full checks rather
-# than silently waving a change through.
-CLASSIFY=$(printf '%s\n' "$STAGED_FILES" | node scripts/classify-changes.mjs 2>/dev/null) || CLASSIFY=""
+DOCS_ONLY=1
+HAS_STAGED=0
 
-NO_RELEASE=$(printf '%s\n' "$CLASSIFY" | sed -n 's/^no_release=//p')
-NO_LINT=$(printf '%s\n' "$CLASSIFY" | sed -n 's/^no_lint=//p')
-HAS_STAGED=$(printf '%s\n' "$CLASSIFY" | sed -n 's/^has_files=//p')
+while IFS= read -r staged_file; do
+  if [ -n "$staged_file" ]; then
+    HAS_STAGED=1
+    # POSIX `case` globs: `*` also matches `/`, so these cover nested paths.
+    case "$staged_file" in
+      README.md|CHANGELOG.md|LICENSE|.github/copilot-instructions.md) ;;
+      docs/*.md|.github/skills/*.md) ;;
+      *)
+        DOCS_ONLY=0
+        break
+        ;;
+    esac
+  fi
+done <<STAGED_FILE_LIST
+$STAGED_FILES
+STAGED_FILE_LIST
 
 # An empty index (for example a message-only `git commit --amend`) falls through
-# to the full checks rather than being treated as a no-release change.
-if [ "$HAS_STAGED" = "true" ] && [ "$NO_RELEASE" = "true" ] && [ "$NO_LINT" = "true" ]; then
-  echo "📝 Docs/data-only change — skipping lint and version checks"
+# to the full checks rather than being treated as documentation.
+if [ "$HAS_STAGED" = "1" ] && [ "$DOCS_ONLY" = "1" ]; then
+  echo "📝 Documentation-only change — skipping lint and version checks"
   exit 0
 fi
 
-npm run lint
-
-if [ "$HAS_STAGED" = "true" ] && [ "$NO_RELEASE" = "true" ]; then
-  echo "🔬 Research-only change — linted, skipping version check (cannot trigger a release)"
-  exit 0
-fi
-
+npm run lint 
 npm run test-version

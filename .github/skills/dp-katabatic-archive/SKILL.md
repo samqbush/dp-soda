@@ -4,8 +4,9 @@ description: >
   Refresh and maintain the local katabatic wind research archive for the DP Ecowitt stations,
   then re-score the prediction rule against it. Use this skill whenever the user wants to update,
   refresh, backfill, or check the state of the wind data archive — including "refresh the
-  katabatic archive", "update the wind data", "run the weekly archive", "backfill the meter
-  history", "how far behind is the archive", "re-run the backtest", "re-score the katabatic
+  katabatic archive", "update the wind data", "run the daily archive", "run the weekly archive",
+  "backfill the meter history", "how far behind is the archive", "re-run the backtest", "re-score
+  the katabatic
   rule", "how is the wind research looking", "did we get any new rideable mornings", or any
   request to pull down recent Ecowitt history for research rather than for a go/no-go call. Also
   trigger when the user returns from travel and wants to catch the data up, asks whether they
@@ -122,7 +123,14 @@ averages, or estimates. The entire value of this archive is that absence is reco
 
 **Holfuy data is not yet part of the backtest.** `data/holfuy-archive/` is pure collection —
 nothing labels or scores it, because there is not enough of it yet. Do not present Lookout Mtn
-numbers as validated; the honest line is "we started recording it on 2026-07-31 and have N days."
+numbers as validated; the honest line is "collection started 2026-07-25 and we have N days, none
+of it scored." Get N by counting `data/holfuy-archive/lookout-mtn/*/*.json` rather than quoting a
+number from here — this file has been stale before.
+
+**There is no Lookout-based go/no-go rule, and users may believe there is.** The rationale for
+collecting it is compelling enough that it gets misremembered as a finding. If asked what ridge
+flow implies for the morning, say plainly that nothing is validated yet, and check
+`research/katabatic-prediction.md` §8.1 for the current state rather than improvising a threshold.
 Why it is worth collecting is measured, not assumed: over 12 months, as overnight (00:00–05:00)
 predictors of the 06:00–08:00 session, Soda's own meter scored AUC 0.729 while every accessible
 remote substitute was worse (Golden ridge PWS 0.627, Hwy 93 RWIS 0.587, Rooney Rd RWIS 0.551),
@@ -135,14 +143,20 @@ completed. Completeness is now judged by whether `fetched_at` is later than the 
 day, so partial days are re-fetched once and then settle. A day being re-fetched that looks like
 it was already there is this working as intended, not a bug.
 
-**A daily GitHub Action also does this** (`.github/workflows/katabatic-archive.yml`, 14:00 UTC).
-Note that GitHub only fires scheduled workflows on the **default branch** — while this work sits
-on a feature branch the cron does not run, so the local command is the real mechanism until it
-merges. Say so if the user assumes it is running automatically. **This now matters more than it
-did:** on a feature branch, every day nobody runs the command locally is a Holfuy day lost.
+**This archive is maintained by hand, through this skill. There is no automation.** A scheduled
+workflow was built and then deliberately removed: GitHub only fires `schedule` events on the
+**default branch**, and this research deliberately lives on the `katabatic-research` branch and
+is not merged to `main`. Those two facts cannot both hold, so the cron could never have run. The
+local command is the only mechanism.
 
-The workflow commits and pushes on its own. When running locally, do not push anything unless
-asked; offer a commit as a checkpoint rather than doing it unprompted.
+**Say this plainly if the user assumes it is running automatically.** And weigh it against the
+Holfuy window above: every day nobody runs the command is a Holfuy day permanently lost. If the
+archive status shows the Holfuy station more than ~4 days behind, treat that as urgent and run
+the fetch before doing anything else the user asked for.
+
+Commit the fetched data to the `katabatic-research` branch — that is where the archive lives.
+Offer the commit as a checkpoint rather than doing it unprompted, and do not push or merge to
+`main` unless the user explicitly asks.
 
 ## Answering questions from the archive
 

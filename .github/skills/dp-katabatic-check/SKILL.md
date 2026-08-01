@@ -87,6 +87,26 @@ attention to the *range* and the `over-N` percentage, not just the average — a
 that swings 8–22 is a very different session than a steady 15. If they need 15 and it's
 averaging 15, say that it's marginal rather than implying comfort.
 
+> ⚠️ **Near threshold, the mean trend is the wrong statistic — read `over-N` instead.** When the
+> average sits within ~1.5 mph of the user's threshold, stop trusting the `Trend:` word and read
+> the `over-N` percentage across the last few slices. The ±3.0 mph trend band is deliberately
+> calibrated for events well above threshold (it exists so routine mountain-wave lulls don't
+> report `DECAYING` and talk someone out of a live session). At threshold it hides the decay:
+> half the distribution is sitting within a hair of the line, so a sub-band mean drop pushes a
+> large share below it. At avg 25 a 1 mph drop moves nothing across the line; at avg 15 against a
+> 15 mph threshold it moves a lot.
+>
+> A monotonic `over-N` slide is decay **regardless of what the trend word says**. Measured on
+> 2026-08-01: `Trend: HOLDING (-0.6 mph)` printed while `over-15` ran 83% → 67% → 50% → 33% → 17%
+> across the hour around the call. The mean barely moved; the session was over. Name it
+> explicitly — *"averaging 15, but the share of readings above 15 has halved in 45 minutes; this
+> is fading, not holding."*
+>
+> **This changes the wording, not the verdict.** Per §2 a missed session costs the whole morning
+> against a five-minute look, so never use a declining `over-N` to suppress a go. Use it to
+> sharpen the advice: be at the gate on the minute, expect the tail rather than the peak, and
+> don't count on the back half of the window.
+
 **Drying air.** Falling humidity overnight indicates the clear-sky radiative cooling that drives
 drainage flow. Rising humidity or a cloud deck undercuts the mechanism, and an event running
 without it is on borrowed time.
@@ -120,6 +140,13 @@ Check this **before** analysing anything, because it can make the whole question
 If the requested session window starts before the gate opens, say so immediately and shift
 the analysis to the time they can actually be on the water. If the gate opens after the event
 is likely over (see below), lead with that — it is the answer, regardless of the wind.
+
+**If sunrise falls within ~30 min of gate-open, downgrade a marginal event.** The +57 min median
+window below is measured from *sunrise*, not from arrival — so when the two nearly coincide, the
+decay clock is already running when the user walks in and they get the tail of the event rather
+than its peak. This is the May–Aug trap against the 6:00 gate, not just a June one: sunrise is
+~5:32 in June and ~6:00 in early August, both inside the margin. A solidly-above-threshold event
+survives this fine; one already sitting at threshold usually does not.
 
 ### Then: when does the wind end?
 
@@ -183,10 +210,14 @@ Structure that works well:
 Keep it tight. Tables beat paragraphs for numbers. Skip preamble entirely — no "I checked the
 meter and here's what I found", just lead with the answer.
 
-## Calibration example
+## Calibration examples
 
-A real run, for reference on tone and how the signals fired. At 5:49am the user asked whether
-Soda would hold above 15 mph for a 6–7am session:
+Two real runs. **Read both** — they are near-identical at call time and resolve in opposite
+directions, which is the point.
+
+### Case 1 — marginal call that paid off
+
+At 5:49am the user asked whether Soda would hold above 15 mph for a 6–7am session:
 
 - Direction locked 262°–288° for 100+ minutes — inside the ideal window, not wandering.
 - Clean build: ~3 mph at 3:50 → 10 by 4:15 → 14–16 sustained from 4:25 on.
@@ -200,6 +231,35 @@ with the honest caveat that 14–16 mph sat *at* the 15 mph threshold rather tha
 Outcome: the 6am hour averaged 16.0 mph, the 7am hour fell to 11.3, and by 8am it was 4.9 with
 the direction swung to SSE. The window call was right and the caveat was warranted — worth
 noting that hedging on a marginal threshold is not weakness, it's accuracy.
+
+### Case 2 — the same fingerprint, and it did not pay off (2026-08-01)
+
+Every structural signal matched Case 1, and the morning was still a bust:
+
+- Direction locked 263°–285°, 100% consistency, 100% in-ideal — textbook.
+- Clean overnight build: 13.2 at midnight → 16.8 peak at 3am.
+- Both neighbours dead — Standley 1.2 mph, Boulder Res 3.7 mph. Clean local-jet confirmation.
+- Humidity flat-low 53–55% all night.
+- Sunrise 5:58 against the 6:00 gate.
+- `Trend: HOLDING (-0.6 mph)`, 30-min avg 14.7.
+
+The call was "go now, solid 6:00–6:45," with the at-threshold caveat. Outcome: the post-gate
+hours averaged **12.8 / 13.4 / 13.7**, with only 10 sustained minutes over 15 all morning — and
+every one of those minutes fell *before* the gate opened. Labeled not rideable. The user's report
+back was "light session."
+
+**What separated the two cases was visible at call time, and it was not direction, build shape,
+humidity, or neighbour contrast — all four were textbook on both mornings.** It was amplitude
+trajectory: the 30-min average had already slid 15.7 → 14.7 and `over-15` from 83% to 50% before
+the call went out, while the trend word still read `HOLDING` because -0.6 mph sits inside the
+±3.0 band. Case 1 was genuinely holding at 14–16; Case 2 was two-thirds of the way through its
+decay and looked the same on every other axis.
+
+The lesson is not "be more pessimistic." It is that on a marginal morning the `over-N` trajectory
+is the only signal that discriminates, so read it deliberately rather than leaning on the four
+structural signals that agree on almost every real event. The right Case 2 call was still *go* —
+but worded as "the tail of a fading event, be at the gate on the minute, don't expect the back
+half," not "solid 6:00–6:45."
 
 ## Notes on the data source
 
