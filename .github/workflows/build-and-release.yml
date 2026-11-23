@@ -142,9 +142,6 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
 
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
-
       # Extract app version and bundle identifier from app.config.js
       - name: 🏷️ Extract app version and bundle ID from app.config.js
         id: get_version
@@ -334,9 +331,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
-
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
 
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file

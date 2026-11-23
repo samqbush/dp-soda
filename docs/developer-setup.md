@@ -410,6 +410,12 @@ in sync, which `npm run test-version` enforces on every PR.
 4. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
    artifacts attached
 
+Native builds install dependencies with `npm ci` and build exactly what is in
+`package-lock.json`. To move to Expo's newer recommended versions, run
+`npx expo install --fix` locally on an `upgrade/` branch and commit the updated
+`package.json`/`package-lock.json`. (CI no longer runs `--fix`, because it made
+builds non-reproducible and broke them whenever Expo published conflicting patches.)
+
 The `create-release` job is gated on `if: github.event_name == 'push'`, so it
 runs **only when something lands on `main`**. A manual "Run workflow" instead
 runs `upload-artifacts`, which bundles the IPA/AAB/APK as a workflow artifact
