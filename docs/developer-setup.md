@@ -361,12 +361,17 @@ and always fail.
 
 ### Git Workflow
 
-1. **Create feature branches** from `main`
-2. **Make small, focused commits** with clear messages
+1. **Create branches from `dev`** named `<type>/<kebab-description>`:
+   - `feature/` — new functionality (e.g. `feature/rename-colorado-lakes-wind-monitor`)
+   - `fix/` — bug fixes
+   - `chore/` — tooling, CI, refactors with no user-facing change
+   - `docs/` — documentation only
+   - `upgrade/` — dependency or SDK upgrades (e.g. `upgrade/expo-sdk-55`)
+2. **Make small, focused commits** using [Conventional Commits](https://www.conventionalcommits.org/): `type(optional-scope): summary` — e.g. `feat: …`, `fix(ecowitt): …`, `ci: …`, `docs: …`, `chore: …`
 3. **Run linting** before committing: `npm run lint` (enforced by Husky pre-commit hook, skipped for documentation-only commits)
-4. **Create pull requests** for code review
+4. **Open pull requests into `dev`** for code review
 5. **Merge after review** and CI checks pass
-6. **Production build** triggers automatically on merge to main
+6. **Release**: open a `dev` → `main` PR (bump the version first); the production build triggers automatically on merge to `main`
 
 ---
 
