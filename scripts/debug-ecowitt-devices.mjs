@@ -52,7 +52,7 @@ async function debugDeviceListAPI(config) {
       params,
       timeout: 5000, // Reduced timeout to 5 seconds
       headers: {
-        'User-Agent': 'DawnPatrol/1.0'
+        'User-Agent': 'ColoradoLakesWindMonitor/1.0'
       }
     });
 
@@ -122,7 +122,7 @@ async function fetchEcowittDeviceList(config) {
       params,
       timeout: 5000, // Reduced timeout
       headers: {
-        'User-Agent': 'DawnPatrol/1.0'
+        'User-Agent': 'ColoradoLakesWindMonitor/1.0'
       }
     });
 

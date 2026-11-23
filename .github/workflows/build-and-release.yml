@@ -1,4 +1,4 @@
-name: Build Dawn Patrol Alarm - Combined Release
+name: Build Colorado Lakes Wind Monitor - Combined Release
 
 # Documentation-only changes skip this workflow entirely. This is a correctness
 # fix as much as a cost saving: `create-release` runs `gh release create
@@ -214,7 +214,10 @@ jobs:
           # Find the .xcworkspace (required)
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           echo "Found workspace: $WORKSPACE_FILE"
-          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          # Expo prebuild names the workspace and scheme after the sanitized app name
+          SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          echo "Using scheme: $SCHEME"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme $SCHEME"
           
           # Extract provisioning profile UUID and name
           PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
@@ -635,7 +638,7 @@ jobs:
           EOF
           
           {
-            echo "## Dawn Patrol Alarm v${APP_VERSION}"
+            echo "## Colorado Lakes Wind Monitor v${APP_VERSION}"
             echo ""
             echo "**Release Build from merge to main**"
             echo ""
@@ -649,7 +652,7 @@ jobs:
           # Create the unified draft release with all files
           gh release create "v${{ needs.ios-build.outputs.app-version }}" \
             --draft \
-            --title "Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}" \
+            --title "Colorado Lakes Wind Monitor v${{ needs.ios-build.outputs.app-version }}" \
             --notes-file "release_body.md" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa#iOS App Store IPA" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.aab#Android App Bundle (AAB)" \

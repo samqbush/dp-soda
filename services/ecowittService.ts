@@ -15,10 +15,10 @@ const getNativeHeaders = (): Record<string, string> => {
   if (Platform.OS === 'web') return {};
   return {
     'User-Agent': Platform.select({
-      ios: 'DawnPatrol/1.0 (iOS)',
-      android: 'DawnPatrol/1.0 (Android)',
-      default: 'DawnPatrol/1.0'
-    }) ?? 'DawnPatrol/1.0'
+      ios: 'ColoradoLakesWindMonitor/1.0 (iOS)',
+      android: 'ColoradoLakesWindMonitor/1.0 (Android)',
+      default: 'ColoradoLakesWindMonitor/1.0'
+    }) ?? 'ColoradoLakesWindMonitor/1.0'
   };
 };
 
@@ -649,9 +649,9 @@ export async function fetchEcowittWindData(): Promise<EcowittWindDataPoint[]> {
       timeout: 10000,
       headers: {
         'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
+          ios: 'ColoradoLakesWindMonitor/1.0 (iOS)',
+          android: 'ColoradoLakesWindMonitor/1.0 (Android)',
+          default: 'ColoradoLakesWindMonitor/1.0'
         })
       }
     });
@@ -1019,9 +1019,9 @@ export async function fetchEcowittRealTimeData(config: EcowittApiConfig): Promis
       timeout: 10000,
       headers: {
         'User-Agent': Platform.select({
-          ios: 'DawnPatrol/1.0 (iOS)',
-          android: 'DawnPatrol/1.0 (Android)',
-          default: 'DawnPatrol/1.0'
+          ios: 'ColoradoLakesWindMonitor/1.0 (iOS)',
+          android: 'ColoradoLakesWindMonitor/1.0 (Android)',
+          default: 'ColoradoLakesWindMonitor/1.0'
         })
       }
     });

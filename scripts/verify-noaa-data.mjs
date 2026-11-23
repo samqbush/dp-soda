@@ -13,7 +13,7 @@
 import axios from 'axios';
 
 const BASE_URL = 'https://api.weather.gov';
-const USER_AGENT = 'DawnPatrolAlarm/1.0 (contact@dawnpatrolalarm.com)';
+const USER_AGENT = 'ColoradoLakesWindMonitor/1.0 (https://github.com/samqbush/dp-soda)';
 
 // Our target locations
 const LOCATIONS = {

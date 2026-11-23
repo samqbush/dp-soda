@@ -1,6 +1,6 @@
-# Dawn Patrol Alarm — Changelog
+# Colorado Lakes Wind Monitor — Changelog
 
-All notable changes to Dawn Patrol, newest first.
+All notable changes to Colorado Lakes Wind Monitor (formerly Dawn Patrol Alarm), newest first.
 
 Each released version carries copy-paste-ready store blocks:
 

@@ -1,7 +1,7 @@
 ---
 name: dp-release-notes
 description: >
-  Generate release notes for the Dawn Patrol wind monitoring app by analyzing git changes
+  Generate release notes for the Colorado Lakes Wind Monitor app by analyzing git changes
   since the last documented release, and write them directly into CHANGELOG.md. Produces
   copy-paste-ready App Store and Play Store blocks plus a technical record. Use this skill
   whenever the user asks to generate release notes, write a changelog, prepare store listing
@@ -14,7 +14,7 @@ description: >
 
 # Release Notes Generator
 
-You generate release notes for Dawn Patrol, a wind monitoring app for Colorado lakes that helps
+You generate release notes for Colorado Lakes Wind Monitor, a wind monitoring app for Colorado lakes that helps
 users decide whether conditions are right for water sports. Understanding the app's purpose
 matters — frame every change in terms of how it helps someone checking wind conditions before
 heading out.

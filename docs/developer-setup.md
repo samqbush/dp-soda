@@ -1,6 +1,6 @@
 # Developer Setup
 
-Complete setup guide for developers working on the Dawn Patrol Alarm project.
+Complete setup guide for developers working on the Colorado Lakes Wind Monitor project.
 
 ## Table of Contents
 
@@ -521,7 +521,7 @@ rm -f distribution.p12 cert_b64.txt profile_b64.txt profile.mobileprovision
 **Step 6: Verify the new certificate works**
 
 ```bash
-gh workflow run "Build Dawn Patrol Alarm - Combined Release" --repo samqbush/dp-soda
+gh workflow run "Build Colorado Lakes Wind Monitor - Combined Release" --repo samqbush/dp-soda
 gh run watch --repo samqbush/dp-soda
 ```
 
@@ -539,6 +539,12 @@ gh run watch --repo samqbush/dp-soda
 **Android**: APK + AAB available for upload Android Play store
 
 **iOS**: IPA available for manual upload to App Store Connect / TestFlight
+
+### App Naming
+
+- **Public name**: "Colorado Lakes Wind Monitor" (formerly "Dawn Patrol Alarm"). Used in-app, in docs, release titles, and as the store listing name. Store listing names are set manually in App Store Connect and Play Console, not by the build.
+- **Home-screen label**: `expo.name` in `app.config.js` is "CO Lakes Wind" because iOS truncates icon labels at ~12 characters. Expo prebuild also derives the Xcode workspace/scheme from it (`COLakesWind`); the iOS build job reads the scheme from the generated workspace, so no workflow change is needed if it changes again.
+- **Do not change** `bundleIdentifier`/`package` (`com.samqbush.dpsoda`), `slug` (`dp-soda`), or `scheme` (`dpsoda`). Changing them creates a new store app or unlinks the EAS project.
 
 ### Manual Release
 #### Android

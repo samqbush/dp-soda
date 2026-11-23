@@ -130,7 +130,7 @@ export default function RootLayout() {
         backgroundColor: '#ffffff' 
       }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
-          Dawn Patrol Alarm
+          Colorado Lakes Wind Monitor
         </Text>
         <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center' }}>
           Loading took longer than expected. Continuing anyway...
@@ -150,7 +150,7 @@ export default function RootLayout() {
         backgroundColor: Platform.OS === 'android' ? '#ffffff' : undefined 
       }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
-          Dawn Patrol Alarm
+          Colorado Lakes Wind Monitor
         </Text>
         <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center' }}>
           Something went wrong during app initialization
