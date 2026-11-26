@@ -21,7 +21,8 @@
 - Details: `docs/developer-setup.md` → Build Triggers.
 
 ## Release Tracking (private)
-- This repo is public. Per-release state and private notes live in the private repo `samqbush/dp-soda-ops`: one pinned issue per release (label `release`), plus `follow-up` issues. Never copy them into this repo.
+- This repo is public. Per-release state and private notes live in the private repo `samqbush/dp-soda-ops`: one pinned issue per release (label `release`), `follow-up` issues, and private plans in `docs/` (e.g. Google Play production access). Never copy them into this repo. Put new private notes there, not in untracked files here.
+- To edit its files, clone it next to this repo (`gh repo clone samqbush/dp-soda-ops ../dp-soda-ops`) or read them with `gh api repos/samqbush/dp-soda-ops/contents/<path>`.
 - Read the active tracker with `gh issue list -R samqbush/dp-soda-ops --label release --state open`, then `gh issue view <n> -R samqbush/dp-soda-ops`. Update its checklist with `gh issue edit` as PRs merge or steps complete.
 - When a new release starts, create its issue there with the generic steps from `docs/developer-setup.md` → Manual Release.
 
