@@ -33,8 +33,9 @@ name: Smoke - launch, station tabs, settings
 - extendedWaitUntil:
     visible: "Configure your app preferences"
     timeout: 15000
+- takeScreenshot: 04-settings-top
 - scrollUntilVisible:
     element: "Version"
     direction: DOWN
 - assertVisible: "${APP_VERSION}"
-- takeScreenshot: 04-settings
+- takeScreenshot: 04-settings-version

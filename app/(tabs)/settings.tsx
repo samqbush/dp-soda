@@ -23,6 +23,8 @@ export default function SettingsScreen() {
       contentContainerStyle={[
         styles.scrollContentContainer,
         { 
+          // No header image here, so keep the title clear of the status bar
+          paddingTop: insets.top,
           paddingBottom: Platform.OS === 'ios' ? insets.bottom + 80 : 20 // Extra padding for iOS tab bar
         }
       ]}
