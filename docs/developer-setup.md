@@ -635,14 +635,19 @@ gh run watch --repo samqbush/dp-soda
 - **Do not change** `bundleIdentifier`/`package` (`com.samqbush.dpsoda`), `slug` (`dp-soda`), or `scheme` (`dpsoda`). Changing them creates a new store app or unlinks the EAS project.
 
 ### Manual Release
-#### Android
-- https://play.google.com/console/u/0/developers & select app
-- Test and release > Testing > Closed testing > manage track > Create new release
 
-#### iOS
-- https://appstoreconnect.apple.com/apps & select app
-- TestFlight > update App Encyryption Documentation
-- Click + under iOS & add package for submission when ready for publishing
+Track each release's progress in a pinned issue in the private `samqbush/dp-soda-ops` repo, not in this public repo. Every release follows these steps:
+
+1. Bump the version (`app.config.js`) and write the `CHANGELOG.md` entry with store blocks (`npm run check:release-notes`).
+2. Open the `dev` → `main` release PR and wait for the native builds and smoke tests to pass.
+3. Test the run's artifacts on real phones:
+   - **Android:** sideload the APK with `adb install -r`. If the Play Store version is installed, uninstall it first, because Play's signing key differs from the upload key. Open every tab, because R8 can strip classes needed at runtime.
+   - **iPhone:** the IPA is signed `app-store-connect`, so upload it to TestFlight with Transporter.
+4. Merge the release PR. This creates a **draft** GitHub Release with the IPA/AAB/APK.
+5. Play Console (https://play.google.com/console/u/0/developers, select the app): Test and release > Testing > Closed testing > Manage track > Create new release. Upload the AAB and paste the Play Store block.
+6. App Store Connect (https://appstoreconnect.apple.com/apps, select the app): TestFlight > update the App Encryption Documentation. Then click + under iOS, add the build for submission and paste the App Store block.
+7. If the store listing name changed, update it by hand in both consoles.
+8. Publish the draft GitHub Release and reinstall any sideloaded test phones from the store.
 
 ---
 
