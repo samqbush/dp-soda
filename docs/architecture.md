@@ -29,8 +29,8 @@ Colorado Lakes Wind Monitor follows a **service-oriented architecture** with cle
 ├─────────────────────────────────────────────────────────────┤
 │                    Business Logic Layer                     │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Hooks    │    │  Contexts   │    │   Config    │     │
-│  │  (hooks/)   │    │ (contexts/) │    │  (config/)  │     │
+│  │    Hooks    │    │    Utils    │    │   Config    │     │
+│  │  (hooks/)   │    │  (utils/)   │    │  (config/)  │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 ├─────────────────────────────────────────────────────────────┤
 │                      Service Layer                          │
@@ -137,14 +137,13 @@ API Request
 
 ```
 app/
-├── _layout.tsx              # Root layout, SettingsContext provider
+├── _layout.tsx              # Root layout and navigation
 ├── +not-found.tsx           # 404 screen
 └── (tabs)/
-    ├── _layout.tsx          # Tab bar config (5 tabs)
+    ├── _layout.tsx          # Tab bar config (4 tabs)
     ├── index.tsx            # Soda Lake (home)
     ├── standley-lake.tsx    # Standley Lake
     ├── boulder-res.tsx      # Boulder Reservoir
-    ├── wind-guru.tsx        # Predictions (experimental, gated)
     └── settings.tsx         # App settings
 ```
 
@@ -169,12 +168,7 @@ app/
 
 ## State Management
 
-### Pattern: Custom Hooks + Context
-
-**SettingsContext** (`contexts/SettingsContext.tsx`):
-- Wind Guru enabled/disabled toggle
-- Wind threshold preferences
-- Persisted via AsyncStorage
+### Pattern: Custom Hooks
 
 **Station Wind Hooks**:
 - `useStationWind.ts` — Base hook for wind data fetching

@@ -168,7 +168,6 @@ dp-soda/
 │       ├── index.tsx          # Home/Soda Lake tab
 │       ├── standley-lake.tsx  # Standley Lake wind tab
 │       ├── boulder-res.tsx    # Boulder Reservoir wind tab
-│       ├── wind-guru.tsx      # Wind Guru predictions tab
 │       └── settings.tsx       # Settings tab
 ├── components/                # Reusable UI components
 │   ├── ui/                    # Generic UI primitives
@@ -374,9 +373,10 @@ flows in `.maestro/` against the real Release builds:
 - `smoke.yaml` — launch, wait for live data, open every station tab, and check
   the version in Settings. Asserts only static text, since wind values change.
 - `upgrade-before.yaml` / `upgrade-after.yaml` (Android only) — install the
-  previous GitHub release's APK, turn on the Wind Guru tab, install the new APK
-  over it (same signing key, like a Play Store update), and confirm the setting
-  survived. The previous release is the newest release, drafts included, whose
+  previous GitHub release's APK, raise the wind threshold to 35 mph, install
+  the new APK over it (same signing key, like a Play Store update), and confirm
+  the setting survived. `android-smoke.sh` drags the slider with `adb` because
+  older releases have no `testID` on it. The previous release is the newest release, drafts included, whose
   tag isn't the current version.
 
 The iOS job builds an unsigned Release `.app` for the Simulator separately,
@@ -393,7 +393,7 @@ Play Console's Android vitals stay blank until enough opted-in users install
 from Play, so this is the only memory reading for the closed-test app.
 
 Flows tap tabs by `testID` (`tab-soda-lake`, `tab-standley-lake`,
-`tab-boulder-res`, `tab-wind-guru`, `tab-settings`, set in
+`tab-boulder-res`, `tab-settings`, set in
 `app/(tabs)/_layout.tsx`). When adding a station tab, give it a `testID` and add
 a step to `smoke.yaml`. To run a flow locally against an emulator or simulator
 with the app installed: `maestro test -e APP_VERSION=<version> .maestro/smoke.yaml`.

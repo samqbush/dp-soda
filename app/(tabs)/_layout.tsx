@@ -7,12 +7,10 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppSettings } from '@/contexts/SettingsContext';
 
 export default function TabLayout() {
   const rawColorScheme = useColorScheme();
   const colorScheme = (rawColorScheme === 'light' || rawColorScheme === 'dark') ? rawColorScheme : 'light';
-  const { settings } = useAppSettings();
 
   return (
     <Tabs
@@ -51,15 +49,6 @@ export default function TabLayout() {
           title: 'Boulder Res',
           tabBarButtonTestID: 'tab-boulder-res',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="drop.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="wind-guru"
-        options={{
-          title: 'Wind Guru',
-          tabBarButtonTestID: 'tab-wind-guru',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="cloud.sun.fill" color={color} />,
-          href: settings.windGuruEnabled ? '/wind-guru' : null,
         }}
       />
       <Tabs.Screen

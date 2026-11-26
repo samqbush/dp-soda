@@ -165,4 +165,4 @@ scratch file to copy from.
 - CI enforces a version increment on pull requests to `main` (`npm run test-version`). Any PR
   touching files outside the ignore list needs a bump in `app.config.js`.
 - The app monitors Soda Lake, Standley Lake and Boulder Reservoir via Ecowitt weather stations.
-- The "Wind Guru" feature is experimental and disabled by default.
+- The experimental "Wind Guru" tab was removed in v1.1.1; don't describe it as a current feature.

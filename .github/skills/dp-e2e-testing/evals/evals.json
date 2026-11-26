@@ -15,8 +15,8 @@
     },
     {
       "id": 3,
-      "prompt": "I want to add a test that verifies you can enable Wind Guru in settings and then see the full Wind Guru page. Like a cross-tab flow test.",
-      "expected_output": "A test that navigates to settings, clicks the toggle with force:true, navigates to wind-guru, verifies content, then cleans up by toggling back off. Should handle state isolation properly.",
+      "prompt": "I want to add a test that drags the wind threshold slider in Settings and checks the new mph value is shown, then confirms it's still set after reloading the page.",
+      "expected_output": "A test in e2e/settings.spec.ts that navigates to /settings, changes the slider (force:true where clicking), verifies the new 'N mph' text, reloads and verifies it persisted, then restores the 15 mph default so other serial tests aren't affected.",
       "files": []
     }
   ]
