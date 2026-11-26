@@ -33,6 +33,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Soda Lake',
+          tabBarButtonTestID: 'tab-soda-lake',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -40,6 +41,7 @@ export default function TabLayout() {
         name="standley-lake"
         options={{
           title: 'Standley Lake',
+          tabBarButtonTestID: 'tab-standley-lake',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="wind" color={color} />,
         }}
       />
@@ -47,6 +49,7 @@ export default function TabLayout() {
         name="boulder-res"
         options={{
           title: 'Boulder Res',
+          tabBarButtonTestID: 'tab-boulder-res',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="drop.fill" color={color} />,
         }}
       />
@@ -54,6 +57,7 @@ export default function TabLayout() {
         name="wind-guru"
         options={{
           title: 'Wind Guru',
+          tabBarButtonTestID: 'tab-wind-guru',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cloud.sun.fill" color={color} />,
           href: settings.windGuruEnabled ? '/wind-guru' : null,
         }}
@@ -62,6 +66,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
+          tabBarButtonTestID: 'tab-settings',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
         }}
       />

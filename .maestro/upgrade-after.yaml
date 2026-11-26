@@ -1,0 +1,13 @@
+# Upgrade test, step 2: runs after the new build is installed over the previous
+# release. The Wind Guru tab enabled by upgrade-before.yaml must still be shown.
+appId: com.samqbush.dpsoda
+name: Upgrade - settings survive the upgrade
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-wind-guru"
+    timeout: 90000
+- tapOn:
+    id: "tab-wind-guru"
+- takeScreenshot: 05-upgraded-wind-guru

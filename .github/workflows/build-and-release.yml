@@ -14,6 +14,12 @@ name: Build Colorado Lakes Wind Monitor - Combined Release
 # workflow skipped by paths-ignore reports as pending and will block merges. The
 # remedy then is to drop paths-ignore in favour of an always-running classifier
 # job plus per-job `if:` conditions (and a `merge_group` trigger).
+#
+# What runs where:
+# - PR into `dev` (feature work): lint-and-test only, so feedback stays fast.
+# - PR into `main` (release) and manual runs: native builds plus native smoke
+#   tests (Maestro on an Android emulator and an iOS Simulator).
+# - Push to `main`: native builds and the GitHub release.
 on:
   push:
     branches: [main]
@@ -27,7 +33,7 @@ on:
       - '.github/skills/*.md'
       - '.github/skills/**/*.md'
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
       - 'README.md'
       - 'CHANGELOG.md'
@@ -68,13 +74,14 @@ jobs:
           npm run lint
           npm run test:coverage
 
-      # Pull requests only. On a push to `main`, origin/main is the commit being
+      # Release PRs only. On a push to `main`, origin/main is the commit being
       # built, so the script would compare the version against itself and always
-      # fail. Until now this check existed only in .husky/pre-commit, which is
+      # fail. Feature PRs into `dev` don't bump the version, so they skip it too.
+      # Until now this check existed only in .husky/pre-commit, which is
       # bypassable with --no-verify and absent for commits made via the GitHub
       # web UI.
       - name: 🔢 Validate version increment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         run: npm run test-version
 
       # Apple allows 4000 characters in "What's New"; Google Play allows only 500.
@@ -110,6 +117,8 @@ jobs:
 
   # iOS Build Job
   ios-build:
+    # Skipped for feature PRs into `dev`
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     needs: lint-and-test
     runs-on: macos-latest
     outputs:
@@ -301,6 +310,8 @@ jobs:
 
   # Android Build Job
   android-build:
+    # Skipped for feature PRs into `dev`
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     needs: lint-and-test
     runs-on: ubuntu-latest
     outputs:
@@ -542,6 +553,186 @@ jobs:
           name: android-apk
           path: android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.apk
           retention-days: 1
+
+  # Native smoke tests: release PRs into `main` and manual runs only. The flows
+  # live in .maestro/ and assert static text, because wind values change.
+  android-smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    needs: android-build
+    # Pinned for KVM and emulator support, like lint-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      APP_VERSION: ${{ needs.android-build.outputs.app-version }}
+      MAESTRO_VERSION: 2.12.1
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./new-apk/
+
+      # The previous release's APK is signed with the same upload key, so
+      # installing the new APK over it mirrors a Play Store update. Releases are
+      # often drafts, which `gh release list` includes for this token.
+      - name: 📥 Download previous release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV_TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName' \
+            | grep -vx "v$APP_VERSION" | head -n1 || true)
+          if [ -z "$PREV_TAG" ]; then
+            echo "::warning::No previous release found; skipping the upgrade test"
+            exit 0
+          fi
+          echo "Previous release: $PREV_TAG"
+          gh release download "$PREV_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.apk' --dir prev-apk
+          echo "PREV_APK=$(find prev-apk -name '*.apk' | head -n1)" >> "$GITHUB_ENV"
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🎼 Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: ⚡ Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 🤖 Run smoke tests on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/android-smoke.sh "new-apk/dp-soda-${{ env.APP_VERSION }}.apk" "${{ env.APP_VERSION }}" "${{ env.PREV_APK }}"
+
+      - name: 📤 Upload smoke test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: android-smoke-results
+          path: maestro-output/
+          retention-days: 7
+
+  # Builds the Release configuration for the Simulator (unsigned, JS bundled, no
+  # Metro), because the App Store-signed IPA from ios-build cannot run there.
+  ios-smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    needs: lint-and-test
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      MAESTRO_VERSION: 2.12.1
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏷️ Extract app version
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+
+      - name: 🍎 Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 🔧 Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
+        env:
+          CI: 1
+
+      - name: 📦 Install CocoaPods dependencies
+        run: cd ios && pod install
+
+      - name: 🏗️ Build Release app for the Simulator
+        run: |
+          cd ios
+          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
+          SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          xcodebuild build \
+            -workspace "$WORKSPACE_FILE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ../build \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee ../xcodebuild.log | grep -E "error:|warning: .*deprecated|\*\* BUILD" || true
+          APP_PATH="$(pwd)/../build/Build/Products/Release-iphonesimulator/$SCHEME.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::Simulator build failed; see xcodebuild.log"
+            tail -n 100 ../xcodebuild.log
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: 📱 Boot iPhone Simulator and install app
+        run: |
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "::error::No available iPhone simulator"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🎼 Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: 🧪 Run smoke tests on iOS Simulator
+        run: maestro test --device "$SIM_UDID" --test-output-dir maestro-output/smoke -e APP_VERSION="$APP_VERSION" .maestro/smoke.yaml
+
+      - name: 📤 Upload smoke test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: ios-smoke-results
+          path: |
+            maestro-output/
+            xcodebuild.log
+          retention-days: 7
 
   # Unified Release Job (only on push to main)
   create-release:
