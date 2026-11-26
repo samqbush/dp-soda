@@ -18,11 +18,19 @@ OUT=maestro-output
 
 mkdir -p "$OUT"
 adb wait-for-device
+
+# A freshly booted CI emulator often raises "Pixel Launcher isn't responding",
+# which covers the app and fails every assertion. Suppress ANR/crash dialogs
+# and dismiss any already showing before each flow.
+adb shell settings put global hide_error_dialogs 1
+close_dialogs() { adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null; }
+close_dialogs
 adb uninstall "$APP_ID" >/dev/null 2>&1 || true
 
 if [ -n "$PREV_APK" ]; then
   echo "📦 Installing previous release: $PREV_APK"
   adb install "$PREV_APK"
+  close_dialogs
   maestro test --test-output-dir "$OUT/upgrade-before" .maestro/upgrade-before.yaml
 
   echo "⬆️ Upgrading in place to $NEW_APK"
@@ -32,8 +40,10 @@ else
   adb install "$NEW_APK"
 fi
 
+close_dialogs
 maestro test --test-output-dir "$OUT/smoke" -e APP_VERSION="$APP_VERSION" .maestro/smoke.yaml
 
 if [ -n "$PREV_APK" ]; then
+  close_dialogs
   maestro test --test-output-dir "$OUT/upgrade-after" .maestro/upgrade-after.yaml
 fi
