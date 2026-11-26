@@ -220,3 +220,4 @@ npx playwright show-report
 | Click timeout with overlay intercept | Expo error overlay blocking | Use `{ force: true }` on click |
 | Flaky toggle tests | Shared in-memory state between tests | Use `workers: 1`, add state checks in beforeEach |
 | "Process from webServer exited early" | Bad webServer config | Remove webServer block entirely (server runs independently) |
+| First test times out with "Loading..." still visible | Metro compiling web bundles from cold | `e2e/global-setup.ts` warms Metro before tests — keep it in `playwright.config.ts` |

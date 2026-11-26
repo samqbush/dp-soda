@@ -138,7 +138,7 @@ npm test -- __tests__/services/windAnalysis.test.ts
 
 #### End-to-End Tests (Playwright)
 
-The dev server starts automatically when you run any E2E command. If one is already running, it will be reused.
+The dev server starts automatically when you run any E2E command. If one is already running, it will be reused. Before any test runs, `e2e/global-setup.ts` loads the app once so Metro compiles its web bundles up front; on a cold CI runner that takes 30s+ and would otherwise time out the first test.
 
 All E2E projects test the **web build** in a browser — the "ios" and "android" projects use mobile viewport emulation (iPhone 14, Pixel 7), not native apps.
 
