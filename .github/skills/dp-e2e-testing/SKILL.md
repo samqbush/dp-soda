@@ -31,8 +31,8 @@ The app has 4 tabs defined in `app/(tabs)/`:
 |-----|-------|-----------|-------------|
 | **Soda Lake** | `/` (home) | `index.tsx` | Wind station data, current conditions, chart, external Ecowitt link |
 | **Standley Lake** | `/standley-lake` | `standley-lake.tsx` | Wind station data, current conditions, chart (no external link) |
-| **Wind Guru** | `/wind-guru` | `wind-guru.tsx` | Disabled by default (feature toggle). When enabled: predictions, timeline, collapsible sections |
-| **Settings** | `/settings` | `settings.tsx` | Threshold slider, Wind Guru toggle (Switch), app info/version |
+| **Boulder Res** | `/boulder-res` | `boulder-res.tsx` | Wind station data, current conditions, chart |
+| **Settings** | `/settings` | `settings.tsx` | Threshold slider, app info/version |
 
 There's also a `+not-found.tsx` for unknown routes.
 
@@ -104,46 +104,9 @@ await expect(page.getByText("Today's Wind Speed")).toBeVisible({ timeout: 30000 
 
 ### Test Isolation with Shared State
 
-The Wind Guru feature toggle persists in-memory across the browser context. Tests that toggle this setting can interfere with each other.
+Saved settings such as the wind threshold (default 15 mph) persist in AsyncStorage, which is `localStorage` on web, across the browser context. Tests that change a setting can interfere with each other.
 
-**The config uses `workers: 1` (serial execution) for this reason.** If you need to modify settings in a test:
-
-```typescript
-test.describe('Wind Guru Tab (enabled)', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/settings');
-    const toggle = page.locator('input[role="switch"]').first();
-    await toggle.click({ force: true });
-    await expect(page.getByText('Experimental Feature').first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test.afterEach(async ({ page }) => {
-    // Always restore default state
-    await page.goto('/settings');
-    const toggle = page.locator('input[role="switch"]').first();
-    await toggle.click({ force: true });
-  });
-});
-```
-
-For tests that might run after other toggle-modifying tests, check the current state first:
-
-```typescript
-const warningText = page.getByText('Wind Guru features are under development');
-if (await warningText.isVisible({ timeout: 1000 }).catch(() => false)) {
-  await toggle.click({ force: true }); // disable first
-  await page.waitForTimeout(500);
-}
-```
-
-### React Native Switch on Web
-
-The Switch component renders as `<input role="switch" type="checkbox">`. Always use:
-
-```typescript
-const toggle = page.locator('input[role="switch"]').first();
-await toggle.click({ force: true });
-```
+**The config uses `workers: 1` (serial execution) for this reason.** If a test changes a setting, restore the default in `afterEach`, and don't assume the starting value when another test may have changed it.
 
 ### Tab Navigation
 
@@ -160,7 +123,7 @@ For tests that don't start on the home tab, navigate directly:
 ```typescript
 await page.goto('/settings');
 await page.goto('/standley-lake');
-await page.goto('/wind-guru');
+await page.goto('/boulder-res');
 ```
 
 ## Existing Test Coverage
@@ -169,10 +132,10 @@ Review the existing test files before adding new ones to avoid duplication:
 
 - `e2e/soda-lake.spec.ts` — Station name, wind data, current conditions, chart, external link, subtitle
 - `e2e/standley-lake.spec.ts` — Station name, wind data, subtitle, current conditions, no external link
-- `e2e/settings.spec.ts` — Title, threshold section, preferences, app features, app info, toggle interaction
-- `e2e/wind-guru.spec.ts` — Disabled state (message, instructions, warning), enabled state (full page, migration notice, timeline, footer, collapsible expand/collapse)
+- `e2e/boulder-res.spec.ts` — Station name, subtitle, wind data, current conditions, chart
+- `e2e/settings.spec.ts` — Title, threshold section, preferences, app info
 - `e2e/navigation.spec.ts` — Tab-to-tab navigation flow
-- `e2e/not-found.spec.ts` — 404 page, error message, link-back-to-home
+- `e2e/not-found.spec.ts` — 404 page, error message, link-back-to-home, removed `/wind-guru` route
 
 ## Adding New Tests
 

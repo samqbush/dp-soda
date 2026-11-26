@@ -24,6 +24,9 @@ Dawn Patrol Alarm is now Colorado Lakes Wind Monitor!
 NEW
 • A new name — the app is now Colorado Lakes Wind Monitor, a clearer name for what it does: live wind conditions at Soda Lake, Standley Lake and Boulder Reservoir. On your home screen it appears as "CO Lakes Wind". Nothing else changes: your settings and wind threshold carry over, and the app updates in place.
 
+REMOVED
+• The experimental Wind Guru tab and its Settings toggle. Wind Guru is no longer being developed, so the tab only showed a placeholder.
+
 FIXED
 • The Settings title no longer sits underneath the clock and status bar at the top of the screen.
 • Various bug fixes and stability improvements across the app.
@@ -40,6 +43,9 @@ NEW
 IMPROVED
 • A smaller, faster app.
 
+REMOVED
+• The experimental Wind Guru tab, which is no longer in development.
+
 FIXED
 • The Settings title no longer overlaps the status bar.
 • Various bug fixes and stability improvements.
@@ -53,6 +59,15 @@ FIXED
   (`com.samqbush.dpsoda`), slug and URL scheme are unchanged, so store listings and existing
   installs carry over. The store listing names must be renamed by hand in App Store Connect and
   Play Console.
+
+### 🗑️ Removed
+
+- **Wind Guru tab** (#47) — the experimental tab and its Settings toggle are gone. Development
+  stopped long ago and the tab only showed a "coming soon" placeholder, which confused users.
+  `SettingsContext`, which held only the toggle, is removed too; the stale `app_settings`
+  AsyncStorage key is left in place and ignored. `/wind-guru` now shows the 404 screen. The
+  Android upgrade smoke test now checks that a 35 mph wind threshold survives the upgrade,
+  since the toggle no longer exists in the new build.
 
 ### 🐛 Fixes
 
@@ -94,8 +109,8 @@ FIXED
 - **Version increment enforcement** (`f1fee6e`) — `npm run test-version` now runs in CI on pull
   requests to `main`. Previously this lived only in `.husky/pre-commit`, which is bypassable with
   `--no-verify` and absent entirely for commits made through the GitHub web UI.
-- **End-to-end test suite** — Playwright harness with fixtures covering navigation, settings and
-  Wind Guru, plus iOS and Android platform-specific configurations.
+- **End-to-end test suite** — Playwright harness with fixtures covering every tab, navigation and
+  the 404 page, plus iOS and Android platform-specific configurations.
 - **Flaky first e2e test fixed** (#44, `07bdcaa`) — a Playwright `globalSetup` warms Metro before
   tests run; a cold compile took 30s+ and timed out the first test.
 - **Agent skills** — `dp-e2e-testing` (`5607f6b`) and `dp-release-notes` skills added under

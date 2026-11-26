@@ -2,18 +2,14 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ThresholdSlider } from '@/components/ThresholdSlider';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useAppSettings } from '@/contexts/SettingsContext';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, View, Platform, Switch } from 'react-native';
+import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
-  const { settings, updateSetting } = useAppSettings();
   const insets = useSafeAreaInsets();
 
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({}, 'card');
 
@@ -45,47 +41,6 @@ export default function SettingsScreen() {
               Set the wind speed threshold for the yellow reference line displayed on the wind charts. This helps you quickly identify when conditions meet your preferred wind speed.
             </ThemedText>
             <ThresholdSlider />
-          </View>
-        </View>
-
-        {/* App Features Section */}
-        <View style={styles.settingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>App Features</ThemedText>
-          
-          <View style={[styles.settingCard, { backgroundColor: cardColor }]}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <ThemedText style={styles.settingLabel}>Wind Guru Tab</ThemedText>
-                <ThemedText style={styles.settingDescription}>
-                  Enable experimental wind forecasting features
-                </ThemedText>
-              </View>
-              <Switch
-                trackColor={{ false: '#767577', true: tintColor }}
-                thumbColor={settings.windGuruEnabled ? '#f5dd4b' : '#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-                onValueChange={async (value) => {
-                  try {
-                    await updateSetting('windGuruEnabled', value);
-                  } catch (err) {
-                    console.error('Failed to update Wind Guru setting:', err);
-                    Alert.alert('Error', 'Failed to update Wind Guru setting');
-                  }
-                }}
-                value={settings.windGuruEnabled}
-              />
-            </View>
-            
-            {settings.windGuruEnabled && (
-              <View style={styles.warningBox}>
-                <ThemedText style={[styles.warningText, { color: '#FF9500' }]}>
-                  ⚠️ <ThemedText style={{ fontWeight: 'bold' }}>Experimental Feature</ThemedText>
-                </ThemedText>
-                <ThemedText style={[styles.warningText, { color: textColor, opacity: 0.8 }]}>
-                  Wind Guru features are under development and may not be reliable for critical decisions.
-                </ThemedText>
-              </View>
-            )}
           </View>
         </View>
 
@@ -178,38 +133,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginBottom: 12,
     lineHeight: 20,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  warningBox: {
-    backgroundColor: 'rgba(255, 149, 0, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9500',
-  },
-  warningText: {
-    fontSize: 14,
-    lineHeight: 18,
-    marginBottom: 4,
   },
   infoRow: {
     flexDirection: 'row',

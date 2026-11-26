@@ -5,9 +5,10 @@
 #
 # Usage: android-smoke.sh <new-apk> <app-version> [previous-release-apk]
 #
-# With a previous-release APK: install it, change a setting, upgrade in place to
-# the new APK (same signing key, so this mirrors a store update), then run the
-# smoke flow and confirm the setting survived. Without one: fresh install only.
+# With a previous-release APK: install it, raise the wind threshold to 35 mph,
+# upgrade in place to the new APK (same signing key, so this mirrors a store
+# update), then run the smoke flow and confirm the setting survived. Without
+# one: fresh install only.
 set -euo pipefail
 
 NEW_APK="$1"
@@ -27,11 +28,35 @@ close_dialogs() { adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_D
 close_dialogs
 adb uninstall "$APP_ID" >/dev/null 2>&1 || true
 
+# Drag the wind threshold slider on the open Settings screen to its maximum
+# (35 mph). Older releases have no testID on the slider and Maestro can't
+# select by widget class, so find the screen's only SeekBar with uiautomator.
+max_wind_threshold() {
+  local bounds x1 y1 x2 y2 y
+  bounds=$(adb exec-out uiautomator dump /dev/tty \
+    | grep -o 'class="android.widget.SeekBar"[^>]*bounds="[^"]*"' | head -n1 \
+    | grep -o '\[[0-9,]*\]\[[0-9,]*\]' || true)
+  if [ -z "$bounds" ]; then
+    echo "❌ Wind threshold slider not found on the Settings screen"
+    exit 1
+  fi
+  read -r x1 y1 x2 y2 <<<"$(echo "$bounds" | tr '[],' '    ')"
+  y=$(( (y1 + y2) / 2 ))
+  adb shell input swipe $(( (x1 + x2) / 2 )) "$y" "$x2" "$y" 400
+  # The slider saves 500 ms after the last change; wait for it before upgrading
+  sleep 2
+  if ! adb exec-out uiautomator dump /dev/tty | grep -q 'text="35 mph"'; then
+    echo "❌ Wind threshold did not change to 35 mph"
+    exit 1
+  fi
+}
+
 if [ -n "$PREV_APK" ]; then
   echo "📦 Installing previous release: $PREV_APK"
   adb install "$PREV_APK"
   close_dialogs
   maestro test --test-output-dir "$OUT/upgrade-before" .maestro/upgrade-before.yaml
+  max_wind_threshold
 
   echo "⬆️ Upgrading in place to $NEW_APK"
   adb install -r "$NEW_APK"

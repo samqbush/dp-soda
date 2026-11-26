@@ -9,7 +9,6 @@ A wind monitoring app for Colorado lakes (Soda Lake, Standley Lake, Boulder Rese
 - **Custom Wind Charts**: SVG charts with horizontal scrolling, gap handling, and time labels
 - **Configurable Thresholds**: Set your minimum wind speed for visual threshold indicators
 - **Transmission Quality**: Detects antenna issues and explains data gaps
-- **Wind Guru (Experimental)**: Advanced katabatic wind predictions (server migration in progress)
 
 ## Tabs
 
@@ -18,8 +17,7 @@ A wind monitoring app for Colorado lakes (Soda Lake, Standley Lake, Boulder Rese
 | **Soda Lake** (Home) | Real-time wind at Soda Lake Dam 1 |
 | **Standley Lake** | Real-time wind at Standley Lake |
 | **Boulder Res** | Real-time wind at Boulder Reservoir |
-| **Wind Guru** | Experimental predictions (disabled by default, enable in Settings) |
-| **Settings** | Threshold config, Wind Guru toggle, app info |
+| **Settings** | Threshold config, app info |
 
 ## Getting Started
 
@@ -37,7 +35,6 @@ A wind monitoring app for Colorado lakes (Soda Lake, Standley Lake, Boulder Rese
 ### Settings
 
 - **Wind Threshold**: Minimum wind speed (mph) shown as a reference line on charts
-- **Wind Guru Toggle**: Enable/disable the experimental prediction tab
 
 ## Transmission Quality Indicators
 
@@ -63,7 +60,6 @@ Builds run automatically via GitHub Actions on push to `main`. See [Developer Se
 ## Coming Soon
 
 - Push notifications for ideal wind conditions
-- Server-powered Wind Guru predictions
 
 ## Contact & Support
 

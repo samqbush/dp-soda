@@ -16,8 +16,6 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { prepareSplashScreen } from '@/services/androidSplash';
 import { getGlobalSessionId } from '@/utils/sessionUtils';
 
-import { SettingsProvider } from '@/contexts/SettingsContext';
-
 // Ignore specific warnings in production builds
 if (!__DEV__) {
   LogBox.ignoreLogs([
@@ -181,15 +179,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
-        <SettingsProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </SettingsProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>
   );
