@@ -383,6 +383,15 @@ The iOS job builds an unsigned Release `.app` for the Simulator separately,
 because the App Store-signed IPA can't run there. Screenshots and logs are
 uploaded as the `android-smoke-results` and `ios-smoke-results` artifacts.
 
+After `smoke.yaml`, the Android job records the app's foreground memory
+(`RssAnon` + `VmSwap` from `/proc/<pid>/status`, the same "Anon RSS + Swap"
+metric as Play's memory vital) in the job summary and in `memory.txt` in the
+artifact. It is informational and never fails the job. Play's bad-behavior
+threshold for apps is 2 GB in the foreground on 4 GB devices, from February 2027
+([technical quality requirements](https://support.google.com/googleplay/android-developer/answer/17492799)).
+Play Console's Android vitals stay blank until enough opted-in users install
+from Play, so this is the only memory reading for the closed-test app.
+
 Flows tap tabs by `testID` (`tab-soda-lake`, `tab-standley-lake`,
 `tab-boulder-res`, `tab-wind-guru`, `tab-settings`, set in
 `app/(tabs)/_layout.tsx`). When adding a station tab, give it a `testID` and add
@@ -439,7 +448,17 @@ in sync, which `npm run test-version` enforces on release PRs into `main`.
 1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage, plus the
    version-increment check on release pull requests
 2. **iOS Build** (macOS) — Expo prebuild → Xcode archive → signed IPA
-3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
+3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK.
+   Release builds run R8 with code optimization, obfuscation and resource
+   shrinking. The `expo-build-properties` plugin in `app.config.js` turns on
+   minification and resource shrinking, and `plugins/withR8Optimization.js`
+   switches the release ProGuard defaults from `proguard-android.txt` (which
+   contains `-dontoptimize`) to `proguard-android-optimize.txt`. Google Play
+   requires at least 25% optimization, obfuscation and shrinking for apps with
+   more than 10 MB of DEX code from February 2027; without R8 this app ships
+   about 36 MB. Check the three percentages for each upload in Play Console's
+   app bundle explorer. If a release build crashes on a missing class, add a
+   keep rule through the `expo-build-properties` `android.extraProguardRules` option.
 4. **Native smoke tests** (release PRs and manual runs) — Maestro on an Android
    emulator and an iOS Simulator; see [Native smoke tests](#native-smoke-tests-maestro)
 5. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
