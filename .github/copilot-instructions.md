@@ -12,6 +12,12 @@
 - This application is built and released using GitHub Actions in .github/workflows
 - It is manually published to the Play Store and App Store using the release notes from GitHub Actions as the release notes for the app store releases.
 
+## Git Branching and Commits
+- Branch from `dev` and open PRs into `dev`. Only `dev` → `main` PRs go to `main` (release builds run on merge to `main`).
+- Branch names: `<type>/<kebab-description>`, where type is `feature`, `fix`, `chore`, `docs`, or `upgrade` (e.g. `feature/rename-colorado-lakes-wind-monitor`, `upgrade/expo-sdk-55`).
+- Commit messages follow Conventional Commits: `type(optional-scope): summary` (e.g. `feat: …`, `fix(ecowitt): …`, `ci: …`, `docs: …`).
+- Full details: `docs/developer-setup.md` → Git Workflow.
+
 ## Documentation - STRICT ANTI-SPRAWL POLICY
 - **ONLY 3 documentation files allowed:**
   1. `README.md` (root) - User-facing information only

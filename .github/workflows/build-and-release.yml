@@ -1,4 +1,4 @@
-name: Build Dawn Patrol Alarm - Combined Release
+name: Build Colorado Lakes Wind Monitor - Combined Release
 
 # Documentation-only changes skip this workflow entirely. This is a correctness
 # fix as much as a cost saving: `create-release` runs `gh release create
@@ -46,7 +46,8 @@ permissions:
 jobs:
   # Lint and Test Job (runs once, shared by both platform builds)
   lint-and-test:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright cannot install browsers on ubuntu-latest (26.04) yet
+    runs-on: ubuntu-24.04
     steps:
       - name: 📦 Checkout repository
         uses: actions/checkout@v4
@@ -141,9 +142,6 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
 
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
-
       # Extract app version and bundle identifier from app.config.js
       - name: 🏷️ Extract app version and bundle ID from app.config.js
         id: get_version
@@ -214,7 +212,10 @@ jobs:
           # Find the .xcworkspace (required)
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           echo "Found workspace: $WORKSPACE_FILE"
-          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          # Expo prebuild names the workspace and scheme after the sanitized app name
+          SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          echo "Using scheme: $SCHEME"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme $SCHEME"
           
           # Extract provisioning profile UUID and name
           PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
@@ -331,9 +332,6 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
 
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
-
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
         run: |
@@ -349,7 +347,7 @@ jobs:
           java-version: '17'
 
       - name: 📱 Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v4
 
       - name: 💾 Cache Gradle packages
         uses: actions/cache@v4
@@ -635,7 +633,7 @@ jobs:
           EOF
           
           {
-            echo "## Dawn Patrol Alarm v${APP_VERSION}"
+            echo "## Colorado Lakes Wind Monitor v${APP_VERSION}"
             echo ""
             echo "**Release Build from merge to main**"
             echo ""
@@ -649,7 +647,7 @@ jobs:
           # Create the unified draft release with all files
           gh release create "v${{ needs.ios-build.outputs.app-version }}" \
             --draft \
-            --title "Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}" \
+            --title "Colorado Lakes Wind Monitor v${{ needs.ios-build.outputs.app-version }}" \
             --notes-file "release_body.md" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa#iOS App Store IPA" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.aab#Android App Bundle (AAB)" \

@@ -1,4 +1,4 @@
-# Dawn Patrol - Wind Monitor
+# Colorado Lakes Wind Monitor
 
 A wind monitoring app for Colorado lakes (Soda Lake, Standley Lake, Boulder Reservoir) that helps you decide whether it's worth heading out for water sports based on real-time wind conditions from Ecowitt weather stations.
 

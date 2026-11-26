@@ -329,7 +329,7 @@ export const checkSimplifiedAlarmConditions = async (): Promise<{
     const criteria = await getAlarmCriteria();
     const threshold = criteria.minimumAverageSpeed;
     
-    // Use the DP Soda Lakes device for Dawn Patrol alarm
+    // Use the DP Soda Lakes device for the morning wind alarm
     const deviceName = 'DP Soda Lakes';
     
     // Fetch current real-time wind data (not historical)

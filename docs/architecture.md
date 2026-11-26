@@ -1,6 +1,6 @@
 # Architecture Guide
 
-Technical architecture overview of the Dawn Patrol Alarm application.
+Technical architecture overview of the Colorado Lakes Wind Monitor application.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Technical architecture overview of the Dawn Patrol Alarm application.
 
 ### High-Level Overview
 
-Dawn Patrol follows a **service-oriented architecture** with clear separation of concerns:
+Colorado Lakes Wind Monitor follows a **service-oriented architecture** with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

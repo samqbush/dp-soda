@@ -14,14 +14,14 @@ export function HeaderImage({ title, subtitle }: HeaderImageProps) {
     <View style={styles.headerImageContainer}>
       {Platform.OS === 'android' ? (
         <SafeImage
-          source={require('@/assets/images/dawnpatrol.jpeg')}
+          source={require('@/assets/images/header.jpeg')}
           style={styles.headerImage}
           backgroundColor="#A1CEDC"
           contentFit="cover"
         />
       ) : (
         <Image
-          source={require('@/assets/images/dawnpatrol.jpeg')}
+          source={require('@/assets/images/header.jpeg')}
           style={styles.headerImage}
           contentFit="cover"
         />

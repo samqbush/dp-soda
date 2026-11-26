@@ -1,6 +1,6 @@
 # Developer Setup
 
-Complete setup guide for developers working on the Dawn Patrol Alarm project.
+Complete setup guide for developers working on the Colorado Lakes Wind Monitor project.
 
 ## Table of Contents
 
@@ -361,12 +361,17 @@ and always fail.
 
 ### Git Workflow
 
-1. **Create feature branches** from `main`
-2. **Make small, focused commits** with clear messages
+1. **Create branches from `dev`** named `<type>/<kebab-description>`:
+   - `feature/` — new functionality (e.g. `feature/rename-colorado-lakes-wind-monitor`)
+   - `fix/` — bug fixes
+   - `chore/` — tooling, CI, refactors with no user-facing change
+   - `docs/` — documentation only
+   - `upgrade/` — dependency or SDK upgrades (e.g. `upgrade/expo-sdk-55`)
+2. **Make small, focused commits** using [Conventional Commits](https://www.conventionalcommits.org/): `type(optional-scope): summary` — e.g. `feat: …`, `fix(ecowitt): …`, `ci: …`, `docs: …`, `chore: …`
 3. **Run linting** before committing: `npm run lint` (enforced by Husky pre-commit hook, skipped for documentation-only commits)
-4. **Create pull requests** for code review
+4. **Open pull requests into `dev`** for code review
 5. **Merge after review** and CI checks pass
-6. **Production build** triggers automatically on merge to main
+6. **Release**: open a `dev` → `main` PR (bump the version first); the production build triggers automatically on merge to `main`
 
 ---
 
@@ -404,6 +409,12 @@ in sync, which `npm run test-version` enforces on every PR.
 3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
 4. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
    artifacts attached
+
+Native builds install dependencies with `npm ci` and build exactly what is in
+`package-lock.json`. To move to Expo's newer recommended versions, run
+`npx expo install --fix` locally on an `upgrade/` branch and commit the updated
+`package.json`/`package-lock.json`. (CI no longer runs `--fix`, because it made
+builds non-reproducible and broke them whenever Expo published conflicting patches.)
 
 The `create-release` job is gated on `if: github.event_name == 'push'`, so it
 runs **only when something lands on `main`**. A manual "Run workflow" instead
@@ -516,7 +527,7 @@ rm -f distribution.p12 cert_b64.txt profile_b64.txt profile.mobileprovision
 **Step 6: Verify the new certificate works**
 
 ```bash
-gh workflow run "Build Dawn Patrol Alarm - Combined Release" --repo samqbush/dp-soda
+gh workflow run "Build Colorado Lakes Wind Monitor - Combined Release" --repo samqbush/dp-soda
 gh run watch --repo samqbush/dp-soda
 ```
 
@@ -534,6 +545,12 @@ gh run watch --repo samqbush/dp-soda
 **Android**: APK + AAB available for upload Android Play store
 
 **iOS**: IPA available for manual upload to App Store Connect / TestFlight
+
+### App Naming
+
+- **Public name**: "Colorado Lakes Wind Monitor" (formerly "Dawn Patrol Alarm"). Used in-app, in docs, release titles, and as the store listing name. Store listing names are set manually in App Store Connect and Play Console, not by the build.
+- **Home-screen label**: `expo.name` in `app.config.js` is "CO Lakes Wind" because iOS truncates icon labels at ~12 characters. Expo prebuild also derives the Xcode workspace/scheme from it (`COLakesWind`); the iOS build job reads the scheme from the generated workspace, so no workflow change is needed if it changes again.
+- **Do not change** `bundleIdentifier`/`package` (`com.samqbush.dpsoda`), `slug` (`dp-soda`), or `scheme` (`dpsoda`). Changing them creates a new store app or unlinks the EAS project.
 
 ### Manual Release
 #### Android

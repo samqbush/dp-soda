@@ -2,7 +2,7 @@ require('dotenv/config');
 
 module.exports = {
   expo: {
-    name: "Dawn Patrol Alarm",
+    name: "CO Lakes Wind",
     slug: "dp-soda",
     version: "1.1.1",
     orientation: "portrait",

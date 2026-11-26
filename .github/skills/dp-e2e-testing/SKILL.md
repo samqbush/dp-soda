@@ -1,7 +1,7 @@
 ---
 name: dp-e2e-testing
 description: >
-  Write, run, and maintain Playwright e2e tests for the dp-soda (Dawn Patrol) Expo React Native web app.
+  Write, run, and maintain Playwright e2e tests for the dp-soda (Colorado Lakes Wind Monitor) Expo React Native web app.
   Use this skill whenever the user asks about e2e tests, integration tests, Playwright tests, browser testing,
   smoke tests, or wants to verify that the web app works end-to-end. Also trigger when the user says things like
   "test that page", "verify the UI", "check if the app loads", "add a test for the new feature",
@@ -12,7 +12,7 @@ description: >
 
 # dp-soda Playwright E2E Testing
 
-You are writing and maintaining Playwright e2e tests for the **Dawn Patrol (dp-soda)** app — an Expo React Native app that monitors wind conditions at Colorado lakes for kiteboarding.
+You are writing and maintaining Playwright e2e tests for the **Colorado Lakes Wind Monitor (dp-soda)** app — an Expo React Native app that monitors wind conditions at Colorado lakes for kiteboarding.
 
 ## Quick Reference
 
