@@ -43,10 +43,7 @@ module.exports = {
       softwareKeyboardLayoutMode: "pan",
       allowBackup: true,
       versionCode: 16,
-      theme: "@style/Theme.App.SplashScreen",
-
-      enableProguard: false,
-      enableShrinkResources: false
+      theme: "@style/Theme.App.SplashScreen"
     },
     web: {
       bundler: "metro",
@@ -58,6 +55,18 @@ module.exports = {
       "expo-audio",
       "expo-font",
       "expo-image",
+      [
+        // Google Play requires R8 optimization, obfuscation and shrinking for
+        // apps with more than 10 MB of DEX code (enforced from February 2027).
+        "expo-build-properties",
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true
+          }
+        }
+      ],
+      "./plugins/withR8Optimization.js",
       [
         "expo-notifications",
         {

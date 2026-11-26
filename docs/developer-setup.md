@@ -439,7 +439,17 @@ in sync, which `npm run test-version` enforces on release PRs into `main`.
 1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage, plus the
    version-increment check on release pull requests
 2. **iOS Build** (macOS) — Expo prebuild → Xcode archive → signed IPA
-3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
+3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK.
+   Release builds run R8 with code optimization, obfuscation and resource
+   shrinking. The `expo-build-properties` plugin in `app.config.js` turns on
+   minification and resource shrinking, and `plugins/withR8Optimization.js`
+   switches the release ProGuard defaults from `proguard-android.txt` (which
+   contains `-dontoptimize`) to `proguard-android-optimize.txt`. Google Play
+   requires at least 25% optimization, obfuscation and shrinking for apps with
+   more than 10 MB of DEX code from February 2027; without R8 this app ships
+   about 36 MB. Check the three percentages for each upload in Play Console's
+   app bundle explorer. If a release build crashes on a missing class, add a
+   keep rule through the `expo-build-properties` `android.extraProguardRules` option.
 4. **Native smoke tests** (release PRs and manual runs) — Maestro on an Android
    emulator and an iOS Simulator; see [Native smoke tests](#native-smoke-tests-maestro)
 5. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
