@@ -49,6 +49,13 @@ permissions:
   contents: write
   pull-requests: read
 
+# One run per PR: a new push cancels the PR's superseded run, so merges into
+# `dev` don't stack 45-minute native runs on the release PR. Push and manual
+# runs get a unique group (run_id) so a queued release is never replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Lint and Test Job (runs once, shared by both platform builds)
   lint-and-test:

@@ -443,6 +443,20 @@ in sync, which `npm run test-version` enforces on release PRs into `main`.
 - Manual trigger via GitHub Actions "Run workflow" button (always runs, even for
   docs-only changes)
 
+Each native run takes about 45 minutes, so avoid redundant ones:
+
+- While a `dev` → `main` release PR is open, every merge into `dev` re-runs the
+  full native pipeline on it, even docs-only merges, because `pull_request` path
+  filters check the PR's whole diff
+  ([docs](https://docs.github.com/en/enterprise-cloud@latest/actions/reference/workflows-and-actions/workflow-syntax#git-diff-comparisons)).
+  Batch changes into fewer merges, and don't start manual runs; the release PR's
+  checks cover them.
+- A new push to a PR cancels that PR's in-progress run (`concurrency` in the
+  workflow). Pushes to `main` and manual runs each get their own group, so they
+  are never cancelled or queued behind another run.
+- Use a manual run only when no release PR is open and the change touches
+  native config, `.maestro/`, `.github/scripts/` or the workflow itself.
+
 ### Build Pipeline
 
 1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage, plus the
