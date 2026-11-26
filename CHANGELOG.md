@@ -37,6 +37,9 @@ Colorado Lakes Wind Monitor helps you decide whether the wind is right before yo
 NEW
 • Dawn Patrol Alarm is now Colorado Lakes Wind Monitor ("CO Lakes Wind" on your home screen). Your settings carry over and the app updates in place.
 
+IMPROVED
+• A smaller, faster app.
+
 FIXED
 • The Settings title no longer overlaps the status bar.
 • Various bug fixes and stability improvements.
@@ -64,6 +67,15 @@ FIXED
   required peer of `expo-audio`), and `babel-preset-expo` is a direct devDependency so Jest resolves
   it. `react-native-reanimated` 4.3.1 and `react-native-worklets` 0.8.3 are kept above the SDK 55 pins and
   listed in `expo.install.exclude`.
+- **R8 optimization, obfuscation and shrinking on Android** (#45, `c6cf1ff`) — prepares for
+  Google Play's February 2027 requirement for apps with over 10 MB of DEX code. DEX drops from
+  36.2 MB (33,888 classes) to 7.9 MB (8,077 classes). Uses `expo-build-properties`
+  (`enableMinifyInReleaseBuilds`, `enableShrinkResourcesInReleaseBuilds`) and a new
+  `plugins/withR8Optimization.js` that switches to `proguard-android-optimize.txt`. The old
+  `enableProguard` / `enableShrinkResources` keys in `app.config.js` were never Expo config keys
+  and had no effect.
+- **Android memory reading** (#45, `d39d5c4`) — the Android smoke test logs `RssAnon` and
+  `VmSwap` to the job summary (about 150 MB against Play's 2 GB threshold). Informational only.
 - **Ecowitt API unit parameters** (`b0a894d`) — use the documented `wind_speed_unitid`,
   `temp_unitid` and `pressure_unitid` names with explicit unit ids. The app's wind values were
   already correct by accident; `scripts/debug-dp-stations.mjs` over-reported wind by 2.24×.
@@ -84,6 +96,8 @@ FIXED
   `--no-verify` and absent entirely for commits made through the GitHub web UI.
 - **End-to-end test suite** — Playwright harness with fixtures covering navigation, settings and
   Wind Guru, plus iOS and Android platform-specific configurations.
+- **Flaky first e2e test fixed** (#44, `07bdcaa`) — a Playwright `globalSetup` warms Metro before
+  tests run; a cold compile took 30s+ and timed out the first test.
 - **Agent skills** — `dp-e2e-testing` (`5607f6b`) and `dp-release-notes` skills added under
   `.github/skills/`.
 - **Android build fixes** — Gradle `lintVital` disabled via init script, Metaspace raised to 1g,
