@@ -383,6 +383,15 @@ The iOS job builds an unsigned Release `.app` for the Simulator separately,
 because the App Store-signed IPA can't run there. Screenshots and logs are
 uploaded as the `android-smoke-results` and `ios-smoke-results` artifacts.
 
+After `smoke.yaml`, the Android job records the app's foreground memory
+(`RssAnon` + `VmSwap` from `/proc/<pid>/status`, the same "Anon RSS + Swap"
+metric as Play's memory vital) in the job summary and in `memory.txt` in the
+artifact. It is informational and never fails the job. Play's bad-behavior
+threshold for apps is 2 GB in the foreground on 4 GB devices, from February 2027
+([technical quality requirements](https://support.google.com/googleplay/android-developer/answer/17492799)).
+Play Console's Android vitals stay blank until enough opted-in users install
+from Play, so this is the only memory reading for the closed-test app.
+
 Flows tap tabs by `testID` (`tab-soda-lake`, `tab-standley-lake`,
 `tab-boulder-res`, `tab-wind-guru`, `tab-settings`, set in
 `app/(tabs)/_layout.tsx`). When adding a station tab, give it a `testID` and add

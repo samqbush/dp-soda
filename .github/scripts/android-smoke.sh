@@ -43,6 +43,27 @@ fi
 close_dialogs
 maestro test --test-output-dir "$OUT/smoke" -e APP_VERSION="$APP_VERSION" .maestro/smoke.yaml
 
+# Google Play's memory vital is anonymous RSS + swap, with bad-behavior
+# thresholds enforced from February 2027. Record it while the app is still in
+# the foreground after visiting every tab. Informational only: never fails the job.
+log_memory() {
+  local pid
+  pid=$(adb shell pidof "$APP_ID" | tr -d '\r' || true)
+  if [ -z "$pid" ]; then
+    echo "⚠️ $APP_ID is not running after the smoke flow; memory not measured"
+    return
+  fi
+  adb shell "grep -E '^(RssAnon|VmSwap):' /proc/$pid/status" | tr -d '\r' \
+    || echo "⚠️ Could not read /proc/$pid/status; memory not measured"
+}
+log_memory | tee "$OUT/memory.txt"
+{
+  echo "### Android memory after smoke flow (foreground)"
+  echo '```'
+  cat "$OUT/memory.txt"
+  echo '```'
+} >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
 if [ -n "$PREV_APK" ]; then
   close_dialogs
   maestro test --test-output-dir "$OUT/upgrade-after" .maestro/upgrade-after.yaml
