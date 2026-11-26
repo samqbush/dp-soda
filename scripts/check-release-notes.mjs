@@ -11,7 +11,8 @@ import fs from 'fs';
  *
  * Usage:
  *   node scripts/check-release-notes.mjs              # validate every store block
- *   node scripts/check-release-notes.mjs --print-entry # print newest entry (for release bodies)
+ *   node scripts/check-release-notes.mjs --print-entry # print newest entry
+ *   node scripts/check-release-notes.mjs --print-entry 1.2.3 # print v1.2.3's entry; exit 1 if missing
  */
 
 const CHANGELOG = 'CHANGELOG.md';
@@ -105,8 +106,16 @@ function main() {
     process.exit(1);
   }
 
-  if (process.argv.includes('--print-entry')) {
-    process.stdout.write(`${entries[0].heading}\n\n${entries[0].body.trim()}\n`);
+  const printIndex = process.argv.indexOf('--print-entry');
+  if (printIndex !== -1) {
+    const version = process.argv[printIndex + 1];
+    const entry = version ? entries.find((candidate) => candidate.version === version) : entries[0];
+    if (!entry) {
+      console.error(`❌ Error: ${CHANGELOG} has no entry for v${version} (newest is v${entries[0].version}).`);
+      console.error(`   Add a "## v${version} — YYYY-MM-DD" entry in the same PR as the version bump.`);
+      process.exit(1);
+    }
+    process.stdout.write(`${entry.heading}\n\n${entry.body.trim()}\n`);
     return;
   }
 

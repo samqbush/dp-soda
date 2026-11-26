@@ -97,6 +97,16 @@ jobs:
       - name: 📝 Validate store release notes
         run: npm run check:release-notes
 
+      # Release PRs only. The draft release body is the CHANGELOG entry for the
+      # built version, so a version bump without its entry fails here, before
+      # merge, instead of shipping the previous version's notes.
+      - name: 📝 Validate CHANGELOG entry for this version
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          node scripts/check-release-notes.mjs --print-entry "$VERSION" > /dev/null
+          echo "✅ CHANGELOG.md has an entry for v$VERSION"
+
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chrome
 
@@ -589,8 +599,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PREV_TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName' \
-            | grep -vx "v$APP_VERSION" | head -n1 || true)
+          # A failed lookup (auth, API outage) fails the step; only a successful
+          # lookup with no other release skips the upgrade test.
+          TAGS=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName')
+          PREV_TAG=$(printf '%s\n' "$TAGS" | grep -vx "v$APP_VERSION" | head -n1 || true)
           if [ -z "$PREV_TAG" ]; then
             echo "::warning::No previous release found; skipping the upgrade test"
             exit 0
@@ -687,6 +699,7 @@ jobs:
           cd ios
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          set +e
           xcodebuild build \
             -workspace "$WORKSPACE_FILE" \
             -scheme "$SCHEME" \
@@ -695,10 +708,14 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ../build \
             CODE_SIGNING_ALLOWED=NO \
-            | tee ../xcodebuild.log | grep -E "error:|warning: .*deprecated|\*\* BUILD" || true
+            > ../xcodebuild.log 2>&1
+          BUILD_STATUS=$?
+          set -e
+          grep -E "error:|warning: .*deprecated|\*\* BUILD" ../xcodebuild.log || true
           APP_PATH="$(pwd)/../build/Build/Products/Release-iphonesimulator/$SCHEME.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Simulator build failed; see xcodebuild.log"
+          # A failed build can leave a partial .app behind, so check the exit code too.
+          if [ "$BUILD_STATUS" -ne 0 ] || [ ! -d "$APP_PATH" ]; then
+            echo "::error::Simulator build failed (xcodebuild exit $BUILD_STATUS); see xcodebuild.log"
             tail -n 100 ../xcodebuild.log
             exit 1
           fi
@@ -781,16 +798,17 @@ jobs:
           APP_VERSION="${{ needs.ios-build.outputs.app-version }}"
           BUNDLE_ID="${{ needs.ios-build.outputs.bundle-id }}"
           
-          # Pull the newest CHANGELOG entry into the release body, so it's obvious what's in a
-          # build before downloading it to test.
+          # Pull this version's CHANGELOG entry into the release body, so it's obvious what's
+          # in a build before downloading it to test.
           #
           # Note: CHANGELOG.md is in this workflow's paths-ignore list, so a changelog-only
           # commit never triggers a build. The entry must land in the SAME merge as the code it
-          # describes, or this body will lag one version behind.
-          if node scripts/check-release-notes.mjs --print-entry > changelog_entry.md; then
-            echo "✅ Included newest CHANGELOG entry in the release body"
+          # describes. Release PRs enforce this in lint-and-test; if it's still missing here,
+          # use build info only rather than attaching another version's notes.
+          if node scripts/check-release-notes.mjs --print-entry "$APP_VERSION" > changelog_entry.md; then
+            echo "✅ Included the v$APP_VERSION CHANGELOG entry in the release body"
           else
-            echo "⚠️ Could not read a CHANGELOG entry; falling back to build info only"
+            echo "::warning::CHANGELOG.md has no v$APP_VERSION entry; the release body has build info only"
             : > changelog_entry.md
           fi
 
@@ -861,7 +879,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Tag**: v${{ needs.ios-build.outputs.app-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Draft (keep it a draft so builds are not public)" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms**: iOS + Android" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Type**: Release (signed for distribution)" >> $GITHUB_STEP_SUMMARY
           echo "- **iOS Bundle ID**: ${{ needs.ios-build.outputs.bundle-id }}" >> $GITHUB_STEP_SUMMARY
@@ -880,7 +898,7 @@ jobs:
           echo "2. Test the builds on your devices if needed" >> $GITHUB_STEP_SUMMARY
           echo "3. Upload IPA to [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
           echo "4. Upload AAB to [Google Play Console](https://play.google.com/console)" >> $GITHUB_STEP_SUMMARY
-          echo "5. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
+          echo "5. Keep the GitHub release a draft; the stores are where it ships" >> $GITHUB_STEP_SUMMARY
 
   # Upload artifacts for workflow_dispatch runs
   upload-artifacts:

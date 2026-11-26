@@ -420,7 +420,7 @@ with the app installed: `maestro test -e APP_VERSION=<version> .maestro/smoke.ya
 - ✅ No local build setup required for releases
 - ✅ Consistent build environment (macOS for iOS, Ubuntu for Android)
 - ✅ Integrated linting, testing, and code signing
-- ✅ Artifacts published to GitHub Releases
+- ✅ Artifacts attached to a draft GitHub Release
 
 **Version increments are manual.** CI only *reads* `expo.version` out of
 `app.config.js`; nothing bumps it for you. Increment it before opening a release
@@ -501,8 +501,9 @@ Upgrade notes:
 The `create-release` job is gated on `if: github.event_name == 'push'`, so it
 runs **only when something lands on `main`**. A manual "Run workflow" instead
 runs `upload-artifacts`, which bundles the IPA/AAB/APK as a workflow artifact
-and creates no tag or release. The draft release is never published
-automatically — review it, then publish and upload to the stores by hand.
+and creates no tag or release. Keep the GitHub release a **draft** so the
+public can't download the builds; download them from it and upload to the
+stores by hand.
 
 ### GitHub Repository Secrets
 
@@ -643,11 +644,11 @@ Track each release's progress in a pinned issue in the private `samqbush/dp-soda
 3. Test the run's artifacts on real phones:
    - **Android:** sideload the APK with `adb install -r`. If the Play Store version is installed, uninstall it first, because Play's signing key differs from the upload key. Open every tab, because R8 can strip classes needed at runtime.
    - **iPhone:** the IPA is signed `app-store-connect`, so upload it to TestFlight with Transporter.
-4. Merge the release PR. This creates a **draft** GitHub Release with the IPA/AAB/APK.
+4. Merge the release PR. This creates a **draft** GitHub Release with the IPA/AAB/APK. Keep it a draft so the public can't download the builds; the Android upgrade test also finds previous releases among the drafts.
 5. Play Console (https://play.google.com/console/u/0/developers, select the app): Test and release > Testing > Closed testing > Manage track > Create new release. Upload the AAB and paste the Play Store block.
 6. App Store Connect (https://appstoreconnect.apple.com/apps, select the app): TestFlight > update the App Encryption Documentation. Then click + under iOS, add the build for submission and paste the App Store block.
 7. If the store listing name changed, update it by hand in both consoles.
-8. Publish the draft GitHub Release and reinstall any sideloaded test phones from the store.
+8. Reinstall any sideloaded test phones from the store. Leave the GitHub release as a draft.
 
 ---
 
