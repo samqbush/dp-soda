@@ -185,6 +185,12 @@ When adding tests for new features:
 5. Run `npm run test:e2e` to verify, then `npm run lint` to ensure no issues
 6. Add any new spec files to the test summary above
 
+## Native Smoke Tests (Maestro)
+
+Playwright covers the web build only. The real iOS and Android apps are tested by Maestro flows in `.maestro/`, which CI runs on an Android emulator and iOS Simulator for release PRs (`dev` → `main`) and manual runs — see "Native smoke tests" in `docs/developer-setup.md`.
+
+When adding a station tab, set `tabBarButtonTestID: 'tab-<name>'` in `app/(tabs)/_layout.tsx` and add a tap-and-wait step for it to `.maestro/smoke.yaml`. Assert static text only (titles, card headings), never live wind values.
+
 ## Running Tests
 
 ```bash

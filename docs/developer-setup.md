@@ -287,7 +287,7 @@ dp-soda/
 | Step | Command | When it runs |
 |------|---------|--------------|
 | Lint & type-check | `npm run lint` | ✅ Automatic on every commit (Husky pre-commit hook) and on every PR |
-| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) and on every PR |
+| Version validation | `npm run test-version` | ✅ Automatic on every commit (Husky pre-commit hook) and on release PRs into `main` |
 | Unit tests | `npm test` | Run manually — CI will catch failures, but faster to verify locally |
 | E2E tests | `npm run test:e2e` | Run manually — recommended for UI changes |
 
@@ -335,8 +335,8 @@ Important details:
 - **Paths containing newlines are not supported** and fall through to the full
   checks.
 - To override deliberately, use `git commit --no-verify`. There is no
-  environment-variable bypass, and the version check now also runs on every pull
-  request, so `--no-verify` defers the check rather than skipping it.
+  environment-variable bypass, and the version check also runs on release pull
+  requests into `main`, so `--no-verify` defers the check rather than skipping it.
 
 When adding a new documentation path, update **both** the `case` patterns in
 `.husky/pre-commit` and the `paths-ignore` lists in
@@ -346,18 +346,48 @@ POSIX `case` treats `*` as matching `/`, while GitHub Actions needs an explicit
 
 ### What CI Runs on Your PR
 
-When you open a PR to `main`, GitHub Actions automatically runs:
-1. `npm run lint` — ESLint + TypeScript + YAML workflow validation
-2. `npm run test:coverage` — all unit tests with coverage report
-3. `npm run test-version` — confirms the app version was incremented relative to `main`
+CI is split so feature work gets fast feedback and releases get the slow,
+thorough checks:
 
-Full iOS and Android builds only run after merge to `main`.
+| Check | Feature PR → `dev` (~3 min) | Release PR `dev` → `main` (~45 min) |
+|-------|:---:|:---:|
+| `npm run lint` — ESLint + TypeScript + YAML workflow validation | ✅ | ✅ |
+| `npm run test:coverage` — unit tests with coverage | ✅ | ✅ |
+| `npm run check:release-notes` — store note length limits | ✅ | ✅ |
+| Playwright web e2e tests against the live APIs | ✅ | ✅ |
+| `npm run test-version` — version incremented relative to `main` | — | ✅ |
+| Signed iOS and Android builds | — | ✅ |
+| Android smoke test on an emulator, including an upgrade from the previous release | — | ✅ |
+| iOS smoke test on a Simulator | — | ✅ |
 
 Documentation-only PRs skip this workflow entirely.
 
-The version check is **pull-request only**. On a push to `main`, `origin/main` is
-the commit being built, so the script would compare the version against itself
-and always fail.
+The version check runs on **release PRs only**. On a push to `main`, `origin/main`
+is the commit being built, so the script would compare the version against
+itself and always fail; feature PRs into `dev` don't bump the version.
+
+#### Native smoke tests (Maestro)
+
+The `android-smoke` and `ios-smoke` jobs run the [Maestro](https://maestro.dev)
+flows in `.maestro/` against the real Release builds:
+
+- `smoke.yaml` — launch, wait for live data, open every station tab, and check
+  the version in Settings. Asserts only static text, since wind values change.
+- `upgrade-before.yaml` / `upgrade-after.yaml` (Android only) — install the
+  previous GitHub release's APK, turn on the Wind Guru tab, install the new APK
+  over it (same signing key, like a Play Store update), and confirm the setting
+  survived. The previous release is the newest release, drafts included, whose
+  tag isn't the current version.
+
+The iOS job builds an unsigned Release `.app` for the Simulator separately,
+because the App Store-signed IPA can't run there. Screenshots and logs are
+uploaded as the `android-smoke-results` and `ios-smoke-results` artifacts.
+
+Flows tap tabs by `testID` (`tab-soda-lake`, `tab-standley-lake`,
+`tab-boulder-res`, `tab-wind-guru`, `tab-settings`, set in
+`app/(tabs)/_layout.tsx`). When adding a station tab, give it a `testID` and add
+a step to `smoke.yaml`. To run a flow locally against an emulator or simulator
+with the app installed: `maestro test -e APP_VERSION=<version> .maestro/smoke.yaml`.
 
 ### Git Workflow
 
@@ -392,10 +422,13 @@ node scripts/increment-version.mjs patch   # or minor / major
 ```
 
 This keeps `expo.version`, `expo.ios.buildNumber` and `expo.android.versionCode`
-in sync, which `npm run test-version` enforces on every PR.
+in sync, which `npm run test-version` enforces on release PRs into `main`.
 
 ### Build Triggers
 
+- Pull request into `dev` — lint and tests only
+- Pull request into `main` — full pipeline including native builds and smoke
+  tests (no release)
 - Push to `main` branch (automatic) — **except** documentation-only pushes, which
   are filtered out by `paths-ignore`
 - Manual trigger via GitHub Actions "Run workflow" button (always runs, even for
@@ -404,10 +437,12 @@ in sync, which `npm run test-version` enforces on every PR.
 ### Build Pipeline
 
 1. **Lint & Test** (Ubuntu) — ESLint, TypeScript, Jest with coverage, plus the
-   version-increment check on pull requests
+   version-increment check on release pull requests
 2. **iOS Build** (macOS) — Expo prebuild → Xcode archive → signed IPA
 3. **Android Build** (Ubuntu) — Expo prebuild → Gradle → signed AAB + APK
-4. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
+4. **Native smoke tests** (release PRs and manual runs) — Maestro on an Android
+   emulator and an iOS Simulator; see [Native smoke tests](#native-smoke-tests-maestro)
+5. **Release** — Creates a **draft** GitHub Release tagged `v<version>` with all
    artifacts attached
 
 Native builds install dependencies with `npm ci` and build exactly what is in
