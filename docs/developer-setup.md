@@ -451,6 +451,20 @@ Native builds install dependencies with `npm ci` and build exactly what is in
 `package.json`/`package-lock.json`. (CI no longer runs `--fix`, because it made
 builds non-reproducible and broke them whenever Expo published conflicting patches.)
 
+Upgrade notes:
+- `react-native-reanimated` and `react-native-worklets` are deliberately newer
+  than the SDK 55 pins and are listed in `expo.install.exclude` in `package.json`,
+  so `--fix` leaves them alone.
+- If `--fix` fails with `ERESOLVE` on an exact-pinned peer (for example
+  `@expo/log-box`), the lockfile is holding an old transitive version. Delete
+  only the conflicting `node_modules/...` entries from `package-lock.json` and
+  rerun `npm install`. Then run `npm test`: re-resolving can un-hoist packages
+  that tooling loads by bare name (`babel-preset-expo` is a direct devDependency
+  for this reason, because `jest.config.js` loads it).
+- If you install through a private npm mirror, rewrite the `resolved` URLs in
+  `package-lock.json` back to `https://registry.npmjs.org/` before committing.
+  CI installs from public npm.
+
 The `create-release` job is gated on `if: github.event_name == 'push'`, so it
 runs **only when something lands on `main`**. A manual "Run workflow" instead
 runs `upload-artifacts`, which bundles the IPA/AAB/APK as a workflow artifact
