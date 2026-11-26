@@ -1,0 +1,24 @@
+# Upgrade test, step 1: runs against the PREVIOUS release before the new build
+# is installed over it. Turns on the Wind Guru tab so upgrade-after.yaml can
+# confirm saved settings survive the upgrade.
+#
+# Older releases have no tab testIDs, so this flow selects by visible text only.
+appId: com.samqbush.dpsoda
+name: Upgrade - change a setting on the previous release
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Current Conditions"
+    timeout: 90000
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Configure your app preferences"
+    timeout: 15000
+# Maestro reports `checked` on every Android node, so anchor to the label
+- tapOn:
+    checked: false
+    rightOf: "Wind Guru Tab"
+- extendedWaitUntil:
+    visible: "Wind Guru"
+    timeout: 10000
+- takeScreenshot: 00-previous-release-wind-guru-on
