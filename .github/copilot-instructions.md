@@ -12,6 +12,14 @@
 - This application is built and released using GitHub Actions in .github/workflows
 - It is manually published to the Play Store and App Store using the release notes from GitHub Actions as the release notes for the app store releases.
 
+## CI Runs (avoid redundant builds)
+- Locally, run only fast checks: `npm run lint`, `npx jest`, and `npm run check:release-notes` when `CHANGELOG.md` changes. Don't build the native apps locally.
+- PRs into `dev` run lint, Jest and Playwright only. That's the gate for feature work.
+- Native builds and Maestro smoke tests (~45 min) run on the `dev` → `main` release PR. Every merge into `dev` re-runs them there, even docs-only merges.
+- While a release PR is open, don't start manual runs (`gh workflow run build-and-release.yml`); merge into `dev` and rely on the release PR's checks. Batch related changes into fewer merges.
+- Start a manual run only when no release PR is open and the change touches native config, `.maestro/`, `.github/scripts/` or the workflow.
+- Details: `docs/developer-setup.md` → Build Triggers.
+
 ## Git Branching and Commits
 - Branch from `dev` and open PRs into `dev`. Only `dev` → `main` PRs go to `main` (release builds run on merge to `main`).
 - Branch names: `<type>/<kebab-description>`, where type is `feature`, `fix`, `chore`, `docs`, or `upgrade` (e.g. `feature/rename-colorado-lakes-wind-monitor`, `upgrade/expo-sdk-55`).
