@@ -16,4 +16,9 @@ test.describe('Not Found Page', () => {
     await page.getByText('Go to home screen!').click();
     await expect(page.getByText('Soda Lake').first()).toBeVisible({ timeout: 10000 });
   });
+
+  test('removed Wind Guru route shows not found', async ({ page }) => {
+    await page.goto('/wind-guru');
+    await expect(page.getByText('This screen does not exist.')).toBeVisible({ timeout: 10000 });
+  });
 });

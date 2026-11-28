@@ -129,9 +129,9 @@ async function checkDeviceData(deviceInfo) {
       start_date: formatEcowittDate(startOfDay),
       end_date: formatEcowittDate(endOfDay),
       cycle_type: '5min',
-      temp_unit: '1',
-      pressure_unit: '3', 
-      wind_unit: '6',
+      temp_unitid: '1', // Celsius (1 = Celsius, 2 = Fahrenheit)
+      pressure_unitid: '3', // hPa (3 = hPa, 4 = inHg, 5 = mmHg)
+      wind_speed_unitid: '9', // mph (6 = m/s, 7 = km/h, 8 = knots, 9 = mph)
       call_back: 'wind',
     };
 
@@ -190,18 +190,18 @@ async function checkDeviceData(deviceInfo) {
     }
 
     // Show recent data samples
-    console.log(`📋 Recent Data Samples (m/s):`);
+    console.log(`📋 Recent Data Samples (mph):`);
     const recentTimestamps = sortedTimestamps.slice(0, 5);
     recentTimestamps.forEach((timestamp, index) => {
       const date = new Date(timestamp * 1000);
       const speed = windData.wind_speed.list[timestamp.toString()];
       const direction = windData.wind_direction.list[timestamp.toString()];
       const gust = windData.wind_gust?.list?.[timestamp.toString()] || speed;
-      
-      // Convert m/s to mph for easier reading
-      const speedMph = (parseFloat(speed || '0') * 2.237).toFixed(1);
-      const gustMph = (parseFloat(gust || '0') * 2.237).toFixed(1);
-      
+
+      // Values are already mph because we requested wind_speed_unitid: '9'
+      const speedMph = parseFloat(speed || '0').toFixed(1);
+      const gustMph = parseFloat(gust || '0').toFixed(1);
+
       console.log(`   ${index + 1}. ${date.toLocaleTimeString()} - Speed: ${speedMph} mph, Dir: ${direction}°, Gust: ${gustMph} mph`);
     });
 

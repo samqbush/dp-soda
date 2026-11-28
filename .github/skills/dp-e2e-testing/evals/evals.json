@@ -1,0 +1,23 @@
+{
+  "skill_name": "dp-e2e-testing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just added a new 'About' section to the settings page that shows 'Colorado Lakes Wind Monitor is a wind monitoring app for Colorado kiteboarding.' Can you write an e2e test for it?",
+      "expected_output": "A test added to e2e/settings.spec.ts that navigates to /settings and verifies the About text is visible, using correct patterns (fixture import, appropriate timeout, no strict mode issues)",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The e2e test for soda lake wind chart is failing sometimes. It says 'Today's Wind Speed' is not visible within 30 seconds. What should I do?",
+      "expected_output": "Diagnosis that the API data may be slow to load, suggestions to increase timeout, check if dev server is running, or check if the station is reporting data. Should NOT suggest mocking data (tests use live API).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to add a test that drags the wind threshold slider in Settings and checks the new mph value is shown, then confirms it's still set after reloading the page.",
+      "expected_output": "A test in e2e/settings.spec.ts that navigates to /settings, changes the slider (force:true where clicking), verifies the new 'N mph' text, reloads and verifies it persisted, then restores the 15 mph default so other serial tests aren't affected.",
+      "files": []
+    }
+  ]
+}

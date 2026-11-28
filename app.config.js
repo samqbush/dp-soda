@@ -2,9 +2,9 @@ require('dotenv/config');
 
 module.exports = {
   expo: {
-    name: "Dawn Patrol Alarm",
+    name: "CO Lakes Wind",
     slug: "dp-soda",
-    version: "1.1.0",
+    version: "1.1.1",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dpsoda",
@@ -12,7 +12,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.samqbush.dpsoda",
-      buildNumber: "15",
+      buildNumber: "16",
       infoPlist: {
         NSMicrophoneUsageDescription: "This app does not use the microphone directly, but some of our libraries require this permission to function properly."
       },
@@ -42,11 +42,8 @@ module.exports = {
       ],
       softwareKeyboardLayoutMode: "pan",
       allowBackup: true,
-      versionCode: 15,
-      theme: "@style/Theme.App.SplashScreen",
-
-      enableProguard: false,
-      enableShrinkResources: false
+      versionCode: 16,
+      theme: "@style/Theme.App.SplashScreen"
     },
     web: {
       bundler: "metro",
@@ -58,6 +55,18 @@ module.exports = {
       "expo-audio",
       "expo-font",
       "expo-image",
+      [
+        // Google Play requires R8 optimization, obfuscation and shrinking for
+        // apps with more than 10 MB of DEX code (enforced from February 2027).
+        "expo-build-properties",
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true
+          }
+        }
+      ],
+      "./plugins/withR8Optimization.js",
       [
         "expo-notifications",
         {

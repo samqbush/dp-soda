@@ -1,20 +1,66 @@
-name: Build Dawn Patrol Alarm - Combined Release
+name: Build Colorado Lakes Wind Monitor - Combined Release
 
+# Documentation-only changes skip this workflow entirely. This is a correctness
+# fix as much as a cost saving: `create-release` runs `gh release create
+# "v$APP_VERSION"`, and a docs-only merge leaves the version unchanged, so the
+# job would fail on a duplicate tag after burning a macOS and an Android build.
+#
+# The paths-ignore list below must stay in sync with the doc allowlist in
+# .husky/pre-commit. The glob dialects differ: POSIX `case` treats `*` as
+# matching `/`, while GitHub Actions requires an explicit `**` for nested paths,
+# hence the doubled entries here.
+#
+# Caveat: if required status checks or a merge queue are added to `main`, a
+# workflow skipped by paths-ignore reports as pending and will block merges. The
+# remedy then is to drop paths-ignore in favour of an always-running classifier
+# job plus per-job `if:` conditions (and a `merge_group` trigger).
+#
+# What runs where:
+# - PR into `dev` (feature work): lint-and-test only, so feedback stays fast.
+# - PR into `main` (release) and manual runs: native builds plus native smoke
+#   tests (Maestro on an Android emulator and an iOS Simulator).
+# - Push to `main`: native builds and the GitHub release.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'docs/*.md'
+      - 'docs/**/*.md'
+      - '.github/copilot-instructions.md'
+      - '.github/skills/*.md'
+      - '.github/skills/**/*.md'
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'docs/*.md'
+      - 'docs/**/*.md'
+      - '.github/copilot-instructions.md'
+      - '.github/skills/*.md'
+      - '.github/skills/**/*.md'
   workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: read
 
+# One run per PR: a new push cancels the PR's superseded run, so merges into
+# `dev` don't stack 45-minute native runs on the release PR. Push and manual
+# runs get a unique group (run_id) so a queued release is never replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Lint and Test Job (runs once, shared by both platform builds)
   lint-and-test:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright cannot install browsers on ubuntu-latest (26.04) yet
+    runs-on: ubuntu-24.04
     steps:
       - name: 📦 Checkout repository
         uses: actions/checkout@v4
@@ -34,6 +80,32 @@ jobs:
         run: |
           npm run lint
           npm run test:coverage
+
+      # Release PRs only. On a push to `main`, origin/main is the commit being
+      # built, so the script would compare the version against itself and always
+      # fail. Feature PRs into `dev` don't bump the version, so they skip it too.
+      # Until now this check existed only in .husky/pre-commit, which is
+      # bypassable with --no-verify and absent for commits made via the GitHub
+      # web UI.
+      - name: 🔢 Validate version increment
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: npm run test-version
+
+      # Apple allows 4000 characters in "What's New"; Google Play allows only 500.
+      # An overflowing block is silently truncated by the store, so it is caught here
+      # rather than discovered during submission.
+      - name: 📝 Validate store release notes
+        run: npm run check:release-notes
+
+      # Release PRs only. The draft release body is the CHANGELOG entry for the
+      # built version, so a version bump without its entry fails here, before
+      # merge, instead of shipping the previous version's notes.
+      - name: 📝 Validate CHANGELOG entry for this version
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          node scripts/check-release-notes.mjs --print-entry "$VERSION" > /dev/null
+          echo "✅ CHANGELOG.md has an entry for v$VERSION"
 
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chrome
@@ -62,6 +134,8 @@ jobs:
 
   # iOS Build Job
   ios-build:
+    # Skipped for feature PRs into `dev`
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     needs: lint-and-test
     runs-on: macos-latest
     outputs:
@@ -93,9 +167,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
-
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
 
       # Extract app version and bundle identifier from app.config.js
       - name: 🏷️ Extract app version and bundle ID from app.config.js
@@ -167,7 +238,10 @@ jobs:
           # Find the .xcworkspace (required)
           WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
           echo "Found workspace: $WORKSPACE_FILE"
-          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme DawnPatrolAlarm"
+          # Expo prebuild names the workspace and scheme after the sanitized app name
+          SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          echo "Using scheme: $SCHEME"
+          BUILD_COMMAND="xcodebuild archive -workspace $WORKSPACE_FILE -scheme $SCHEME"
           
           # Extract provisioning profile UUID and name
           PROFILE_UUID=$(grep -A1 -a 'UUID' ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
@@ -253,6 +327,8 @@ jobs:
 
   # Android Build Job
   android-build:
+    # Skipped for feature PRs into `dev`
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     needs: lint-and-test
     runs-on: ubuntu-latest
     outputs:
@@ -284,9 +360,6 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           CI: 1
 
-      - name: 🔍 Fix package versions
-        run: npx expo install --fix
-
       # Create .env file from GitHub secrets
       - name: 🔐 Create .env file
         run: |
@@ -302,7 +375,7 @@ jobs:
           java-version: '17'
 
       - name: 📱 Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v4
 
       - name: 💾 Cache Gradle packages
         uses: actions/cache@v4
@@ -498,6 +571,195 @@ jobs:
           path: android/app/build/outputs/bundle/release/dp-soda-${{ env.APP_VERSION }}.apk
           retention-days: 1
 
+  # Native smoke tests: release PRs into `main` and manual runs only. The flows
+  # live in .maestro/ and assert static text, because wind values change.
+  android-smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    needs: android-build
+    # Pinned for KVM and emulator support, like lint-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      APP_VERSION: ${{ needs.android-build.outputs.app-version }}
+      MAESTRO_VERSION: 2.12.1
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./new-apk/
+
+      # The previous release's APK is signed with the same upload key, so
+      # installing the new APK over it mirrors a Play Store update. Releases are
+      # often drafts, which `gh release list` includes for this token.
+      - name: 📥 Download previous release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A failed lookup (auth, API outage) fails the step; only a successful
+          # lookup with no other release skips the upgrade test.
+          TAGS=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName')
+          PREV_TAG=$(printf '%s\n' "$TAGS" | grep -vx "v$APP_VERSION" | head -n1 || true)
+          if [ -z "$PREV_TAG" ]; then
+            echo "::warning::No previous release found; skipping the upgrade test"
+            exit 0
+          fi
+          echo "Previous release: $PREV_TAG"
+          gh release download "$PREV_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.apk' --dir prev-apk
+          echo "PREV_APK=$(find prev-apk -name '*.apk' | head -n1)" >> "$GITHUB_ENV"
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🎼 Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: ⚡ Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 🤖 Run smoke tests on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/android-smoke.sh "new-apk/dp-soda-${{ env.APP_VERSION }}.apk" "${{ env.APP_VERSION }}" "${{ env.PREV_APK }}"
+
+      - name: 📤 Upload smoke test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: android-smoke-results
+          path: maestro-output/
+          retention-days: 7
+
+  # Builds the Release configuration for the Simulator (unsigned, JS bundled, no
+  # Metro), because the App Store-signed IPA from ios-build cannot run there.
+  ios-smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    needs: lint-and-test
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      MAESTRO_VERSION: 2.12.1
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏷️ Extract app version
+        run: |
+          VERSION=$(node -p "const c = require('./app.config.js'); (typeof c === 'function' ? c() : c).expo.version")
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 🔐 Create .env file
+        run: |
+          echo "ECOWITT_APPLICATION_KEY=${{ secrets.ECOWITT_APPLICATION_KEY }}" > .env
+          echo "ECOWITT_API_KEY=${{ secrets.ECOWITT_API_KEY }}" >> .env
+
+      - name: 🍎 Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 🔧 Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
+        env:
+          CI: 1
+
+      - name: 📦 Install CocoaPods dependencies
+        run: cd ios && pod install
+
+      - name: 🏗️ Build Release app for the Simulator
+        run: |
+          cd ios
+          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | sed 's|./||')
+          SCHEME="${WORKSPACE_FILE%.xcworkspace}"
+          set +e
+          xcodebuild build \
+            -workspace "$WORKSPACE_FILE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ../build \
+            CODE_SIGNING_ALLOWED=NO \
+            > ../xcodebuild.log 2>&1
+          BUILD_STATUS=$?
+          set -e
+          grep -E "error:|warning: .*deprecated|\*\* BUILD" ../xcodebuild.log || true
+          APP_PATH="$(pwd)/../build/Build/Products/Release-iphonesimulator/$SCHEME.app"
+          # A failed build can leave a partial .app behind, so check the exit code too.
+          if [ "$BUILD_STATUS" -ne 0 ] || [ ! -d "$APP_PATH" ]; then
+            echo "::error::Simulator build failed (xcodebuild exit $BUILD_STATUS); see xcodebuild.log"
+            tail -n 100 ../xcodebuild.log
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: 📱 Boot iPhone Simulator and install app
+        run: |
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "::error::No available iPhone simulator"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🎼 Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: 🧪 Run smoke tests on iOS Simulator
+        run: maestro test --device "$SIM_UDID" --test-output-dir maestro-output/smoke -e APP_VERSION="$APP_VERSION" .maestro/smoke.yaml
+
+      - name: 📤 Upload smoke test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: ios-smoke-results
+          path: |
+            maestro-output/
+            xcodebuild.log
+          retention-days: 7
+
   # Unified Release Job (only on push to main)
   create-release:
     if: github.event_name == 'push'
@@ -536,12 +798,22 @@ jobs:
           APP_VERSION="${{ needs.ios-build.outputs.app-version }}"
           BUNDLE_ID="${{ needs.ios-build.outputs.bundle-id }}"
           
+          # Pull this version's CHANGELOG entry into the release body, so it's obvious what's
+          # in a build before downloading it to test.
+          #
+          # Note: CHANGELOG.md is in this workflow's paths-ignore list, so a changelog-only
+          # commit never triggers a build. The entry must land in the SAME merge as the code it
+          # describes. Release PRs enforce this in lint-and-test; if it's still missing here,
+          # use build info only rather than attaching another version's notes.
+          if node scripts/check-release-notes.mjs --print-entry "$APP_VERSION" > changelog_entry.md; then
+            echo "✅ Included the v$APP_VERSION CHANGELOG entry in the release body"
+          else
+            echo "::warning::CHANGELOG.md has no v$APP_VERSION entry; the release body has build info only"
+            : > changelog_entry.md
+          fi
+
           # Create comprehensive release body content
-          cat > release_body.md << 'EOF'
-          ## Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}
-          
-          **Release Build from merge to main**
-          
+          cat > release_body_tail.md << 'EOF'
           ### 📱 Available Downloads:
           - **iOS IPA**: For TestFlight and App Store distribution
           - **Android AAB**: For Google Play Store submission
@@ -578,10 +850,22 @@ jobs:
           *This is an automated draft release created by GitHub Actions*
           EOF
           
+          {
+            echo "## Colorado Lakes Wind Monitor v${APP_VERSION}"
+            echo ""
+            echo "**Release Build from merge to main**"
+            echo ""
+            if [ -s changelog_entry.md ]; then
+              cat changelog_entry.md
+              echo ""
+            fi
+            cat release_body_tail.md
+          } > release_body.md
+          
           # Create the unified draft release with all files
           gh release create "v${{ needs.ios-build.outputs.app-version }}" \
             --draft \
-            --title "Dawn Patrol Alarm v${{ needs.ios-build.outputs.app-version }}" \
+            --title "Colorado Lakes Wind Monitor v${{ needs.ios-build.outputs.app-version }}" \
             --notes-file "release_body.md" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.ipa#iOS App Store IPA" \
             "./artifacts/dp-soda-${{ needs.ios-build.outputs.app-version }}.aab#Android App Bundle (AAB)" \
@@ -595,7 +879,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 Release Information:" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Tag**: v${{ needs.ios-build.outputs.app-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: Draft (ready for review and publishing)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Draft (keep it a draft so builds are not public)" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms**: iOS + Android" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Type**: Release (signed for distribution)" >> $GITHUB_STEP_SUMMARY
           echo "- **iOS Bundle ID**: ${{ needs.ios-build.outputs.bundle-id }}" >> $GITHUB_STEP_SUMMARY
@@ -614,7 +898,7 @@ jobs:
           echo "2. Test the builds on your devices if needed" >> $GITHUB_STEP_SUMMARY
           echo "3. Upload IPA to [App Store Connect](https://appstoreconnect.apple.com)" >> $GITHUB_STEP_SUMMARY
           echo "4. Upload AAB to [Google Play Console](https://play.google.com/console)" >> $GITHUB_STEP_SUMMARY
-          echo "5. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
+          echo "5. Keep the GitHub release a draft; the stores are where it ships" >> $GITHUB_STEP_SUMMARY
 
   # Upload artifacts for workflow_dispatch runs
   upload-artifacts:

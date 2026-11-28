@@ -1,0 +1,19 @@
+# Upgrade test, step 1: runs against the PREVIOUS release before the new build
+# is installed over it. Opens Settings at the default wind threshold;
+# android-smoke.sh then drags the slider to 35 mph so upgrade-after.yaml can
+# confirm saved settings survive the upgrade.
+#
+# Older releases have no tab testIDs, so this flow selects by visible text only.
+appId: com.samqbush.dpsoda
+name: Upgrade - open Settings on the previous release
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Current Conditions"
+    timeout: 90000
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Configure your app preferences"
+    timeout: 15000
+- assertVisible: "15 mph"
+- takeScreenshot: 00-previous-release-settings

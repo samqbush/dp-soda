@@ -1,6 +1,6 @@
 # Architecture Guide
 
-Technical architecture overview of the Dawn Patrol Alarm application.
+Technical architecture overview of the Colorado Lakes Wind Monitor application.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Technical architecture overview of the Dawn Patrol Alarm application.
 
 ### High-Level Overview
 
-Dawn Patrol follows a **service-oriented architecture** with clear separation of concerns:
+Colorado Lakes Wind Monitor follows a **service-oriented architecture** with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -29,8 +29,8 @@ Dawn Patrol follows a **service-oriented architecture** with clear separation of
 ├─────────────────────────────────────────────────────────────┤
 │                    Business Logic Layer                     │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Hooks    │    │  Contexts   │    │   Config    │     │
-│  │  (hooks/)   │    │ (contexts/) │    │  (config/)  │     │
+│  │    Hooks    │    │    Utils    │    │   Config    │     │
+│  │  (hooks/)   │    │  (utils/)   │    │  (config/)  │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 ├─────────────────────────────────────────────────────────────┤
 │                      Service Layer                          │
@@ -137,14 +137,13 @@ API Request
 
 ```
 app/
-├── _layout.tsx              # Root layout, SettingsContext provider
+├── _layout.tsx              # Root layout and navigation
 ├── +not-found.tsx           # 404 screen
 └── (tabs)/
-    ├── _layout.tsx          # Tab bar config (5 tabs)
+    ├── _layout.tsx          # Tab bar config (4 tabs)
     ├── index.tsx            # Soda Lake (home)
     ├── standley-lake.tsx    # Standley Lake
     ├── boulder-res.tsx      # Boulder Reservoir
-    ├── wind-guru.tsx        # Predictions (experimental, gated)
     └── settings.tsx         # App settings
 ```
 
@@ -169,12 +168,7 @@ app/
 
 ## State Management
 
-### Pattern: Custom Hooks + Context
-
-**SettingsContext** (`contexts/SettingsContext.tsx`):
-- Wind Guru enabled/disabled toggle
-- Wind threshold preferences
-- Persisted via AsyncStorage
+### Pattern: Custom Hooks
 
 **Station Wind Hooks**:
 - `useStationWind.ts` — Base hook for wind data fetching

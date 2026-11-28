@@ -1,0 +1,41 @@
+# Native smoke test: launch, visit every station tab, and check the version in
+# Settings. Runs in CI on the Android emulator and iOS Simulator for release PRs
+# (dev -> main). Asserts only static text because wind values change constantly.
+#
+# Usage: maestro test -e APP_VERSION=1.2.3 .maestro/smoke.yaml
+appId: com.samqbush.dpsoda
+name: Smoke - launch, station tabs, settings
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Current Conditions"
+    timeout: 90000
+- assertVisible: "Soda Lake"
+- assertNotVisible: ".*Dawn Patrol.*"
+- takeScreenshot: 01-soda-lake
+
+- tapOn:
+    id: "tab-standley-lake"
+- extendedWaitUntil:
+    visible: "Standley Lake Wind Monitor"
+    timeout: 30000
+- takeScreenshot: 02-standley-lake
+
+- tapOn:
+    id: "tab-boulder-res"
+- extendedWaitUntil:
+    visible: "Boulder Reservoir Wind Monitor"
+    timeout: 30000
+- takeScreenshot: 03-boulder-res
+
+- tapOn:
+    id: "tab-settings"
+- extendedWaitUntil:
+    visible: "Configure your app preferences"
+    timeout: 15000
+- takeScreenshot: 04-settings-top
+- scrollUntilVisible:
+    element: "Version"
+    direction: DOWN
+- assertVisible: "${APP_VERSION}"
+- takeScreenshot: 04-settings-version
